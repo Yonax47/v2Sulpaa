@@ -1,0 +1,648 @@
+{% extends "base.html" %}
+
+{% block title %}
+Finalizar compra | SULPAA
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="checkout-page">
+
+    <div class="container">
+
+        <header class="checkout-header">
+
+            <span class="checkout-kicker">
+                FINALIZA TU COMPRA
+            </span>
+
+            <h1>
+                Tu pedido está casi listo.
+            </h1>
+
+            <p>
+                Revisa tus datos y los productos
+                antes de confirmar el pedido.
+            </p>
+
+        </header>
+
+
+        {% if carrito_vacio %}
+
+        <section class="checkout-empty">
+
+            <h2>
+                Tu carrito está vacío
+            </h2>
+
+            <p>
+                Agrega productos desde nuestra tienda
+                antes de continuar.
+            </p>
+
+            <a
+                href="{{ url_for('comercio.tienda') }}"
+                class="checkout-primary-button"
+            >
+                Volver a la tienda
+            </a>
+
+        </section>
+
+
+        {% else %}
+
+        <div class="checkout-layout">
+
+
+            <!-- =============================================
+                 INFORMACIÓN DEL CLIENTE
+                 ============================================= -->
+
+            <div class="checkout-main">
+
+
+                <section class="checkout-card">
+
+                    <span class="checkout-step">
+                        01
+                    </span>
+
+                    <h2>
+                        Tus datos
+                    </h2>
+
+
+                    {% if checkout and checkout["ok"] %}
+
+                    {% set cliente = checkout["cliente"] %}
+
+                    <div class="checkout-fields">
+
+                        <div class="checkout-field">
+
+                            <span>
+                                Nombre
+                            </span>
+
+                            <strong>
+                                {{ cliente["nombres"] }}
+                                {{ cliente["apellido_paterno"] }}
+                                {{ cliente["apellido_materno"] or "" }}
+                            </strong>
+
+                        </div>
+
+
+                        <div class="checkout-field">
+
+                            <span>
+                                Correo
+                            </span>
+
+                            <strong>
+                                {{ cliente["correo"] }}
+                            </strong>
+
+                        </div>
+
+
+                        <div class="checkout-field">
+
+                            <span>
+                                Teléfono
+                            </span>
+
+                            <strong>
+                                {{ cliente["telefono"] }}
+                            </strong>
+
+                        </div>
+
+
+                        <div class="checkout-field">
+
+                            <span>
+                                DNI
+                            </span>
+
+                            <strong>
+                                {{ cliente["dni"] or "No registrado" }}
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                    {% else %}
+
+                    <p>
+                        No pudimos cargar los datos
+                        de tu cuenta.
+                    </p>
+
+                    {% endif %}
+
+                </section>
+
+
+
+                <!-- =========================================
+                     DIRECCIÓN
+                     ========================================= -->
+
+                <!-- =========================================
+                    DIRECCIÓN DE ENTREGA
+                    ========================================= -->
+
+                <section class="checkout-card">
+
+                    <span class="checkout-step">
+                        02
+                    </span>
+
+                    <h2>
+                        Dirección de entrega
+                    </h2>
+
+
+                    {% if (
+                        checkout
+                        and checkout["ok"]
+                        and checkout["direccion"]
+                    ) %}
+
+                        {% set direccion = checkout["direccion"] %}
+
+                        <div class="checkout-fields">
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Dirección
+                                </span>
+
+                                <strong>
+                                    {{ direccion["direccion"] }}
+                                </strong>
+
+                            </div>
+
+
+                            {% if direccion["referencia"] %}
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Referencia
+                                </span>
+
+                                <strong>
+                                    {{ direccion["referencia"] }}
+                                </strong>
+
+                            </div>
+
+                            {% endif %}
+
+                        </div>
+
+
+                    {% else %}
+
+                        <div class="checkout-warning">
+
+                            <strong>
+                                Aún no tienes una dirección registrada.
+                            </strong>
+
+                            <p>
+                                Registra tu dirección para continuar
+                                con el pedido.
+                            </p>
+
+                        </div>
+
+
+                        <form
+                            id="checkout-address-form"
+                            class="checkout-address-form"
+                            autocomplete="on"
+                        >
+
+                            <!-- DEPARTAMENTO -->
+
+                            <div class="checkout-form-group">
+
+                                <label for="checkout-department">
+                                    Departamento
+                                </label>
+
+                                <select
+                                    id="checkout-department"
+                                    name="departamento_id"
+                                    required
+                                >
+
+                                    <option value="">
+                                        Selecciona un departamento
+                                    </option>
+
+                                    {% for departamento in departamentos %}
+
+                                    <option
+                                        value="{{ departamento['id'] }}"
+                                    >
+                                        {{ departamento["nombre"] }}
+                                    </option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                            </div>
+
+
+                            <!-- PROVINCIA -->
+
+                            <div class="checkout-form-group">
+
+                                <label for="checkout-province">
+                                    Provincia
+                                </label>
+
+                                <select
+                                    id="checkout-province"
+                                    name="provincia_id"
+                                    required
+                                    disabled
+                                >
+
+                                    <option value="">
+                                        Primero selecciona un departamento
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <!-- DISTRITO -->
+
+                            <div class="checkout-form-group">
+
+                                <label for="checkout-district">
+                                    Distrito
+                                </label>
+
+                                <select
+                                    id="checkout-district"
+                                    name="distrito_id"
+                                    required
+                                    disabled
+                                >
+
+                                    <option value="">
+                                        Primero selecciona una provincia
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <!-- DIRECCIÓN -->
+
+                            <div class="checkout-form-group">
+
+                                <label for="checkout-address">
+                                    Dirección
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="checkout-address"
+                                    name="direccion"
+                                    maxlength="255"
+                                    autocomplete="street-address"
+                                    placeholder="Ej. Av. Los Andes 245"
+                                    required
+                                >
+
+                            </div>
+
+
+                            <!-- REFERENCIA -->
+
+                            <div class="checkout-form-group">
+
+                                <label for="checkout-reference">
+                                    Referencia
+                                    <span>
+                                        (opcional)
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="checkout-reference"
+                                    name="referencia"
+                                    maxlength="255"
+                                    placeholder="Ej. Frente al parque principal"
+                                >
+
+                            </div>
+
+
+                            <!-- ALIAS -->
+
+                            <div class="checkout-form-group">
+
+                                <label for="checkout-address-alias">
+                                    Nombre de la dirección
+                                    <span>
+                                        (opcional)
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="checkout-address-alias"
+                                    name="alias"
+                                    maxlength="50"
+                                    placeholder="Ej. Casa"
+                                    value="Casa"
+                                >
+
+                            </div>
+
+
+                            <div
+                                id="checkout-address-message"
+                                role="status"
+                                aria-live="polite"
+                            ></div>
+
+
+                            <button
+                                type="submit"
+                                id="checkout-save-address"
+                                class="checkout-primary-button"
+                            >
+                                Guardar dirección
+                            </button>
+
+                        </form>
+
+                    {% endif %}
+
+                </section>
+
+
+
+               
+                <!-- =========================================
+                    COMPROBANTE
+                    ========================================= -->
+
+                <section class="checkout-card">
+
+                    <span class="checkout-step">
+                        03
+                    </span>
+
+                    <h2>
+                        Comprobante
+                    </h2>
+
+                    <div class="checkout-document-options">
+
+                        <label>
+                            <input
+                                type="radio"
+                                name="tipo_comprobante"
+                                value="BOLETA"
+                                id="checkout-boleta"
+                                checked
+                            >
+                            Boleta
+                        </label>
+
+                        <label>
+                            <input
+                                type="radio"
+                                name="tipo_comprobante"
+                                value="FACTURA"
+                                id="checkout-factura"
+                            >
+                            Factura
+                        </label>
+
+                    </div>
+
+
+                    <!-- BOLETA -->
+
+                    <div id="checkout-boleta-panel">
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-dni">
+                                DNI
+                            </label>
+
+                            <div class="checkout-document-row">
+
+                                <input
+                                    type="text"
+                                    id="checkout-dni"
+                                    inputmode="numeric"
+                                    maxlength="8"
+                                    autocomplete="off"
+                                    value="{{
+                                        checkout['cliente']['dni']
+                                        if (
+                                            checkout
+                                            and checkout['ok']
+                                            and checkout['cliente']
+                                            and checkout['cliente']['dni']
+                                        )
+                                        else ''
+                                    }}"
+                                    placeholder="8 dígitos"
+                                >
+
+                                <button
+                                    type="button"
+                                    id="checkout-verify-dni"
+                                    class="checkout-secondary-button"
+                                >
+                                    Verificar DNI
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            id="checkout-dni-message"
+                            role="status"
+                            aria-live="polite"
+                        ></div>
+
+
+                        <div
+                            id="checkout-dni-result"
+                            hidden
+                        >
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Titular verificado
+                                </span>
+
+                                <strong id="checkout-dni-name"></strong>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- FACTURA -->
+
+                    <div
+                        id="checkout-factura-panel"
+                        hidden
+                    >
+
+                        <p>
+                            La consulta por RUC será habilitada
+                            en el siguiente paso.
+                        </p>
+
+                    </div>
+
+                </section>
+
+
+
+            <!-- =============================================
+                 RESUMEN DEL PEDIDO
+                 ============================================= -->
+
+            <aside class="checkout-summary">
+
+                <span class="checkout-kicker">
+                    TU PEDIDO
+                </span>
+
+                <h2>
+                    Resumen
+                </h2>
+
+
+                <div class="checkout-products">
+
+                    {% for item in carrito["items"] %}
+
+                    <article class="checkout-product">
+
+                        <div>
+
+                            <strong>
+                                {{ item["nombre"] }}
+                            </strong>
+
+                            <span>
+                                Cantidad:
+                                {{ item["cantidad"] }}
+                            </span>
+
+                        </div>
+
+
+                        <strong>
+                            S/
+                            {{ "%.2f"|format(
+                                item["subtotal"]
+                            ) }}
+                        </strong>
+
+                    </article>
+
+                    {% endfor %}
+
+                </div>
+
+
+                <div class="checkout-total">
+
+                    <span>
+                        Subtotal
+                    </span>
+
+                    <strong>
+                        S/
+                        {{ "%.2f"|format(
+                            carrito["subtotal"]
+                        ) }}
+                    </strong>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="checkout-confirm-button"
+                    disabled
+                >
+                    Confirmar pedido
+                </button>
+
+
+                <small class="checkout-security">
+
+                    La confirmación se habilitará
+                    cuando terminemos de conectar
+                    pedido, entrega e inventario.
+
+                </small>
+
+
+                <a
+                    href="{{ url_for('comercio.tienda') }}"
+                    class="checkout-back"
+                >
+                    ← Seguir comprando
+                </a>
+
+            </aside>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</main>
+
+<script
+    src="{{ url_for('static', filename='js/modules/checkout.js') }}"
+    defer
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/modules/checkout-billing.js') }}"
+    defer
+></script>
+
+{% endblock %}

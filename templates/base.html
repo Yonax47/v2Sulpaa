@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <!--
+        Permite que la interfaz responda correctamente
+        en celulares y tablets.
+    -->
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <!--
+        Cada página hija puede definir su propio título.
+    -->
+    <title>
+        {% block title %}
+            SULPAA
+        {% endblock %}
+    </title>
+
+
+    <!-- =====================================================
+         CSS GLOBAL
+         ===================================================== -->
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/main.css') }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/components.css') }}"
+    >
+
+
+    <!--
+        Cada página podrá cargar CSS propio
+        sin duplicar estilos globales.
+    -->
+    {% block page_css %}
+    {% endblock %}
+
+</head>
+
+
+<body>
+
+    <!-- =====================================================
+         CONTENIDO PRINCIPAL
+         ===================================================== -->
+
+    {% block content %}
+    {% endblock %}
+
+
+    <!-- =====================================================
+         JAVASCRIPT GLOBAL
+         ===================================================== -->
+
+    <script
+        src="{{ url_for('static', filename='js/main.js') }}"
+    ></script>
+
+
+    <!--
+        Espacio para scripts exclusivos de una página.
+    -->
+    {% block page_js %}
+    {% endblock %}
+
+</body>
+
+</html>

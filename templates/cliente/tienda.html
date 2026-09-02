@@ -1,0 +1,1816 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Tienda | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/store.css') }}"
+>
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+{#
+============================================================
+DATOS VISUALES
+
+Estos datos NO contienen:
+- precio;
+- stock;
+- artículo de venta;
+- inventario.
+
+La información comercial real llega desde Flask.
+============================================================
+#}
+
+{% set productos = [
+    {
+        "nombre": "Café",
+        "slug": "cafe",
+        "sabor": "Tostado · intenso · aromático",
+        "perfil": "INTENSO",
+        "imagen": "img/BotellaCafe.png",
+        "clase": "product-coffee",
+        "descripcion": "Una kombucha con carácter, notas tostadas y una experiencia aromática pensada para quienes disfrutan sabores profundos.",
+        "atributos": [
+            "Elaborada con café",
+            "Bebida fermentada",
+            "Perfil tostado y aromático"
+        ]
+    },
+    {
+        "nombre": "Flor de Jamaica",
+        "slug": "jamaica",
+        "sabor": "Frutal · vibrante · refrescante",
+        "perfil": "FRUTAL",
+        "imagen": "img/Botellaflordejamaica.png",
+        "clase": "product-jamaica",
+        "descripcion": "Color, aroma y frescura en un perfil frutal que convierte cada sorbo en una experiencia ligera y vibrante.",
+        "atributos": [
+            "Elaborada con flor de Jamaica",
+            "Bebida fermentada",
+            "Perfil frutal y refrescante"
+        ]
+    },
+    {
+        "nombre": "Limón",
+        "slug": "limon",
+        "sabor": "Cítrico · ligero · fresco",
+        "perfil": "REFRESCANTE",
+        "imagen": "img/Botellalimon.png",
+        "clase": "product-lemon",
+        "descripcion": "Una experiencia cítrica, ligera y refrescante para quienes buscan un sabor fácil de disfrutar en cualquier momento.",
+        "atributos": [
+            "Perfil cítrico",
+            "Bebida fermentada",
+            "Sensación fresca y ligera"
+        ]
+    },
+    {
+        "nombre": "Kion",
+        "slug": "kion",
+        "sabor": "Especiado · aromático · diferente",
+        "perfil": "ESPECIADO",
+        "imagen": "img/Botellakion.png",
+        "clase": "product-ginger",
+        "descripcion": "Aromática y especiada, con la personalidad característica del kion para quienes quieren probar algo diferente.",
+        "atributos": [
+            "Elaborada con kion",
+            "Bebida fermentada",
+            "Perfil especiado y aromático"
+        ]
+    }
+] %}
+
+
+{% set pack_visuales = [
+    {
+        "nombre": "Café",
+        "slug": "cafe",
+        "clase": "pack-coffee",
+        "perfil": "INTENSO",
+        "imagen": "img/Pack6unidadescafe.jpg",
+        "descripcion": "Profundo, tostado y aromático. Para quienes disfrutan sabores con carácter."
+    },
+    {
+        "nombre": "Jamaica",
+        "slug": "jamaica",
+        "clase": "pack-jamaica",
+        "perfil": "FRUTAL",
+        "imagen": "img/Pack6unidadesJamaica.jpg",
+        "descripcion": "Vibrante, aromático y refrescante para quienes buscan un perfil frutal."
+    },
+    {
+        "nombre": "Limón",
+        "slug": "limon",
+        "clase": "pack-lemon",
+        "perfil": "REFRESCANTE",
+        "imagen": "img/Pack6unidadeslimon.jpg",
+        "descripcion": "Cítrico, ligero y fresco. Una opción fácil de disfrutar."
+    },
+    {
+        "nombre": "Kion",
+        "slug": "kion",
+        "clase": "pack-ginger",
+        "perfil": "ESPECIADO",
+        "imagen": "img/Pack6unidadeskion.jpg",
+        "descripcion": "Aromático, especiado y diferente. Un sabor con personalidad propia."
+    }
+] %}
+
+
+<main class="store-page">
+
+
+    <!-- ======================================================
+         1. HERO
+         ====================================================== -->
+
+    <section class="store-hero">
+
+        <span
+            class="store-hero-shape store-hero-shape-one"
+            aria-hidden="true"
+        ></span>
+
+        <span
+            class="store-hero-shape store-hero-shape-two"
+            aria-hidden="true"
+        ></span>
+
+        <div class="container store-hero-grid">
+
+            <div class="store-hero-copy reveal reveal-left">
+
+                <span class="store-kicker">
+                    TIENDA SULPAA
+                </span>
+
+                <h1>
+                    Encuentra tu sabor.
+                    <span>Elige cómo disfrutarlo.</span>
+                </h1>
+
+                <p>
+                    Descubre nuestros cuatro perfiles SULPAA,
+                    crea tu combinación favorita o elige el formato
+                    perfecto para cada ocasión.
+                </p>
+
+                <div class="store-hero-actions">
+
+                    <a
+                        href="#sabores"
+                        class="store-btn store-btn-primary"
+                    >
+                        Descubrir sabores
+                        <span aria-hidden="true">→</span>
+                    </a>
+
+                    <a
+                        href="#arma-tu-pack"
+                        class="store-btn store-btn-secondary"
+                    >
+                        Armar mi pack
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <div class="store-hero-products reveal reveal-right">
+
+                <div
+                    class="store-hero-circle"
+                    aria-hidden="true"
+                ></div>
+
+                <img
+                    src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
+                    alt=""
+                    class="store-hero-bottle store-hero-cafe"
+                    aria-hidden="true"
+                >
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellaflordejamaica.png') }}"
+                    alt=""
+                    class="store-hero-bottle store-hero-jamaica"
+                    aria-hidden="true"
+                >
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellakion.png') }}"
+                    alt=""
+                    class="store-hero-bottle store-hero-kion"
+                    aria-hidden="true"
+                >
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellalimon.png') }}"
+                    alt=""
+                    class="store-hero-bottle store-hero-limon"
+                    aria-hidden="true"
+                >
+
+                <div class="store-hero-message">
+
+                    <span aria-hidden="true">✦</span>
+
+                    <strong>
+                        Cuatro sabores.
+                    </strong>
+
+                    <small>
+                        Una experiencia SULPAA.
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         2. RUTAS DE COMPRA
+         ====================================================== -->
+
+    <section class="store-paths">
+
+        <div class="container">
+
+            <div class="store-path-grid">
+
+                <a
+                    href="#sabores"
+                    class="store-path-card reveal"
+                >
+                    <span class="store-path-icon">01</span>
+
+                    <div>
+                        <strong>Descubre</strong>
+                        <p>Conoce nuestros sabores.</p>
+                    </div>
+
+                    <span aria-hidden="true">→</span>
+                </a>
+
+
+                <a
+                    href="#packs"
+                    class="store-path-card reveal"
+                >
+                    <span class="store-path-icon">02</span>
+
+                    <div>
+                        <strong>Packs</strong>
+                        <p>6 · 12 · 24 botellas.</p>
+                    </div>
+
+                    <span aria-hidden="true">→</span>
+                </a>
+
+
+                <a
+                    href="#arma-tu-pack"
+                    class="store-path-card store-path-highlight reveal"
+                >
+                    <span class="store-path-icon">✦</span>
+
+                    <div>
+                        <strong>Arma tu pack</strong>
+                        <p>Combina tus favoritos.</p>
+                    </div>
+
+                    <span aria-hidden="true">→</span>
+                </a>
+
+
+                <a
+                    href="#formatos-grandes"
+                    class="store-path-card reveal"
+                >
+                    <span class="store-path-icon">04</span>
+
+                    <div>
+                        <strong>En grande</strong>
+                        <p>1 L · 30 L · 50 L.</p>
+                    </div>
+
+                    <span aria-hidden="true">→</span>
+                </a>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         3. DESCUBRE TU SABOR
+         ====================================================== -->
+
+    <section
+        class="store-catalog"
+        id="sabores"
+    >
+
+        <div class="container">
+
+            <div class="store-section-heading reveal">
+
+                <div>
+
+                    <span class="store-kicker">
+                        DESCUBRE TU SABOR
+                    </span>
+
+                    <h2>
+                        Hay un SULPAA
+                        <span>para cada momento.</span>
+                    </h2>
+
+                </div>
+
+                <p>
+                    Primero encuentra el perfil que va contigo.
+                    Después podrás elegir cómo llevarlo.
+                </p>
+
+            </div>
+
+
+            <div class="store-toolbar reveal">
+
+                <label class="store-search">
+
+                    <span aria-hidden="true">⌕</span>
+
+                    <input
+                        type="search"
+                        placeholder="Buscar un sabor..."
+                        aria-label="Buscar sabores"
+                        data-store-search
+                    >
+
+                </label>
+
+
+                <div
+                    class="store-flavor-filters"
+                    aria-label="Filtrar sabores"
+                >
+
+                    <button
+                        type="button"
+                        class="is-active"
+                        data-filter="all"
+                    >
+                        Todos
+                    </button>
+
+                    <button
+                        type="button"
+                        data-filter="cafe"
+                    >
+                        Café
+                    </button>
+
+                    <button
+                        type="button"
+                        data-filter="jamaica"
+                    >
+                        Jamaica
+                    </button>
+
+                    <button
+                        type="button"
+                        data-filter="limon"
+                    >
+                        Limón
+                    </button>
+
+                    <button
+                        type="button"
+                        data-filter="kion"
+                    >
+                        Kion
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="store-results-info reveal"
+                aria-live="polite"
+            >
+                <span data-results-count>
+                    4 sabores para descubrir
+                </span>
+
+                <button
+                    type="button"
+                    data-clear-filters
+                >
+                    Ver todos
+                </button>
+            </div>
+
+
+            <div
+                class="store-products-grid"
+                data-products-grid
+            >
+
+                {% for producto in productos %}
+
+                    <div
+                        class="reveal"
+                        style="--reveal-delay: {{ loop.index0 * 90 }}ms;"
+                        data-product-wrapper
+                        data-name="{{ producto.nombre|lower }}"
+                        data-flavor="{{ producto.slug }}"
+                    >
+
+                        {% include "components/product_card.html" %}
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+
+            <div
+                class="store-empty-state"
+                data-empty-state
+                hidden
+            >
+
+                <span aria-hidden="true">✦</span>
+
+                <h3>
+                    No encontramos ese sabor.
+                </h3>
+
+                <p>
+                    Prueba con otro nombre o vuelve
+                    a mostrar todos los sabores.
+                </p>
+
+                <button
+                    type="button"
+                    class="store-btn store-btn-primary"
+                    data-empty-clear
+                >
+                    Ver todos
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         4. PACKS FIJOS 330 ML
+         ====================================================== -->
+
+    <section
+        class="store-packs"
+        id="packs"
+    >
+
+        <div class="container">
+
+            <div class="store-section-heading store-heading-center reveal">
+
+                <div>
+
+                    <span class="store-kicker">
+                        PACKS SULPAA · 330 ML
+                    </span>
+
+                    <h2>
+                        Tu sabor favorito,
+                        <span>en el pack perfecto.</span>
+                    </h2>
+
+                </div>
+
+                <p>
+                    Elige un sabor y selecciona
+                    tu pack real de 6, 12 o 24 botellas.
+                </p>
+
+            </div>
+
+
+            <div class="store-pack-grid">
+
+                {% for visual in pack_visuales %}
+
+                    <article
+                        class="store-pack-card {{ visual.clase }} reveal"
+                        data-pack-card
+                        data-pack-flavor="{{ visual.slug }}"
+                        data-pack-name="Pack {{ visual.nombre }}"
+                    >
+
+                        <div class="store-pack-image">
+
+                            <img
+                                src="{{ url_for('static', filename=visual.imagen) }}"
+                                alt="Pack SULPAA {{ visual.nombre }}"
+                                loading="lazy"
+                            >
+
+                        </div>
+
+
+                        <div class="store-pack-info">
+
+                            <span>
+                                {{ visual.perfil }}
+                            </span>
+
+                            <h3>
+                                Pack {{ visual.nombre }}
+                            </h3>
+
+                            <p>
+                                {{ visual.descripcion }}
+                            </p>
+
+
+                            <div
+                                class="store-pack-size"
+                                role="group"
+                                aria-label="Tamaño del Pack {{ visual.nombre }}"
+                            >
+
+                                {% for tamano in [6, 12, 24] %}
+
+                                    {% set ns = namespace(pack=None) %}
+
+                                    {% for pack in packs %}
+
+                                        {% if
+                                            pack.tipo|upper == "FIJO"
+                                            and pack.cantidad_unidades == tamano
+                                            and visual.nombre in pack.pack_nombre
+                                        %}
+
+                                            {% set ns.pack = pack %}
+
+                                        {% endif %}
+
+                                    {% endfor %}
+
+
+                                    {% if ns.pack %}
+
+                                        <button
+                                            type="button"
+                                            class="{% if tamano == 6 %}is-active{% endif %}"
+                                            data-pack-size="{{ tamano }}"
+                                            data-pack-id="{{ ns.pack.pack_id }}"
+                                            data-article-id="{{ ns.pack.articulo_venta_id }}"
+                                            data-price="{{ ns.pack.precio }}"
+                                            data-stock="{{ ns.pack.stock_disponible_packs }}"
+                                            data-currency="{{ ns.pack.moneda }}"
+                                        >
+                                            {{ tamano }}
+                                        </button>
+
+                                    {% endif %}
+
+                                {% endfor %}
+
+                            </div>
+
+
+                            <div class="store-pack-price">
+
+                                <small>
+                                    Precio del pack
+                                </small>
+
+                                <strong data-pack-price>
+                                    —
+                                </strong>
+
+                            </div>
+
+
+                            <span
+                                class="store-stock"
+                                data-pack-stock
+                            >
+                                Consultando disponibilidad
+                            </span>
+
+
+                            <div class="store-pack-quantity">
+
+                                <span>
+                                    Cantidad de packs
+                                </span>
+
+                                <div class="store-quantity">
+
+                                    <button
+                                        type="button"
+                                        data-pack-minus
+                                        aria-label="Disminuir cantidad de packs"
+                                    >
+                                        −
+                                    </button>
+
+                                    <span data-pack-quantity>
+                                        1
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        data-pack-plus
+                                        aria-label="Aumentar cantidad de packs"
+                                    >
+                                        +
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+
+                            <p
+                                class="store-pack-total"
+                                data-pack-total
+                            >
+                                1 pack
+                            </p>
+
+
+                            <button
+                                type="button"
+                                class="store-pack-buy"
+                                data-pack-add
+                            >
+                                Agregar pack
+                                <span aria-hidden="true">→</span>
+                            </button>
+
+                        </div>
+
+                    </article>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         5. ARMA TU PACK
+         ====================================================== -->
+
+    <section
+        class="store-mix-pack"
+        id="arma-tu-pack"
+    >
+
+        <div class="container store-mix-grid">
+
+            <div class="store-mix-image reveal reveal-left">
+
+                <span
+                    class="store-mix-circle"
+                    aria-hidden="true"
+                ></span>
+
+                <img
+                    src="{{ url_for('static', filename='img/Packmixto.jpg') }}"
+                    alt="Pack mixto de kombucha SULPAA"
+                    loading="lazy"
+                >
+
+                <div class="store-mix-sticker">
+                    <strong>TÚ</strong>
+                    <span>ELIGES</span>
+                </div>
+
+            </div>
+
+
+            <div
+                class="store-mix-content reveal reveal-right"
+                data-mix-builder
+            >
+
+                <span class="store-kicker store-kicker-light">
+                    ARMA TU PACK
+                </span>
+
+                <h2>
+                    Cuatro sabores.
+                    <span>Tú haces la mezcla.</span>
+                </h2>
+
+                <p>
+                    Elige el tamaño disponible y distribuye
+                    las botellas siguiendo las reglas configuradas
+                    en SULPAA.
+                </p>
+
+
+                {% if packs_personalizados %}
+
+                    <div
+                        class="store-mix-size-selector"
+                        role="group"
+                        aria-label="Seleccionar tamaño del pack"
+                    >
+
+                        {% for tamano in [6, 12, 24] %}
+
+                            {% set ns = namespace(pack=None) %}
+
+                            {% for pack in packs_personalizados %}
+
+                                {% if pack.cantidad_unidades == tamano %}
+                                    {% set ns.pack = pack %}
+                                {% endif %}
+
+                            {% endfor %}
+
+
+                            {% if ns.pack %}
+
+                                <button
+                                    type="button"
+                                    class="{% if loop.first %}is-active{% endif %}"
+                                    data-mix-size="{{ ns.pack.cantidad_unidades }}"
+                                    data-mix-pack-id="{{ ns.pack.pack_id }}"
+                                    data-mix-article-id="{{ ns.pack.articulo_venta_id }}"
+                                    data-mix-price="{{ ns.pack.precio }}"
+                                    data-mix-currency="{{ ns.pack.moneda }}"
+                                >
+                                    <strong>
+                                        {{ ns.pack.cantidad_unidades }}
+                                    </strong>
+
+                                    <span>
+                                        botellas
+                                    </span>
+                                </button>
+
+                            {% endif %}
+
+                        {% endfor %}
+
+                    </div>
+
+
+                    <div class="store-pack-price">
+
+                        <small>
+                            Precio del pack
+                        </small>
+
+                        <strong data-mix-price-display>
+                            —
+                        </strong>
+
+                    </div>
+
+
+                    <p
+                        class="store-mix-rule"
+                        data-mix-rule
+                    >
+                        Selecciona un tamaño para ver
+                        las combinaciones permitidas.
+                    </p>
+
+
+                    <div class="store-mix-flavors">
+
+                        {% for variante in variantes_330 %}
+
+                            {% set sabor_slug =
+                                "cafe"
+                                if variante.sabor == "Café"
+                                else
+                                "jamaica"
+                                if variante.sabor == "Jamaica"
+                                else
+                                "limon"
+                                if variante.sabor == "Limón"
+                                else
+                                "kion"
+                            %}
+
+                            <div
+                                class="store-mix-flavor"
+                                data-mix-flavor="{{ sabor_slug }}"
+                                data-mix-variant="{{ variante.variante_id }}"
+                                data-mix-stock="{{ variante.stock_disponible }}"
+                            >
+
+                                <div>
+
+                                    <strong>
+                                        {{ variante.sabor }}
+                                    </strong>
+
+                                    <span>
+                                        Disponible:
+                                        {{ variante.stock_disponible }}
+                                    </span>
+
+                                </div>
+
+
+                                <div class="store-quantity">
+
+                                    <button
+                                        type="button"
+                                        data-mix-minus
+                                        aria-label="Quitar {{ variante.sabor }}"
+                                    >
+                                        −
+                                    </button>
+
+                                    <span data-mix-value>
+                                        0
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        data-mix-plus
+                                        aria-label="Agregar {{ variante.sabor }}"
+                                    >
+                                        +
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+
+
+                    <div class="store-mix-progress">
+
+                        <div>
+
+                            <strong data-mix-counter>
+                                0 / 0
+                            </strong>
+
+                            <span>
+                                botellas seleccionadas
+                            </span>
+
+                        </div>
+
+
+                        <div class="store-mix-progress-track">
+                            <span data-mix-progress></span>
+                        </div>
+
+
+                        <p data-mix-status>
+                            Selecciona un tamaño y crea tu combinación.
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        class="store-btn store-btn-white"
+                        data-mix-add
+                        disabled
+                    >
+                        Agregar mi pack
+                        <span aria-hidden="true">→</span>
+                    </button>
+
+
+                    {#
+                    Datos reales de configuración.
+
+                    JavaScript utilizará este bloque para conocer:
+                    - pack;
+                    - precio;
+                    - reglas;
+                    - variantes permitidas;
+                    - stock.
+                    #}
+
+                    <script
+                        type="application/json"
+                        id="store-custom-pack-data"
+                    >
+                        {{ packs_personalizados|tojson }}
+                    </script>
+
+                {% else %}
+
+                    <div class="store-empty-state">
+
+                        <span aria-hidden="true">✦</span>
+
+                        <h3>
+                            Arma tu pack próximamente.
+                        </h3>
+
+                        <p>
+                            No existe actualmente una configuración
+                            comercial activa para packs personalizados.
+                        </p>
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         6. DESCUBRE TU PERFIL
+         ====================================================== -->
+
+    <section class="store-discover">
+
+        <div class="container">
+
+            <div class="store-discover-card reveal">
+
+                <div class="store-discover-copy">
+
+                    <span class="store-kicker">
+                        ENCUENTRA TU PERFIL
+                    </span>
+
+                    <h2>
+                        ¿Qué SULPAA va contigo?
+                    </h2>
+
+                    <p>
+                        No todos buscamos lo mismo.
+                        Elige la experiencia que más te provoca.
+                    </p>
+
+                </div>
+
+
+                <div class="store-discover-options">
+
+                    <button
+                        type="button"
+                        data-discover-filter="cafe"
+                    >
+                        <span>☕ Intenso</span>
+                        <small>Café · tostado y profundo</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-discover-filter="jamaica"
+                    >
+                        <span>🌺 Frutal</span>
+                        <small>Jamaica · vibrante y refrescante</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-discover-filter="limon"
+                    >
+                        <span>🍋 Refrescante</span>
+                        <small>Limón · cítrico y ligero</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        data-discover-filter="kion"
+                    >
+                        <span>✦ Especiado</span>
+                        <small>Kion · aromático y diferente</small>
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         7. FORMATOS GRANDES
+         ====================================================== -->
+
+    <section
+        class="store-large-formats"
+        id="formatos-grandes"
+    >
+
+        <div class="container">
+
+            <div class="store-section-heading reveal">
+
+                <div>
+
+                    <span class="store-kicker">
+                        SULPAA EN GRANDE
+                    </span>
+
+                    <h2>
+                        Cuando quieres
+                        <span>un poco más.</span>
+                    </h2>
+
+                </div>
+
+                <p>
+                    Precios y disponibilidad obtenidos
+                    directamente del sistema.
+                </p>
+
+            </div>
+
+
+            <div class="store-large-grid">
+
+
+                <!-- ==========================================
+                     BOTELLA 1 L
+                     ========================================== -->
+
+                <article
+                    class="store-large-card store-liter-card reveal"
+                    data-large-card
+                    data-large-type="Botella 1 L"
+                >
+
+                    <div class="store-large-visual">
+
+                        <span class="store-large-badge">
+                            1 L
+                        </span>
+
+                        <img
+                            src="{{ url_for('static', filename='img/Botellalitrosulpaa.png') }}"
+                            alt="Botella SULPAA de 1 litro"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="store-large-content">
+
+                        <span class="store-kicker">
+                            PARA DISFRUTAR MÁS
+                        </span>
+
+                        <h3>
+                            Botella SULPAA 1 L
+                        </h3>
+
+                        <p>
+                            Más SULPAA para compartir
+                            o disfrutar tu sabor favorito
+                            por más tiempo.
+                        </p>
+
+
+                        <label class="store-large-field">
+
+                            <span>
+                                Elige tu sabor
+                            </span>
+
+                            <select data-large-select="Botella 1 L">
+
+                                {% for item in catalogo %}
+
+                                    {% if item.presentacion == "Botella 1 L" %}
+
+                                        <option
+                                            value="{{ item.variante_id }}"
+                                            data-name="{{ item.sabor }}"
+                                            data-price="{{ item.precio }}"
+                                            data-stock="{{ item.stock_disponible }}"
+                                            data-article="{{ item.articulo_venta_id }}"
+                                            data-currency="{{ item.moneda }}"
+                                        >
+                                            {{ item.sabor }}
+                                        </option>
+
+                                    {% endif %}
+
+                                {% endfor %}
+
+                            </select>
+
+                        </label>
+
+
+                        <div class="store-large-commerce">
+
+                            <div>
+
+                                <span>
+                                    Precio
+                                </span>
+
+                                <strong data-large-price>
+                                    —
+                                </strong>
+
+                            </div>
+
+                            <span
+                                class="store-stock"
+                                data-large-stock
+                            >
+                                Consultando disponibilidad
+                            </span>
+
+                        </div>
+
+
+                        <div class="store-large-buy">
+
+                            <div class="store-quantity">
+
+                                <button
+                                    type="button"
+                                    data-large-minus
+                                    aria-label="Disminuir cantidad"
+                                >
+                                    −
+                                </button>
+
+                                <span data-large-quantity>
+                                    1
+                                </span>
+
+                                <button
+                                    type="button"
+                                    data-large-plus
+                                    aria-label="Aumentar cantidad"
+                                >
+                                    +
+                                </button>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                class="store-add-cart"
+                                data-large-add
+                            >
+                                Agregar
+                                <span aria-hidden="true">→</span>
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </article>
+
+
+                <!-- ==========================================
+                     BARRILES
+                     ========================================== -->
+
+                <article
+                    class="store-large-card store-barrel-card reveal"
+                    data-large-card
+                    data-large-type="Barril"
+                >
+
+                    <div class="store-large-visual">
+
+                        <span class="store-large-badge">
+                            30 / 50 L
+                        </span>
+
+                        <img
+                            src="{{ url_for('static', filename='img/Barrilsulpaa.png') }}"
+                            alt="Barril SULPAA"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="store-large-content">
+
+                        <span class="store-kicker">
+                            SULPAA PARA GRANDES MOMENTOS
+                        </span>
+
+                        <h3>
+                            Barril SULPAA
+                        </h3>
+
+                        <p>
+                            Una presentación pensada para eventos,
+                            negocios y ocasiones donde SULPAA
+                            necesita llegar en grande.
+                        </p>
+
+
+                        <div class="store-barrel-size">
+
+                            <span>
+                                Tamaño
+                            </span>
+
+                            <div
+                                class="store-pack-size"
+                                role="group"
+                                aria-label="Seleccionar tamaño de barril"
+                            >
+
+                                <button
+                                    type="button"
+                                    class="is-active"
+                                    data-barrel-size="Barril 30 L"
+                                >
+                                    30 L
+                                </button>
+
+                                <button
+                                    type="button"
+                                    data-barrel-size="Barril 50 L"
+                                >
+                                    50 L
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+                        <label class="store-large-field">
+
+                            <span>
+                                Elige tu sabor
+                            </span>
+
+                            <select data-barrel-flavor>
+
+                                <option value="Café">
+                                    Café
+                                </option>
+
+                                <option value="Jamaica">
+                                    Jamaica
+                                </option>
+
+                                <option value="Limón">
+                                    Limón
+                                </option>
+
+                                <option value="Kion">
+                                    Kion
+                                </option>
+
+                            </select>
+
+                        </label>
+
+
+                        <div
+                            data-barrel-catalog
+                            hidden
+                        >
+
+                            {% for item in catalogo %}
+
+                                {% if item.presentacion in ["Barril 30 L", "Barril 50 L"] %}
+
+                                    <span
+                                        data-barrel-item
+                                        data-presentation="{{ item.presentacion }}"
+                                        data-flavor="{{ item.sabor }}"
+                                        data-variant="{{ item.variante_id }}"
+                                        data-article="{{ item.articulo_venta_id }}"
+                                        data-price="{{ item.precio }}"
+                                        data-stock="{{ item.stock_disponible }}"
+                                        data-currency="{{ item.moneda }}"
+                                    ></span>
+
+                                {% endif %}
+
+                            {% endfor %}
+
+                        </div>
+
+
+                        <div class="store-large-commerce">
+
+                            <div>
+
+                                <span>
+                                    Precio
+                                </span>
+
+                                <strong data-large-price>
+                                    —
+                                </strong>
+
+                            </div>
+
+
+                            <span
+                                class="store-stock"
+                                data-large-stock
+                            >
+                                Consultando disponibilidad
+                            </span>
+
+                        </div>
+
+
+                        <div class="store-large-buy">
+
+                            <div class="store-quantity">
+
+                                <button
+                                    type="button"
+                                    data-large-minus
+                                    aria-label="Disminuir cantidad"
+                                >
+                                    −
+                                </button>
+
+                                <span data-large-quantity>
+                                    1
+                                </span>
+
+                                <button
+                                    type="button"
+                                    data-large-plus
+                                    aria-label="Aumentar cantidad"
+                                >
+                                    +
+                                </button>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                class="store-add-cart"
+                                data-large-add
+                            >
+                                Agregar
+                                <span aria-hidden="true">→</span>
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </article>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         8. SUSCRIPCIÓN
+         ====================================================== -->
+
+    <section
+        class="store-subscription"
+        id="suscripcion"
+    >
+
+        <div class="container store-subscription-grid">
+
+            <div class="store-subscription-copy reveal reveal-left">
+
+                <span class="store-kicker store-kicker-light">
+                    SULPAA CONTIGO
+                </span>
+
+                <h2>
+                    Tu favorita,
+                    <span>sin volver a empezar.</span>
+                </h2>
+
+                <p>
+                    Programa tus compras de manera
+                    quincenal o mensual y mantén
+                    tu selección SULPAA activa.
+                </p>
+
+                <a
+                    href="#"
+                    class="store-btn store-btn-white"
+                >
+                    Conocer suscripciones
+                    <span aria-hidden="true">→</span>
+                </a>
+
+            </div>
+
+
+            <div class="store-subscription-image reveal reveal-right">
+
+                <span
+                    class="store-subscription-circle"
+                    aria-hidden="true"
+                ></span>
+
+                <img
+                    src="{{ url_for('static', filename='img/siluetamujersulpaaetiqueta.png') }}"
+                    alt="Identidad visual SULPAA"
+                    loading="lazy"
+                >
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         9. DELIVERY
+         ====================================================== -->
+
+    <section class="store-delivery">
+
+        <div class="container store-delivery-card">
+
+            <div class="store-delivery-character reveal reveal-left">
+
+                <div
+                    class="store-delivery-background"
+                    aria-hidden="true"
+                ></div>
+
+                <img
+                    src="{{ url_for('static', filename='img/DeliverySulpaa.png') }}"
+                    alt="Delivery SULPAA"
+                    loading="lazy"
+                >
+
+            </div>
+
+
+            <div class="store-delivery-copy reveal reveal-right">
+
+                <span class="store-kicker">
+                    DE SULPAA HASTA TI
+                </span>
+
+                <h2>
+                    Tu pedido también
+                    <span>merece una buena llegada.</span>
+                </h2>
+
+                <p>
+                    Compra desde nuestra tienda
+                    y selecciona la modalidad de entrega
+                    disponible para tu pedido.
+                </p>
+
+                <a
+                    href="#packs"
+                    class="store-btn store-btn-primary"
+                >
+                    Elegir mis productos
+                    <span aria-hidden="true">→</span>
+                </a>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         10. FOOTER
+         ====================================================== -->
+
+    <footer class="store-footer">
+
+        <div class="container store-footer-grid">
+
+            <div class="store-footer-brand">
+
+                <img
+                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                    alt="SULPAA"
+                >
+
+                <p>
+                    Sabores para descubrir.
+                    Combinaciones para disfrutar.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <strong>
+                    Tienda
+                </strong>
+
+                <a href="#sabores">
+                    Sabores
+                </a>
+
+                <a href="#packs">
+                    Packs
+                </a>
+
+                <a href="#arma-tu-pack">
+                    Arma tu pack
+                </a>
+
+                <a href="#formatos-grandes">
+                    Formatos grandes
+                </a>
+
+            </div>
+
+
+            <div>
+
+                <strong>
+                    Tu cuenta
+                </strong>
+
+                <a href="#">
+                    Mis pedidos
+                </a>
+
+                <a href="#">
+                    Suscripciones
+                </a>
+
+                <a href="#">
+                    Perfil
+                </a>
+
+            </div>
+
+
+            <div>
+
+                <strong>
+                    SULPAA
+                </strong>
+
+                <a href="#">
+                    Ayuda
+                </a>
+
+                <a href="#">
+                    Términos
+                </a>
+
+                <a href="#">
+                    Privacidad
+                </a>
+
+            </div>
+
+        </div>
+
+
+        <div class="container store-footer-bottom">
+
+            <span>
+                © SULPAA
+            </span>
+
+            <span>
+                Kombucha · Perú
+            </span>
+
+        </div>
+
+    </footer>
+
+
+</main>
+
+
+<!-- ==========================================================
+     11. CARRITO REAL
+     ========================================================== -->
+
+<div
+    class="store-cart-overlay"
+    data-cart-overlay
+    hidden
+></div>
+
+
+<aside
+    class="store-cart-drawer"
+    data-cart-drawer
+    aria-hidden="true"
+    aria-label="Carrito de compras"
+>
+
+    <header>
+
+        <div>
+
+            <span>
+                TU CARRITO
+            </span>
+
+            <strong>
+                Selección SULPAA
+            </strong>
+
+        </div>
+
+
+        <button
+            type="button"
+            data-cart-close
+            aria-label="Cerrar carrito"
+        >
+            ×
+        </button>
+
+    </header>
+
+
+    <div
+        class="store-cart-preview"
+        data-cart-content
+    >
+
+        {% if carrito["items"] %}
+
+            {% for item in carrito["items"] %}
+
+                <article
+                    class="store-cart-item"
+                    data-cart-item="{{ item.carrito_detalle_id }}"
+                >
+
+                    <div>
+
+                        <strong>
+                            {{ item.nombre }}
+                        </strong>
+
+                        <p>
+                            {{ item.cantidad }}
+                            ×
+                            S/ {{ "%.2f"|format(item.precio) }}
+                        </p>
+
+                    </div>
+
+
+                    <strong>
+                        S/ {{ "%.2f"|format(item.subtotal) }}
+                    </strong>
+
+                </article>
+
+            {% endfor %}
+
+        {% else %}
+
+            <div class="store-cart-empty">
+
+                <span aria-hidden="true">
+                    ✦
+                </span>
+
+                <strong>
+                    Tu carrito está vacío.
+                </strong>
+
+                <p>
+                    Elige tus productos SULPAA
+                    para comenzar.
+                </p>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+
+    <footer>
+
+        <div class="store-cart-summary">
+
+            <span>
+                Subtotal
+            </span>
+
+            <strong data-cart-subtotal>
+                S/ {{ "%.2f"|format(carrito["subtotal"]) }}
+            </strong>
+
+        </div>
+
+
+        <button
+            type="button"
+            class="store-btn store-btn-secondary"
+            data-cart-continue
+        >
+            Seguir comprando
+        </button>
+
+
+        <a
+            href="{{ url_for('comercio.checkout') }}"
+            class="store-btn store-btn-primary"
+            data-cart-checkout
+        >
+            Continuar pedido
+        </a>
+
+    </footer>
+
+</aside>
+
+
+<!-- ==========================================================
+     12. DATOS INICIALES DEL CARRITO
+     ========================================================== -->
+
+<script
+    type="application/json"
+    id="store-cart-data"
+>
+    {{ carrito|tojson }}
+</script>
+
+
+{% endblock %}
+
+
+{% block page_js %}
+
+<script
+    src="{{ url_for('static', filename='js/modules/navbar.js') }}"
+    defer
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/modules/store.js') }}"
+    defer
+></script>
+
+{% endblock %}

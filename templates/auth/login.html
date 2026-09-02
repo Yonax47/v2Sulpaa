@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Iniciar sesión | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/auth.css') }}"
+>
+
+{% endblock %}
+
+
+{% block content %}
+
+<main class="auth-page">
+
+    <section class="auth-shell">
+
+        <!-- =================================================
+             PANEL IZQUIERDO: MARCA
+             ================================================= -->
+
+        <div class="auth-brand-panel">
+
+            <a
+                href="/"
+                class="brand-logo auth-brand-logo"
+                aria-label="Ir al inicio de SULPAA"
+            >
+
+                <img
+                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                    alt="Logo SULPAA"
+                >
+
+            </a>
+
+
+            <div class="auth-brand-content">
+
+                <span class="auth-eyebrow">
+                    QUÉ BUENO VERTE DE NUEVO
+                </span>
+
+
+                <h1 class="auth-brand-title">
+
+                    Vuelve a disfrutar
+
+                    <span>
+                        SULPAA.
+                    </span>
+
+                </h1>
+
+
+                <p class="auth-brand-description">
+
+                    Inicia sesión para continuar tus compras,
+                    revisar tus pedidos y administrar tu cuenta.
+
+                </p>
+
+
+                <div class="auth-benefits">
+
+                    <div class="auth-benefit">
+
+                        <span
+                            class="auth-benefit-icon"
+                            aria-hidden="true"
+                        >
+                            ✓
+                        </span>
+
+                        <span>
+                            Revisa tus pedidos en cualquier momento
+                        </span>
+
+                    </div>
+
+
+                    <div class="auth-benefit">
+
+                        <span
+                            class="auth-benefit-icon"
+                            aria-hidden="true"
+                        >
+                            ✓
+                        </span>
+
+                        <span>
+                            Compra más rápido con tu cuenta
+                        </span>
+
+                    </div>
+
+
+                    <div class="auth-benefit">
+
+                        <span
+                            class="auth-benefit-icon"
+                            aria-hidden="true"
+                        >
+                            ✓
+                        </span>
+
+                        <span>
+                            Mantén tus datos y preferencias organizados
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- Decoración visual -->
+            <div
+                class="auth-decoration auth-decoration-one"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                class="auth-decoration auth-decoration-two"
+                aria-hidden="true"
+            ></div>
+
+        </div>
+
+
+
+        <!-- =================================================
+             PANEL DERECHO: LOGIN
+             ================================================= -->
+
+        <div class="auth-form-panel">
+
+            <div class="auth-form-wrapper">
+
+
+                <!-- =========================================
+                     ENCABEZADO
+                     ========================================= -->
+
+                <div class="auth-form-header">
+
+                    <span class="auth-mobile-logo">
+                        SULPAA
+                    </span>
+
+                    <h2>
+                        Inicia sesión
+                    </h2>
+
+                    <p>
+                        Ingresa tus datos para continuar.
+                    </p>
+
+                </div>
+
+
+
+                <!-- =========================================
+                     MENSAJES DEL SISTEMA
+                     ========================================= -->
+
+                {% with mensajes = get_flashed_messages(with_categories=true) %}
+
+                    {% if mensajes %}
+
+                        <div
+                            class="auth-alerts"
+                            aria-live="polite"
+                        >
+
+                            {% for categoria, mensaje in mensajes %}
+
+                                <div
+                                    class="alert
+                                    {% if categoria == 'success' %}
+                                        alert-success
+                                    {% else %}
+                                        alert-danger
+                                    {% endif %}"
+                                    role="alert"
+                                >
+                                    {{ mensaje }}
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% endif %}
+
+                {% endwith %}
+
+
+
+                <!-- =========================================
+                     FORMULARIO
+                     ========================================= -->
+
+                <form
+                    method="POST"
+                    class="auth-form"
+                    id="login-form"
+                    autocomplete="on"
+                >
+
+
+                    <!-- Correo -->
+                    <div class="form-group">
+
+                        <label
+                            for="correo"
+                            class="form-label"
+                        >
+                            Correo electrónico
+                        </label>
+
+                        <input
+                            type="email"
+                            id="correo"
+                            name="correo"
+                            class="form-control"
+                            placeholder="nombre@correo.com"
+
+                            value="{{ correo }}"
+
+                            autocomplete="email"
+                            maxlength="150"
+
+                            required
+                        >
+
+                    </div>
+
+
+
+                    <!-- Contraseña -->
+                    <div class="form-group">
+
+                        <label
+                            for="password"
+                            class="form-label"
+                        >
+                            Contraseña
+                        </label>
+
+
+                        <div class="password-field">
+
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                class="form-control"
+                                placeholder="Ingresa tu contraseña"
+
+                                autocomplete="current-password"
+
+                                minlength="8"
+                                maxlength="72"
+
+                                required
+                            >
+
+
+                            <button
+                                type="button"
+                                class="password-toggle"
+
+                                data-password-toggle="password"
+
+                                aria-label="Mostrar contraseña"
+                                aria-controls="password"
+                            >
+                                Ver
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =====================================
+                         ACCIONES SECUNDARIAS
+                         ===================================== -->
+
+                    <div class="auth-form-options">
+
+                        <label class="auth-remember">
+
+                            <input
+                                type="checkbox"
+                                name="recordarme"
+                                value="1"
+                            >
+
+                            <span>
+                                Recordarme
+                            </span>
+
+                        </label>
+
+
+                        <a
+                            href="#"
+                            class="auth-forgot-link"
+                        >
+                            ¿Olvidaste tu contraseña?
+                        </a>
+
+                    </div>
+
+
+
+                    <!-- Botón -->
+                    <button
+                        type="submit"
+                        class="btn btn-primary btn-block auth-submit"
+                    >
+                        Iniciar sesión
+                    </button>
+
+
+
+                    <!-- Registro -->
+                    <p class="auth-login-link">
+
+                        ¿Todavía no tienes una cuenta?
+
+                        <a href="{{ url_for('identidad.registro') }}">
+                            Crear cuenta
+                        </a>
+
+                    </p>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+{% endblock %}
+
+
+{% block page_js %}
+
+<!--
+    Reutilizamos exactamente el mismo JavaScript
+    del módulo de autenticación.
+-->
+<script
+    src="{{ url_for('static', filename='js/modules/auth.js') }}"
+    defer
+></script>
+
+{% endblock %}

@@ -1,0 +1,174 @@
+{#
+============================================================
+SULPAA V2 - TARJETA DE SABOR
+============================================================
+
+Componente reutilizable para presentar cada sabor SULPAA.
+
+FUNCIÓN DE ESTA TARJETA:
+
+- Presentar visualmente el sabor.
+- Comunicar su perfil sensorial.
+- Mostrar atributos del producto.
+- Guiar al cliente hacia las opciones de compra.
+
+IMPORTANTE:
+
+La botella de 330 ml NO se vende individualmente.
+
+Por eso esta tarjeta NO contiene:
+
+- selector de presentación;
+- precio individual;
+- selector de cantidad;
+- botón directo de agregar al carrito;
+- cambio dinámico de imágenes.
+
+Las compras de 330 ml se realizarán mediante:
+
+- packs de 6 botellas;
+- packs de 12 botellas;
+- packs de 24 botellas;
+- pack personalizado.
+
+Los formatos de 1 L y barriles tendrán posteriormente
+su propia sección comercial conectada con precio y stock real.
+
+Variables esperadas:
+
+- producto.nombre
+- producto.slug
+- producto.sabor
+- producto.perfil
+- producto.imagen
+- producto.clase
+- producto.descripcion
+- producto.atributos
+
+============================================================
+#}
+
+
+<article
+    class="store-product-card {{ producto.clase }}"
+    data-product-card
+    data-flavor="{{ producto.slug }}"
+>
+
+    <!-- ======================================================
+         ÁREA VISUAL DEL SABOR
+         ====================================================== -->
+
+    <div class="store-product-visual">
+
+        <!-- Elemento decorativo -->
+        <div
+            class="store-product-orbit"
+            aria-hidden="true"
+        ></div>
+
+
+        <!-- Perfil sensorial -->
+        <div class="store-product-label">
+
+            <span>
+                {{ producto.perfil }}
+            </span>
+
+        </div>
+
+
+        <!--
+        Imagen principal.
+
+        Cada sabor mantiene SIEMPRE su botella correspondiente.
+        Ya no cambiamos esta imagen por 1 L o barril.
+        -->
+        <img
+            src="{{ url_for('static', filename=producto.imagen) }}"
+            alt="Kombucha SULPAA sabor {{ producto.nombre }}"
+            loading="lazy"
+            class="store-product-image"
+        >
+
+    </div>
+
+
+
+    <!-- ======================================================
+         INFORMACIÓN DEL SABOR
+         ====================================================== -->
+
+    <div class="store-product-content">
+
+        <span class="store-product-brand">
+            KOMBUCHA SULPAA
+        </span>
+
+
+        <h3>
+            {{ producto.nombre }}
+        </h3>
+
+
+        <p class="store-product-profile">
+            {{ producto.sabor }}
+        </p>
+
+
+        <!-- Descripción comercial / sensorial -->
+        <p class="store-product-description">
+            {{ producto.descripcion }}
+        </p>
+
+
+
+        <!-- ==================================================
+             ATRIBUTOS DEL SABOR
+             ================================================== -->
+
+        <div class="store-product-benefits">
+
+            {% for atributo in producto.atributos %}
+
+                <span>
+
+                    <i aria-hidden="true">
+                        ✦
+                    </i>
+
+                    {{ atributo }}
+
+                </span>
+
+            {% endfor %}
+
+        </div>
+
+
+
+        <!-- ==================================================
+             ACCIÓN
+
+             Por ahora dirige al cliente hacia los packs,
+             que es donde se comercializa la presentación
+             de 330 ml.
+             ================================================== -->
+
+        <a
+            href="#packs"
+            class="store-product-detail"
+            data-flavor-cta="{{ producto.slug }}"
+        >
+
+            Elegir este sabor
+
+            <span aria-hidden="true">
+                →
+            </span>
+
+        </a>
+
+    </div>
+
+</article>

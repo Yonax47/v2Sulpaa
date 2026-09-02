@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Crear cuenta | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/auth.css') }}"
+>
+
+{% endblock %}
+
+
+{% block content %}
+
+<main class="auth-page">
+
+    <section class="auth-shell">
+
+        <!-- =================================================
+             PANEL IZQUIERDO: IDENTIDAD DE MARCA
+             =================================================
+
+             Este bloque es únicamente visual.
+             En tablets y celulares se reorganiza mediante
+             auth.css sin modificar el HTML.
+        -->
+
+        <div class="auth-brand-panel">
+
+            <a
+                href="/"
+                class="brand-logo auth-brand-logo"
+                aria-label="Ir al inicio de SULPAA"
+            >
+
+                <img
+                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                    alt="Logo SULPAA"
+                >
+
+            </a>
+
+
+            <div class="auth-brand-content">
+
+                <span class="auth-eyebrow">
+                    BIENVENIDO A SULPAA
+                </span>
+
+
+                <h1 class="auth-brand-title">
+
+                    Tu kombucha,
+
+                    <span>
+                        más cerca de ti.
+                    </span>
+
+                </h1>
+
+
+                <p class="auth-brand-description">
+
+                    Crea tu cuenta para comprar, gestionar tus pedidos
+                    y disfrutar una experiencia más rápida y personalizada.
+
+                </p>
+
+
+                <div class="auth-benefits">
+
+                    <div class="auth-benefit">
+
+                        <span
+                            class="auth-benefit-icon"
+                            aria-hidden="true"
+                        >
+                            ✓
+                        </span>
+
+                        <span>
+                            Compra de manera sencilla y segura
+                        </span>
+
+                    </div>
+
+
+                    <div class="auth-benefit">
+
+                        <span
+                            class="auth-benefit-icon"
+                            aria-hidden="true"
+                        >
+                            ✓
+                        </span>
+
+                        <span>
+                            Consulta el estado de tus pedidos
+                        </span>
+
+                    </div>
+
+
+                    <div class="auth-benefit">
+
+                        <span
+                            class="auth-benefit-icon"
+                            aria-hidden="true"
+                        >
+                            ✓
+                        </span>
+
+                        <span>
+                            Accede a promociones y suscripciones
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!--
+                Elementos puramente decorativos.
+                aria-hidden evita que lectores de pantalla
+                intenten interpretarlos.
+            -->
+
+            <div
+                class="auth-decoration auth-decoration-one"
+                aria-hidden="true"
+            ></div>
+
+            <div
+                class="auth-decoration auth-decoration-two"
+                aria-hidden="true"
+            ></div>
+
+        </div>
+
+
+
+        <!-- =================================================
+             PANEL DERECHO: FORMULARIO
+             ================================================= -->
+
+        <div class="auth-form-panel">
+
+            <div class="auth-form-wrapper">
+
+
+                <!-- =========================================
+                     ENCABEZADO
+                     ========================================= -->
+
+                <div class="auth-form-header">
+
+                    <span class="auth-mobile-logo">
+                        SULPAA
+                    </span>
+
+                    <h2>
+                        Crear una cuenta
+                    </h2>
+
+                    <p>
+                        Completa tus datos para comenzar.
+                    </p>
+
+                </div>
+
+
+
+                <!-- =========================================
+                     MENSAJES GENERALES DEL BACKEND
+                     =========================================
+
+                     Flask utiliza flash() para mostrar errores
+                     de negocio como:
+
+                     - Correo ya registrado
+                     - DNI duplicado
+                     - Datos inválidos
+                -->
+
+                {% with mensajes = get_flashed_messages(with_categories=true) %}
+
+                    {% if mensajes %}
+
+                        <div
+                            class="auth-alerts"
+                            aria-live="polite"
+                        >
+
+                            {% for categoria, mensaje in mensajes %}
+
+                                <div
+                                    class="alert
+                                    {% if categoria == 'success' %}
+                                        alert-success
+                                    {% else %}
+                                        alert-danger
+                                    {% endif %}"
+                                    role="alert"
+                                >
+                                    {{ mensaje }}
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% endif %}
+
+                {% endwith %}
+
+
+
+                <!-- =========================================
+                     FORMULARIO DE REGISTRO
+                     =========================================
+
+                     IMPORTANTE:
+
+                     HTML valida para mejorar la experiencia.
+
+                     El backend vuelve a validar todos los datos,
+                     porque nunca debemos confiar únicamente
+                     en las validaciones del navegador.
+                -->
+
+                <form
+                    method="POST"
+                    class="auth-form"
+                    id="registro-form"
+                    autocomplete="on"
+                >
+
+                    <div class="auth-form-grid">
+
+
+                        <!-- =================================
+                             NOMBRES
+                             ================================= -->
+
+                        <div class="form-group auth-field-full">
+
+                            <label
+                                for="nombres"
+                                class="form-label"
+                            >
+                                Nombres
+                            </label>
+
+                            <input
+                                type="text"
+                                id="nombres"
+                                name="nombres"
+                                class="form-control"
+                                placeholder="Ej. Carlos Alberto"
+
+                                value="{{ datos_formulario.get('nombres', '') }}"
+
+                                autocomplete="given-name"
+
+                                minlength="2"
+                                maxlength="80"
+
+                                pattern="[A-Za-zÁÉÍÓÚáéíóúÑñÜü '-]+"
+
+                                title="Solo se permiten letras, espacios, apóstrofes y guiones."
+
+                                data-validation="nombre"
+
+                                required
+                            >
+
+                        </div>
+
+
+
+                        <!-- =================================
+                             APELLIDO PATERNO
+                             ================================= -->
+
+                        <div class="form-group">
+
+                            <label
+                                for="apellido_paterno"
+                                class="form-label"
+                            >
+                                Apellido paterno
+                            </label>
+
+                            <input
+                                type="text"
+                                id="apellido_paterno"
+                                name="apellido_paterno"
+                                class="form-control"
+                                placeholder="Ej. Serna"
+
+                                value="{{ datos_formulario.get('apellido_paterno', '') }}"
+
+                                autocomplete="family-name"
+
+                                minlength="2"
+                                maxlength="80"
+
+                                pattern="[A-Za-zÁÉÍÓÚáéíóúÑñÜü '-]+"
+
+                                title="Solo se permiten letras, espacios, apóstrofes y guiones."
+
+                                data-validation="nombre"
+
+                                required
+                            >
+
+                        </div>
+
+
+
+                        <!-- =================================
+                             APELLIDO MATERNO
+                             ================================= -->
+
+                        <div class="form-group">
+
+                            <label
+                                for="apellido_materno"
+                                class="form-label"
+                            >
+                                Apellido materno
+                            </label>
+
+                            <input
+                                type="text"
+                                id="apellido_materno"
+                                name="apellido_materno"
+                                class="form-control"
+                                placeholder="Ej. Rutti"
+
+                                value="{{ datos_formulario.get('apellido_materno', '') }}"
+
+                                minlength="2"
+                                maxlength="80"
+
+                                pattern="[A-Za-zÁÉÍÓÚáéíóúÑñÜü '-]+"
+
+                                title="Solo se permiten letras, espacios, apóstrofes y guiones."
+
+                                data-validation="nombre"
+                            >
+
+                        </div>
+
+
+
+                        <!-- =================================
+                             DNI
+                             =================================
+
+                             Regla:
+                             exactamente 8 números.
+
+                             El DNI permanece opcional según
+                             nuestra lógica actual de registro.
+                        -->
+
+                        <div class="form-group">
+
+                            <label
+                                for="dni"
+                                class="form-label"
+                            >
+                                DNI
+                            </label>
+
+                            <input
+                                type="text"
+                                id="dni"
+                                name="dni"
+                                class="form-control"
+                                placeholder="8 dígitos"
+
+                                value="{{ datos_formulario.get('dni', '') }}"
+
+                                inputmode="numeric"
+
+                                minlength="8"
+                                maxlength="8"
+
+                                pattern="[0-9]{8}"
+
+                                title="El DNI debe contener exactamente 8 números."
+
+                                data-validation="dni"
+                            >
+
+                        </div>
+
+
+
+                        <!-- =================================
+                             TELÉFONO
+                             =================================
+
+                             Regla para móvil peruano:
+                             - exactamente 9 números
+                             - comienza con 9
+                        -->
+
+                        <div class="form-group">
+
+                            <label
+                                for="telefono"
+                                class="form-label"
+                            >
+                                Teléfono
+                            </label>
+
+                            <input
+                                type="tel"
+                                id="telefono"
+                                name="telefono"
+                                class="form-control"
+                                placeholder="Ej. 999999999"
+
+                                value="{{ datos_formulario.get('telefono', '') }}"
+
+                                autocomplete="tel"
+
+                                inputmode="numeric"
+
+                                minlength="9"
+                                maxlength="9"
+
+                                pattern="9[0-9]{8}"
+
+                                title="Ingresa un celular peruano de 9 dígitos que comience con 9."
+
+                                data-validation="telefono"
+
+                                required
+                            >
+
+                        </div>
+
+
+
+                        <!-- =================================
+                             CORREO ELECTRÓNICO
+                             ================================= -->
+
+                        <div class="form-group auth-field-full">
+
+                            <label
+                                for="correo"
+                                class="form-label"
+                            >
+                                Correo electrónico
+                            </label>
+
+                            <input
+                                type="email"
+                                id="correo"
+                                name="correo"
+                                class="form-control"
+                                placeholder="nombre@correo.com"
+
+                                value="{{ datos_formulario.get('correo', '') }}"
+
+                                autocomplete="email"
+
+                                maxlength="150"
+
+                                data-validation="correo"
+
+                                required
+                            >
+
+                        </div>
+
+
+
+                        <!-- =================================
+                             CONTRASEÑA
+                             =================================
+
+                             La contraseña deliberadamente NO
+                             conserva su valor cuando falla el
+                             formulario.
+
+                             Esto evita volver a enviar o renderizar
+                             información sensible.
+                        -->
+
+                        <div class="form-group auth-field-full">
+
+                            <label
+                                for="password"
+                                class="form-label"
+                            >
+                                Contraseña
+                            </label>
+
+
+                            <div class="password-field">
+
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    class="form-control"
+                                    placeholder="Mínimo 8 caracteres"
+
+                                    autocomplete="new-password"
+
+                                    minlength="8"
+                                    maxlength="72"
+
+                                    data-validation="password"
+
+                                    aria-describedby="password-help"
+
+                                    required
+                                >
+
+
+                                <button
+                                    type="button"
+                                    class="password-toggle"
+
+                                    data-password-toggle="password"
+
+                                    aria-label="Mostrar contraseña"
+                                    aria-controls="password"
+                                >
+                                    Ver
+                                </button>
+
+                            </div>
+
+
+                            <small
+                                class="form-help"
+                                id="password-help"
+                            >
+                                Mínimo 8 caracteres, incluyendo al menos
+                                una letra y un número.
+                            </small>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =====================================
+                         BOTÓN PRINCIPAL
+                         ===================================== -->
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary btn-block auth-submit"
+                        id="registro-submit"
+                    >
+                        Crear mi cuenta
+                    </button>
+
+
+
+                    <!-- =====================================
+                         ENLACE AL LOGIN
+                         =====================================
+
+                         Por ahora la ruta de login todavía
+                         no existe. Cuando la creemos cambiaremos
+                         # por url_for('identidad.login').
+                    -->
+
+                    <p class="auth-login-link">
+
+                        ¿Ya tienes una cuenta?
+
+                        <a href="{{ url_for('identidad.login') }}">
+                            Inicia sesión
+                        </a>
+
+                    </p>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+{% endblock %}
+
+
+{% block page_js %}
+
+<!--
+    JavaScript reutilizable del módulo de autenticación.
+    Registro y Login compartirán estas funcionalidades.
+-->
+<script
+    src="{{ url_for('static', filename='js/modules/auth.js') }}"
+    defer
+></script>
+
+{% endblock %}

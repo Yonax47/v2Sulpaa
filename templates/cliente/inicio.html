@@ -1,0 +1,1365 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Inicio | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/home.css') }}"
+>
+{% endblock %}
+
+
+{% block content %}
+
+<!-- ==========================================================
+     NAVBAR
+     ========================================================== -->
+
+{% include "components/navbar.html" %}
+
+
+<main class="home-page">
+
+
+    <!-- ======================================================
+         1. HERO PRINCIPAL
+         ====================================================== -->
+
+    <section class="home-hero">
+
+        <!-- Elementos decorativos -->
+        <span class="hero-shape hero-shape-pink" aria-hidden="true"></span>
+        <span class="hero-shape hero-shape-yellow" aria-hidden="true"></span>
+        <span class="hero-shape hero-shape-green" aria-hidden="true"></span>
+
+
+        <div class="container home-hero-grid">
+
+
+            <!-- =================================================
+                 TEXTO DEL HERO
+                 ================================================= -->
+
+            <div class="home-hero-copy reveal reveal-left">
+
+                <span class="home-kicker">
+                    KOMBUCHA SULPAA · HECHA PARA DISFRUTAR
+                </span>
+
+
+                <h1 class="home-hero-title">
+
+                    Descubre el sabor
+
+                    <span>
+                        de sentirte bien.
+                    </span>
+
+                </h1>
+
+
+                <p class="home-hero-description">
+
+                    Sabores que sorprenden, combinaciones que
+                    eliges tú y una forma diferente de disfrutar
+                    tu kombucha.
+
+                </p>
+
+
+                <div class="home-hero-actions">
+
+                    <a
+                        href="#sabores"
+                        class="home-btn home-btn-primary"
+                    >
+                        Explorar sabores
+
+                        <span aria-hidden="true">
+                            →
+                        </span>
+                    </a>
+
+
+                    <a
+                        href="#packs"
+                        class="home-btn home-btn-soft"
+                    >
+                        Ver packs
+                    </a>
+
+                </div>
+
+
+                <!-- Mensaje emocional secundario -->
+
+                <div class="home-hero-note">
+
+                    <span aria-hidden="true">
+                        ✦
+                    </span>
+
+                    <p>
+                        Encuentra el sabor que vaya con tu momento.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 COMPOSICIÓN VISUAL
+                 ================================================= -->
+
+            <div
+                class="home-hero-visual reveal reveal-right"
+                aria-label="Productos SULPAA"
+            >
+
+                <div
+                    class="hero-organic-background"
+                    aria-hidden="true"
+                ></div>
+
+
+                <!-- Persona protagonista -->
+
+                <img
+                    src="{{ url_for('static', filename='img/ChicaTomando kombucha.png') }}"
+                    alt="Persona disfrutando una kombucha SULPAA"
+                    class="hero-person"
+                    fetchpriority="high"
+                >
+
+
+                <!-- Botella Café -->
+
+                <img
+                    src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
+                    alt=""
+                    class="hero-bottle hero-bottle-cafe"
+                    aria-hidden="true"
+                >
+
+
+                <!-- Botella Jamaica -->
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellaflordejamaica.png') }}"
+                    alt=""
+                    class="hero-bottle hero-bottle-jamaica"
+                    aria-hidden="true"
+                >
+
+
+                <!-- Sello -->
+
+                <div class="hero-badge">
+
+                    <small>
+                        SULPAA
+                    </small>
+
+                    <strong>
+                        TU SABOR
+                    </strong>
+
+                    <span>
+                        TU MOMENTO
+                    </span>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         2. DESCUBRE TU SABOR
+         ====================================================== -->
+
+    <section
+        class="home-flavors"
+        id="sabores"
+    >
+
+        <div class="container">
+
+
+            <!-- Encabezado -->
+
+            <div class="home-section-intro reveal">
+
+                <span class="home-kicker">
+                    ENCUENTRA TU FAVORITO
+                </span>
+
+                <h2>
+                    ¿Cuál es tu
+                    <span>SULPAA?</span>
+                </h2>
+
+                <p>
+                    De lo intenso a lo cítrico, cada sabor tiene
+                    una personalidad diferente. Descubre el que
+                    mejor va contigo.
+                </p>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 GRID DE SABORES
+                 ================================================= -->
+
+            <div class="flavors-showcase">
+
+
+                <!-- =================================================
+                     CAFÉ
+                     ================================================= -->
+
+                <article
+                    class="flavor-showcase flavor-coffee reveal"
+                    style="--reveal-delay: 0ms;"
+                >
+
+                    <div class="flavor-top">
+
+                        <span class="flavor-number">
+                            01
+                        </span>
+
+                        <span class="flavor-category">
+                            INTENSO
+                        </span>
+
+                    </div>
+
+
+                    <div class="flavor-product">
+
+                        <span
+                            class="flavor-glow"
+                            aria-hidden="true"
+                        ></span>
+
+                        <img
+                            src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
+                            alt="Kombucha SULPAA sabor café"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="flavor-info">
+
+                        <span class="flavor-brand">
+                            KOMBUCHA SULPAA
+                        </span>
+
+                        <h3>
+                            Café
+                        </h3>
+
+                        <p class="flavor-personality">
+                            Tostado · intenso · con carácter
+                        </p>
+
+
+                        <div class="flavor-features">
+
+                            <span>
+                                ✦ Perfil profundo
+                            </span>
+
+                            <span>
+                                ✦ Para sabores intensos
+                            </span>
+
+                        </div>
+
+
+                        <a href="#">
+                            Descubrir Café
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- =================================================
+                     JAMAICA
+                     ================================================= -->
+
+                <article
+                    class="flavor-showcase flavor-jamaica reveal"
+                    style="--reveal-delay: 90ms;"
+                >
+
+                    <div class="flavor-top">
+
+                        <span class="flavor-number">
+                            02
+                        </span>
+
+                        <span class="flavor-category">
+                            FRUTAL
+                        </span>
+
+                    </div>
+
+
+                    <div class="flavor-product">
+
+                        <span
+                            class="flavor-glow"
+                            aria-hidden="true"
+                        ></span>
+
+                        <img
+                            src="{{ url_for('static', filename='img/Botellaflordejamaica.png') }}"
+                            alt="Kombucha SULPAA sabor flor de Jamaica"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="flavor-info">
+
+                        <span class="flavor-brand">
+                            KOMBUCHA SULPAA
+                        </span>
+
+                        <h3>
+                            Flor de Jamaica
+                        </h3>
+
+                        <p class="flavor-personality">
+                            Frutal · vibrante · refrescante
+                        </p>
+
+
+                        <div class="flavor-features">
+
+                            <span>
+                                ✦ Perfil frutal
+                            </span>
+
+                            <span>
+                                ✦ Sabor vibrante
+                            </span>
+
+                        </div>
+
+
+                        <a href="#">
+                            Descubrir Jamaica
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- =================================================
+                     LIMÓN
+                     ================================================= -->
+
+                <article
+                    class="flavor-showcase flavor-lemon reveal"
+                    style="--reveal-delay: 180ms;"
+                >
+
+                    <div class="flavor-top">
+
+                        <span class="flavor-number">
+                            03
+                        </span>
+
+                        <span class="flavor-category">
+                            CÍTRICO
+                        </span>
+
+                    </div>
+
+
+                    <div class="flavor-product">
+
+                        <span
+                            class="flavor-glow"
+                            aria-hidden="true"
+                        ></span>
+
+                        <img
+                            src="{{ url_for('static', filename='img/Botellalimon.png') }}"
+                            alt="Kombucha SULPAA sabor limón"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="flavor-info">
+
+                        <span class="flavor-brand">
+                            KOMBUCHA SULPAA
+                        </span>
+
+                        <h3>
+                            Limón
+                        </h3>
+
+                        <p class="flavor-personality">
+                            Cítrico · ligero · refrescante
+                        </p>
+
+
+                        <div class="flavor-features">
+
+                            <span>
+                                ✦ Perfil cítrico
+                            </span>
+
+                            <span>
+                                ✦ Sensación fresca
+                            </span>
+
+                        </div>
+
+
+                        <a href="#">
+                            Descubrir Limón
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- =================================================
+                     KION
+                     ================================================= -->
+
+                <article
+                    class="flavor-showcase flavor-ginger reveal"
+                    style="--reveal-delay: 270ms;"
+                >
+
+                    <div class="flavor-top">
+
+                        <span class="flavor-number">
+                            04
+                        </span>
+
+                        <span class="flavor-category">
+                            ESPECIADO
+                        </span>
+
+                    </div>
+
+
+                    <div class="flavor-product">
+
+                        <span
+                            class="flavor-glow"
+                            aria-hidden="true"
+                        ></span>
+
+                        <img
+                            src="{{ url_for('static', filename='img/Botellakion.png') }}"
+                            alt="Kombucha SULPAA sabor kion"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="flavor-info">
+
+                        <span class="flavor-brand">
+                            KOMBUCHA SULPAA
+                        </span>
+
+                        <h3>
+                            Kion
+                        </h3>
+
+                        <p class="flavor-personality">
+                            Especiado · aromático · diferente
+                        </p>
+
+
+                        <div class="flavor-features">
+
+                            <span>
+                                ✦ Perfil especiado
+                            </span>
+
+                            <span>
+                                ✦ Sabor con carácter
+                            </span>
+
+                        </div>
+
+
+                        <a href="#">
+                            Descubrir Kion
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         3. PACKS
+         ====================================================== -->
+
+    <section
+        class="home-packs"
+        id="packs"
+    >
+
+        <div class="container">
+
+
+            <div class="home-section-intro home-section-intro-center reveal">
+
+                <span class="home-kicker">
+                    ELIGE CÓMO DISFRUTARLA
+                </span>
+
+                <h2>
+                    Tu sabor favorito,
+                    <span>ahora en pack.</span>
+                </h2>
+
+                <p>
+                    Para compartir, guardar o simplemente tener
+                    tu SULPAA favorita siempre cerca.
+                </p>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 PACKS POR SABOR
+                 ================================================= -->
+
+            <div class="packs-grid">
+
+
+                <!-- Pack Café -->
+
+                <article
+                    class="pack-card pack-card-coffee reveal"
+                    style="--reveal-delay: 0ms;"
+                >
+
+                    <div class="pack-image">
+
+                        <img
+                            src="{{ url_for('static', filename='img/Pack6unidadescafe.jpg') }}"
+                            alt="Pack de kombucha SULPAA sabor café"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="pack-content">
+
+                        <span>
+                            PARA LOS QUE BUSCAN INTENSIDAD
+                        </span>
+
+                        <h3>
+                            Pack Café
+                        </h3>
+
+                        <p>
+                            Una selección para quienes disfrutan
+                            sabores con carácter.
+                        </p>
+
+                        <a href="#">
+                            Ver opciones
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- Pack Jamaica -->
+
+                <article
+                    class="pack-card pack-card-jamaica reveal"
+                    style="--reveal-delay: 100ms;"
+                >
+
+                    <div class="pack-image">
+
+                        <img
+                            src="{{ url_for('static', filename='img/Pack6unidadesJamaica.jpg') }}"
+                            alt="Pack de kombucha SULPAA sabor Jamaica"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="pack-content">
+
+                        <span>
+                            FRUTAL Y VIBRANTE
+                        </span>
+
+                        <h3>
+                            Pack Jamaica
+                        </h3>
+
+                        <p>
+                            Una alternativa llena de color
+                            y personalidad.
+                        </p>
+
+                        <a href="#">
+                            Ver opciones
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- Pack Limón -->
+
+                <article
+                    class="pack-card pack-card-lemon reveal"
+                    style="--reveal-delay: 200ms;"
+                >
+
+                    <div class="pack-image">
+
+                        <img
+                            src="{{ url_for('static', filename='img/Pack6unidadeslimon.jpg') }}"
+                            alt="Pack de kombucha SULPAA sabor limón"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="pack-content">
+
+                        <span>
+                            FRESCO Y CÍTRICO
+                        </span>
+
+                        <h3>
+                            Pack Limón
+                        </h3>
+
+                        <p>
+                            Una opción ligera y refrescante
+                            para cualquier momento.
+                        </p>
+
+                        <a href="#">
+                            Ver opciones
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- Pack Kion -->
+
+                <article
+                    class="pack-card pack-card-ginger reveal"
+                    style="--reveal-delay: 300ms;"
+                >
+
+                    <div class="pack-image">
+
+                        <img
+                            src="{{ url_for('static', filename='img/Pack6unidadeskion.jpg') }}"
+                            alt="Pack de kombucha SULPAA sabor kion"
+                            loading="lazy"
+                        >
+
+                    </div>
+
+
+                    <div class="pack-content">
+
+                        <span>
+                            ESPECIADO Y DIFERENTE
+                        </span>
+
+                        <h3>
+                            Pack Kion
+                        </h3>
+
+                        <p>
+                            Para quienes quieren una kombucha
+                            con mayor personalidad.
+                        </p>
+
+                        <a href="#">
+                            Ver opciones
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         4. ARMA TU PACK
+         ====================================================== -->
+
+    <section class="home-custom-pack">
+
+        <div class="container custom-pack-grid">
+
+
+            <!-- =================================================
+                 COMPOSICIÓN DE BOTELLAS
+                 ================================================= -->
+
+            <div class="custom-pack-visual reveal reveal-left">
+
+                <div
+                    class="custom-pack-shape"
+                    aria-hidden="true"
+                ></div>
+
+
+                <img
+                    src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
+                    alt=""
+                    class="custom-bottle custom-bottle-1"
+                    aria-hidden="true"
+                >
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellaflordejamaica.png') }}"
+                    alt=""
+                    class="custom-bottle custom-bottle-2"
+                    aria-hidden="true"
+                >
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellalimon.png') }}"
+                    alt=""
+                    class="custom-bottle custom-bottle-3"
+                    aria-hidden="true"
+                >
+
+                <img
+                    src="{{ url_for('static', filename='img/Botellakion.png') }}"
+                    alt=""
+                    class="custom-bottle custom-bottle-4"
+                    aria-hidden="true"
+                >
+
+            </div>
+
+
+
+            <!-- =================================================
+                 TEXTO
+                 ================================================= -->
+
+            <div class="custom-pack-content reveal reveal-right">
+
+                <span class="home-kicker home-kicker-light">
+                    TÚ ELIGES LA COMBINACIÓN
+                </span>
+
+
+                <h2>
+                    ¿Por qué elegir uno
+                    <span>si puedes combinarlos?</span>
+                </h2>
+
+
+                <p>
+                    Crea tu propio pack SULPAA combinando
+                    diferentes sabores según tus preferencias.
+                </p>
+
+
+                <!-- Opciones explicadas -->
+
+                <div class="custom-pack-options">
+
+
+                    <div>
+
+                        <strong>
+                            6
+                        </strong>
+
+                        <span>
+                            botellas
+                        </span>
+
+                        <small>
+                            Combina hasta 3 sabores
+                        </small>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong>
+                            12
+                        </strong>
+
+                        <span>
+                            botellas
+                        </span>
+
+                        <small>
+                            Combina hasta 4 sabores
+                        </small>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong>
+                            24
+                        </strong>
+
+                        <span>
+                            botellas
+                        </span>
+
+                        <small>
+                            Combina hasta 6 sabores
+                        </small>
+
+                    </div>
+
+
+                </div>
+
+
+                <a
+                    href="#"
+                    class="home-btn home-btn-white"
+                >
+                    Armar mi pack
+
+                    <span aria-hidden="true">
+                        →
+                    </span>
+                </a>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         5. ¿QUÉ ES LA KOMBUCHA?
+         ====================================================== -->
+
+    <section class="home-about">
+
+        <div class="container home-about-grid">
+
+
+            <div class="home-about-image reveal reveal-left">
+
+                <div class="home-about-shape"></div>
+
+                <img
+                    src="{{ url_for('static', filename='img/QueesKombucha.png') }}"
+                    alt="Kombucha SULPAA"
+                    loading="lazy"
+                >
+
+            </div>
+
+
+
+            <div class="home-about-copy reveal reveal-right">
+
+                <span class="home-kicker">
+                    CONOCE LO QUE TOMAS
+                </span>
+
+
+                <h2>
+                    Una bebida diferente,
+                    <span>una experiencia SULPAA.</span>
+                </h2>
+
+
+                <p>
+                    La kombucha es una bebida obtenida mediante
+                    la fermentación del té con una cultura de
+                    bacterias y levaduras.
+                </p>
+
+
+                <p>
+                    SULPAA combina esta bebida con diferentes
+                    perfiles de sabor para ofrecer alternativas
+                    que puedes disfrutar según tus preferencias.
+                </p>
+
+
+                <div class="home-about-tags">
+
+                    <span>
+                        FERMENTADA
+                    </span>
+
+                    <span>
+                        REFRESCANTE
+                    </span>
+
+                    <span>
+                        DIFERENTES SABORES
+                    </span>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         6. EXPERIENCIA / BENEFICIOS
+         ====================================================== -->
+
+    <section class="home-benefits">
+
+        <div class="container home-benefits-grid">
+
+
+            <div class="home-benefits-copy reveal reveal-left">
+
+                <span class="home-kicker home-kicker-light">
+                    VIVE LA EXPERIENCIA SULPAA
+                </span>
+
+
+                <h2>
+                    Una kombucha que también
+                    entra por los ojos.
+                </h2>
+
+
+                <p>
+                    Sabores, color, distintas combinaciones
+                    y presentaciones pensadas para acompañar
+                    diferentes momentos.
+                </p>
+
+
+                <div class="benefits-list">
+
+
+                    <div>
+                        <span>01</span>
+
+                        <p>
+                            Diferentes sabores para explorar
+                        </p>
+                    </div>
+
+
+                    <div>
+                        <span>02</span>
+
+                        <p>
+                            Packs listos o personalizados
+                        </p>
+                    </div>
+
+
+                    <div>
+                        <span>03</span>
+
+                        <p>
+                            Compra y seguimiento desde tu cuenta
+                        </p>
+                    </div>
+
+
+                </div>
+
+            </div>
+
+
+
+            <div class="home-benefits-image reveal reveal-right">
+
+                <img
+                    src="{{ url_for('static', filename='img/Beneficiosimagen.png') }}"
+                    alt="Productos SULPAA"
+                    loading="lazy"
+                >
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         7. SUSCRIPCIONES
+         ====================================================== -->
+
+    <section
+        class="home-subscription"
+        id="suscripciones"
+    >
+
+        <div class="container subscription-grid">
+
+
+            <div class="subscription-content reveal reveal-left">
+
+                <span class="home-kicker home-kicker-light">
+                    SULPAA CONTIGO
+                </span>
+
+
+                <h2>
+                    Que nunca falte
+                    <span>tu SULPAA favorita.</span>
+                </h2>
+
+
+                <p>
+                    Programa tus compras y recibe tus productos
+                    periódicamente sin repetir todo el proceso.
+                </p>
+
+
+                <div class="subscription-options">
+
+
+                    <article>
+
+                        <span>
+                            CADA 15 DÍAS
+                        </span>
+
+                        <strong>
+                            Quincenal
+                        </strong>
+
+                        <p>
+                            Para quienes disfrutan SULPAA
+                            con mayor frecuencia.
+                        </p>
+
+                    </article>
+
+
+                    <article>
+
+                        <span>
+                            CADA MES
+                        </span>
+
+                        <strong>
+                            Mensual
+                        </strong>
+
+                        <p>
+                            Una renovación programada
+                            para mantener tu selección.
+                        </p>
+
+                    </article>
+
+
+                </div>
+
+
+                <a
+                    href="#"
+                    class="home-btn home-btn-white"
+                >
+                    Ver suscripciones
+
+                    <span aria-hidden="true">
+                        →
+                    </span>
+                </a>
+
+            </div>
+
+
+
+            <div class="subscription-visual reveal reveal-right">
+
+                <span
+                    class="subscription-circle"
+                    aria-hidden="true"
+                ></span>
+
+                <img
+                    src="{{ url_for('static', filename='img/siluetamujersulpaaetiqueta.png') }}"
+                    alt="Ilustración de la identidad SULPAA"
+                    loading="lazy"
+                >
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         8. CTA FINAL
+         ====================================================== -->
+
+    <section class="home-final">
+
+        <div class="container">
+
+            <div class="home-final-card reveal">
+
+
+                <div>
+
+                    <span class="home-kicker">
+                        TU PRÓXIMO SABOR TE ESPERA
+                    </span>
+
+                    <h2>
+                        ¿Cuál vas a probar primero?
+                    </h2>
+
+                    <p>
+                        Explora SULPAA y encuentra
+                        la combinación que va contigo.
+                    </p>
+
+                </div>
+
+
+                <a
+                    href="#sabores"
+                    class="home-btn home-btn-primary"
+                >
+                    Descubrir sabores
+
+                    <span aria-hidden="true">
+                        →
+                    </span>
+                </a>
+
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         9. FOOTER
+         ====================================================== -->
+
+    <footer class="home-footer">
+
+        <div class="container home-footer-grid">
+
+
+            <div class="home-footer-brand">
+
+                <img
+                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                    alt="SULPAA"
+                >
+
+                <p>
+                    Sabores para descubrir.
+                    Combinaciones para disfrutar.
+                </p>
+
+            </div>
+
+
+
+            <div class="home-footer-links">
+
+                <strong>
+                    Explorar
+                </strong>
+
+                <a href="#sabores">
+                    Sabores
+                </a>
+
+                <a href="#packs">
+                    Packs
+                </a>
+
+                <a href="#suscripciones">
+                    Suscripciones
+                </a>
+
+            </div>
+
+
+
+            <div class="home-footer-links">
+
+                <strong>
+                    Mi cuenta
+                </strong>
+
+                <a href="#">
+                    Mis pedidos
+                </a>
+
+                <a href="#">
+                    Mi perfil
+                </a>
+
+                <a href="#">
+                    Carrito
+                </a>
+
+            </div>
+
+
+
+            <div class="home-footer-links">
+
+                <strong>
+                    Ayuda
+                </strong>
+
+                <a href="#">
+                    Preguntas frecuentes
+                </a>
+
+                <a href="#">
+                    Términos y condiciones
+                </a>
+
+                <a href="#">
+                    Privacidad
+                </a>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="container home-footer-bottom">
+
+            <span>
+                © SULPAA
+            </span>
+
+            <span>
+                Kombucha · Perú
+            </span>
+
+        </div>
+
+    </footer>
+
+
+</main>
+
+{% endblock %}
+
+
+
+{% block page_js %}
+
+<script
+    src="{{ url_for('static', filename='js/modules/navbar.js') }}"
+    defer
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/modules/home.js') }}"
+    defer
+></script>
+
+{% endblock %}

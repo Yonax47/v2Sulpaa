@@ -1,0 +1,295 @@
+<!--
+============================================================
+SULPAA V2 - NAVBAR PRINCIPAL
+============================================================
+
+Componente reutilizable para todas las páginas autenticadas
+del cliente.
+
+IMPORTANTE:
+No duplicar este navbar en otras plantillas.
+Si cambia la navegación, se modifica únicamente aquí.
+============================================================
+-->
+
+<header class="site-header">
+
+    <div class="container navbar-container">
+
+        <!-- =================================================
+             LOGO / MARCA
+             ================================================= -->
+
+        <a
+            href="{{ url_for('inicio') }}"
+            class="navbar-brand"
+            aria-label="Ir al inicio de SULPAA"
+        >
+            <img
+                src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                alt="SULPAA"
+                class="navbar-logo"
+            >
+        </a>
+
+
+        <!-- =================================================
+             NAVEGACIÓN PRINCIPAL - ESCRITORIO
+             ================================================= -->
+
+        <nav
+            class="navbar-menu"
+            aria-label="Navegación principal"
+        >
+
+            <a
+                href="{{ url_for('inicio') }}"
+                class="navbar-link"
+            >
+                Inicio
+            </a>
+
+
+            <!-- =================================================
+                 TIENDA
+                 =================================================
+
+                 Esta ruta ya pertenece al módulo Comercio.
+                 ================================================= -->
+
+            <a
+                href="{{ url_for('comercio.tienda') }}"
+                class="navbar-link"
+            >
+                Tienda
+            </a>
+
+
+            <!-- =================================================
+                 RUTAS PENDIENTES
+                 =================================================
+
+                 Conforme construyamos estas funciones,
+                 reemplazaremos "#" por sus respectivos url_for().
+                 ================================================= -->
+
+            <a
+                href="#"
+                class="navbar-link"
+            >
+                Mis pedidos
+            </a>
+
+            <a
+                href="#"
+                class="navbar-link"
+            >
+                Suscripciones
+            </a>
+
+        </nav>
+
+
+        <!-- =================================================
+             ACCIONES DEL USUARIO
+             ================================================= -->
+
+        <div class="navbar-actions">
+
+
+            <!-- =================================================
+                 CARRITO
+                 ================================================= -->
+
+            <a
+                href="#"
+                class="navbar-icon-button"
+                aria-label="Ver carrito"
+                title="Carrito"
+            >
+
+                <span aria-hidden="true">
+                    🛒
+                </span>
+
+                <!--
+                Más adelante este valor será dinámico
+                y vendrá del carrito real del usuario.
+                -->
+
+                <span class="navbar-cart-count">
+                    0
+                </span>
+
+            </a>
+
+
+            <!-- =================================================
+                 PERFIL DEL USUARIO
+                 ================================================= -->
+
+            <a
+                href="#"
+                class="navbar-user"
+                aria-label="Ir a mi perfil"
+            >
+
+                <span
+                    class="navbar-user-avatar"
+                    aria-hidden="true"
+                >
+                    👤
+                </span>
+
+
+                <span class="navbar-user-info">
+
+                    <span class="navbar-user-label">
+                        Mi cuenta
+                    </span>
+
+                    <span class="navbar-user-email">
+                        {{ session.get('correo', '') }}
+                    </span>
+
+                </span>
+
+            </a>
+
+
+            <!-- =================================================
+                 CERRAR SESIÓN - ESCRITORIO
+                 ================================================= -->
+
+            <form
+                method="POST"
+                action="{{ url_for('identidad.logout') }}"
+                class="navbar-logout-form"
+            >
+
+                <button
+                    type="submit"
+                    class="navbar-logout-button"
+                >
+                    Cerrar sesión
+                </button>
+
+            </form>
+
+
+            <!-- =================================================
+                 BOTÓN DEL MENÚ MÓVIL
+                 ================================================= -->
+
+            <button
+                type="button"
+                class="navbar-mobile-toggle"
+                aria-label="Abrir menú"
+                aria-expanded="false"
+                aria-controls="navbar-mobile-menu"
+                data-navbar-toggle
+            >
+                ☰
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         MENÚ PARA TABLET / CELULAR
+         ===================================================== -->
+
+    <div
+        class="navbar-mobile-menu"
+        id="navbar-mobile-menu"
+        data-navbar-menu
+    >
+
+        <div class="container navbar-mobile-content">
+
+
+            <!-- Inicio -->
+
+            <a
+                href="{{ url_for('inicio') }}"
+                class="navbar-mobile-link"
+            >
+                Inicio
+            </a>
+
+
+            <!-- Tienda -->
+
+            <a
+                href="{{ url_for('comercio.tienda') }}"
+                class="navbar-mobile-link"
+            >
+                Tienda
+            </a>
+
+
+            <!-- Pedidos -->
+
+            <a
+                href="#"
+                class="navbar-mobile-link"
+            >
+                Mis pedidos
+            </a>
+
+
+            <!-- Suscripciones -->
+
+            <a
+                href="#"
+                class="navbar-mobile-link"
+            >
+                Suscripciones
+            </a>
+
+
+            <!-- Carrito -->
+
+            <a
+                href="#"
+                class="navbar-mobile-link"
+            >
+                Carrito
+            </a>
+
+
+            <!-- Perfil -->
+
+            <a
+                href="#"
+                class="navbar-mobile-link"
+            >
+                Mi perfil
+            </a>
+
+
+            <!-- =================================================
+                 CERRAR SESIÓN - MÓVIL
+                 ================================================= -->
+
+            <form
+                method="POST"
+                action="{{ url_for('identidad.logout') }}"
+            >
+
+                <button
+                    type="submit"
+                    class="navbar-mobile-logout"
+                >
+                    Cerrar sesión
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</header>

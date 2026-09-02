@@ -1,0 +1,216 @@
+/*
+============================================================
+SULPAA V2 - ESTILOS GLOBALES
+============================================================
+
+Este archivo contiene:
+- Variables de diseño
+- Tipografía base
+- Reset básico
+- Contenedores
+- Utilidades generales
+
+IMPORTANTE:
+No colocar aquí estilos específicos de una sola página.
+============================================================
+*/
+
+
+/* ==========================================================
+   1. VARIABLES DEL SISTEMA VISUAL
+   ========================================================== */
+
+:root {
+
+    /* ------------------------------------------------------
+       Colores institucionales SULPAA
+       ------------------------------------------------------ */
+
+    --sulpaa-green-900: #016f46;
+    --sulpaa-green-800: #08784d;
+    --sulpaa-green-600: #57a052;
+    --sulpaa-lime-500: #82c341;
+
+
+    /* ------------------------------------------------------
+       Superficies
+       ------------------------------------------------------ */
+
+    --color-background: #f7f9f5;
+    --color-surface: #ffffff;
+    --color-surface-soft: #eef5ed;
+
+
+    /* ------------------------------------------------------
+       Texto
+       ------------------------------------------------------ */
+
+    --color-text: #17312a;
+    --color-text-secondary: #65736e;
+    --color-text-inverse: #ffffff;
+
+
+    /* ------------------------------------------------------
+       Estados
+       ------------------------------------------------------ */
+
+    --color-success: #2e8b57;
+    --color-warning: #c88a24;
+    --color-danger: #c84b4b;
+    --color-info: #3478a5;
+
+
+    /* ------------------------------------------------------
+       Bordes
+       ------------------------------------------------------ */
+
+    --color-border: #dfe8e2;
+
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+    --radius-pill: 999px;
+
+
+    /* ------------------------------------------------------
+       Sombras
+       ------------------------------------------------------ */
+
+    --shadow-sm:
+        0 4px 14px rgba(20, 49, 41, 0.06);
+
+    --shadow-md:
+        0 10px 30px rgba(20, 49, 41, 0.10);
+
+    --shadow-lg:
+        0 20px 60px rgba(20, 49, 41, 0.14);
+
+
+    /* ------------------------------------------------------
+       Espaciado
+       ------------------------------------------------------ */
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-7: 3rem;
+    --space-8: 4rem;
+
+
+    /* ------------------------------------------------------
+       Transiciones
+       ------------------------------------------------------ */
+
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+
+
+    /* ------------------------------------------------------
+       Ancho general del sitio
+       ------------------------------------------------------ */
+
+    --container-max-width: 1200px;
+}
+
+
+/* ==========================================================
+   2. RESET BÁSICO
+   ========================================================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+
+html {
+    scroll-behavior: smooth;
+}
+
+
+body {
+    margin: 0;
+
+    background-color: var(--color-background);
+
+    color: var(--color-text);
+
+    font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    line-height: 1.5;
+
+    -webkit-font-smoothing: antialiased;
+}
+
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+
+/* ==========================================================
+   3. CONTENEDOR GENERAL
+   ========================================================== */
+
+.container {
+    width: min(
+        calc(100% - 2rem),
+        var(--container-max-width)
+    );
+
+    margin-inline: auto;
+}
+
+
+/* ==========================================================
+   4. ACCESIBILIDAD
+   ========================================================== */
+
+:focus-visible {
+    outline: 3px solid rgba(130, 195, 65, 0.45);
+    outline-offset: 3px;
+}
+
+
+/* ==========================================================
+   5. RESPONSIVE GLOBAL
+   ========================================================== */
+
+/*
+En pantallas pequeñas reducimos el margen lateral general.
+*/
+
+@media (max-width: 640px) {
+
+    .container {
+        width: min(
+            calc(100% - 1.25rem),
+            var(--container-max-width)
+        );
+    }
+}

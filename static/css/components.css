@@ -1,0 +1,1018 @@
+/*
+============================================================
+SULPAA V2 - COMPONENTES REUTILIZABLES
+============================================================
+
+Aquí viven componentes que pueden aparecer
+en diferentes partes del sistema:
+
+- Botones
+- Inputs
+- Alertas
+- Tarjetas
+- Logos
+- Formularios
+- Navbar
+
+No colocar aquí estilos exclusivos de una pantalla.
+============================================================
+*/
+
+
+/* ==========================================================
+   1. LOGO
+   ========================================================== */
+
+.brand-logo {
+    display: inline-flex;
+    align-items: center;
+}
+
+.brand-logo img {
+    width: 150px;
+    height: auto;
+}
+
+
+/* ==========================================================
+   2. BOTONES
+   ========================================================== */
+
+.btn {
+    min-height: 46px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: var(--space-2);
+
+    padding:
+        0.75rem
+        1.25rem;
+
+    border: 1px solid transparent;
+
+    border-radius: var(--radius-md);
+
+    cursor: pointer;
+
+    font-weight: 700;
+
+    transition:
+        background-color var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast),
+        transform var(--transition-fast),
+        box-shadow var(--transition-fast);
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    background-color: var(--sulpaa-green-900);
+    color: var(--color-text-inverse);
+
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+    background-color: var(--sulpaa-green-800);
+
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background-color: transparent;
+
+    border-color: var(--sulpaa-green-900);
+
+    color: var(--sulpaa-green-900);
+}
+
+.btn-secondary:hover {
+    background-color: var(--color-surface-soft);
+}
+
+.btn-block {
+    width: 100%;
+}
+
+
+/* ==========================================================
+   3. CAMPOS DE FORMULARIO
+   ========================================================== */
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--space-2);
+}
+
+.form-label {
+    font-size: 0.9rem;
+    font-weight: 650;
+
+    color: var(--color-text);
+}
+
+.form-control {
+    width: 100%;
+
+    min-height: 48px;
+
+    padding:
+        0.75rem
+        0.9rem;
+
+    border:
+        1px solid
+        var(--color-border);
+
+    border-radius:
+        var(--radius-md);
+
+    background:
+        var(--color-surface);
+
+    color:
+        var(--color-text);
+
+    transition:
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
+        background-color var(--transition-fast);
+}
+
+.form-control::placeholder {
+    color: #97a39f;
+}
+
+.form-control:focus {
+    border-color:
+        var(--sulpaa-green-600);
+
+    box-shadow:
+        0 0 0 4px
+        rgba(87, 160, 82, 0.12);
+
+    outline: none;
+}
+
+
+/* ==========================================================
+   4. ALERTAS
+   ========================================================== */
+
+.alert {
+    padding:
+        0.9rem
+        1rem;
+
+    border-radius:
+        var(--radius-md);
+
+    font-size:
+        0.92rem;
+
+    border:
+        1px solid transparent;
+}
+
+.alert-success {
+    background:
+        #edf8f1;
+
+    border-color:
+        #bee1cb;
+
+    color:
+        #23643e;
+}
+
+.alert-danger {
+    background:
+        #fff0f0;
+
+    border-color:
+        #efc3c3;
+
+    color:
+        #8c3434;
+}
+
+
+/* ==========================================================
+   5. TARJETAS
+   ========================================================== */
+
+.card {
+    background:
+        var(--color-surface);
+
+    border:
+        1px solid
+        var(--color-border);
+
+    border-radius:
+        var(--radius-lg);
+
+    box-shadow:
+        var(--shadow-sm);
+}
+
+
+/* ==========================================================
+   6. TEXTO AUXILIAR
+   ========================================================== */
+
+.text-muted {
+    color:
+        var(--color-text-secondary);
+}
+
+.text-center {
+    text-align: center;
+}
+
+
+/* ==========================================================
+   7. RESPONSIVE DE COMPONENTES GENERALES
+   ========================================================== */
+
+@media (max-width: 640px) {
+
+    .brand-logo img {
+        width: 125px;
+    }
+
+    .btn {
+        min-height: 48px;
+    }
+}
+
+
+/*
+============================================================
+8. NAVBAR PRINCIPAL SULPAA
+============================================================
+
+Componente reutilizable para páginas autenticadas.
+
+Objetivos:
+
+- Mantener siempre visible el logo.
+- Integrar los colores institucionales SULPAA.
+- Usar un degradado profesional.
+- Mantener buen contraste en escritorio y móvil.
+- Evitar que el logo desaparezca en pantallas pequeñas.
+============================================================
+*/
+
+
+/* ==========================================================
+   HEADER
+   ========================================================== */
+
+.site-header {
+    position: sticky;
+    top: 0;
+
+    z-index: 100;
+
+    /*
+    En escritorio sí dejamos que el degradado
+    termine casi en blanco.
+    */
+    background:
+        linear-gradient(
+            100deg,
+            var(--sulpaa-green-900) 0%,
+            var(--sulpaa-green-800) 24%,
+            #dceee4 60%,
+            #ffffff 82%
+        );
+
+    border-bottom:
+        1px solid
+        rgba(1, 111, 70, 0.12);
+
+    box-shadow:
+        0 4px 18px
+        rgba(0, 55, 35, 0.08);
+}
+
+
+/* ==========================================================
+   CONTENEDOR
+   ========================================================== */
+
+.navbar-container {
+    min-height: 76px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 1.5rem;
+}
+
+
+/* ==========================================================
+   LOGO DEL NAVBAR
+   ========================================================== */
+
+.navbar-brand {
+    /*
+    Evita que Flexbox comprima el logo cuando
+    disminuye el ancho disponible.
+    */
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    min-width: 125px;
+
+    position: relative;
+
+    z-index: 2;
+}
+
+.navbar-logo {
+    display: block;
+
+    width: 125px;
+    max-width: 100%;
+    height: auto;
+
+    object-fit: contain;
+}
+
+
+/* ==========================================================
+   NAVEGACIÓN PRINCIPAL
+   ========================================================== */
+
+.navbar-menu {
+    display: flex;
+    align-items: center;
+
+    gap: 1.55rem;
+
+    margin-left: auto;
+}
+
+.navbar-link {
+    position: relative;
+
+    padding:
+        0.5rem
+        0;
+
+    color:
+        rgba(14, 56, 42, 0.92);
+
+    font-size: 0.92rem;
+    font-weight: 700;
+
+    transition:
+        color var(--transition-fast);
+}
+
+.navbar-link::after {
+    content: "";
+
+    position: absolute;
+
+    left: 0;
+    bottom: 0;
+
+    width: 0;
+    height: 2px;
+
+    border-radius:
+        var(--radius-pill);
+
+    background:
+        var(--sulpaa-lime-500);
+
+    transition:
+        width var(--transition-fast);
+}
+
+.navbar-link:hover {
+    color:
+        var(--sulpaa-green-900);
+}
+
+.navbar-link:hover::after {
+    width: 100%;
+}
+
+
+/* ==========================================================
+   ACCIONES DEL NAVBAR
+   ========================================================== */
+
+.navbar-actions {
+    display: flex;
+    align-items: center;
+
+    gap: 0.75rem;
+
+    flex: 0 0 auto;
+}
+
+
+/* ==========================================================
+   CARRITO
+   ========================================================== */
+
+.navbar-icon-button {
+    position: relative;
+
+    width: 42px;
+    height: 42px;
+
+    display: grid;
+    place-items: center;
+
+    border:
+        1px solid
+        rgba(1, 111, 70, 0.16);
+
+    border-radius:
+        50%;
+
+    background:
+        rgba(255, 255, 255, 0.72);
+
+    color:
+        var(--sulpaa-green-900);
+
+    font-size:
+        1.05rem;
+
+    box-shadow:
+        0 3px 10px
+        rgba(0, 55, 35, 0.05);
+
+    transition:
+        background-color var(--transition-fast),
+        transform var(--transition-fast),
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast);
+}
+
+.navbar-icon-button:hover {
+    transform:
+        translateY(-1px);
+
+    background:
+        #ffffff;
+
+    border-color:
+        rgba(1, 111, 70, 0.30);
+
+    box-shadow:
+        0 5px 14px
+        rgba(0, 55, 35, 0.09);
+}
+
+.navbar-cart-count {
+    position: absolute;
+
+    top: -4px;
+    right: -4px;
+
+    min-width: 18px;
+    height: 18px;
+
+    display: grid;
+    place-items: center;
+
+    padding:
+        0
+        4px;
+
+    border:
+        2px solid
+        #ffffff;
+
+    border-radius:
+        var(--radius-pill);
+
+    background:
+        var(--sulpaa-lime-500);
+
+    color:
+        var(--sulpaa-green-900);
+
+    font-size:
+        0.68rem;
+
+    font-weight:
+        800;
+}
+
+
+/* ==========================================================
+   INFORMACIÓN DEL USUARIO
+   ========================================================== */
+
+.navbar-user {
+    display: flex;
+    align-items: center;
+
+    gap: 0.65rem;
+
+    max-width: 220px;
+
+    padding:
+        0.45rem
+        0.7rem;
+
+    border-radius:
+        var(--radius-md);
+
+    transition:
+        background-color var(--transition-fast);
+}
+
+.navbar-user:hover {
+    background:
+        rgba(255, 255, 255, 0.50);
+}
+
+.navbar-user-avatar {
+    width: 36px;
+    height: 36px;
+
+    flex:
+        0 0 auto;
+
+    display: grid;
+    place-items: center;
+
+    border-radius:
+        50%;
+
+    background:
+        var(--sulpaa-green-900);
+
+    color:
+        var(--color-text-inverse);
+
+    font-size:
+        0.95rem;
+}
+
+.navbar-user-info {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.navbar-user-label {
+    color:
+        var(--sulpaa-green-900);
+
+    font-size:
+        0.8rem;
+
+    font-weight:
+        800;
+}
+
+.navbar-user-email {
+    max-width: 150px;
+
+    overflow: hidden;
+
+    color:
+        #567067;
+
+    font-size:
+        0.72rem;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+
+/* ==========================================================
+   CERRAR SESIÓN
+   ========================================================== */
+
+.navbar-logout-form {
+    margin: 0;
+}
+
+.navbar-logout-button {
+    min-height: 40px;
+
+    padding:
+        0.65rem
+        0.9rem;
+
+    border:
+        1px solid
+        rgba(1, 111, 70, 0.18);
+
+    border-radius:
+        var(--radius-md);
+
+    background:
+        rgba(255, 255, 255, 0.55);
+
+    color:
+        var(--sulpaa-green-900);
+
+    cursor:
+        pointer;
+
+    font-size:
+        0.82rem;
+
+    font-weight:
+        750;
+
+    transition:
+        color var(--transition-fast),
+        background-color var(--transition-fast),
+        border-color var(--transition-fast),
+        transform var(--transition-fast);
+}
+
+.navbar-logout-button:hover {
+    transform:
+        translateY(-1px);
+
+    background:
+        #ffffff;
+
+    border-color:
+        rgba(1, 111, 70, 0.30);
+}
+
+
+/* ==========================================================
+   BOTÓN MENÚ MÓVIL
+   ========================================================== */
+
+.navbar-mobile-toggle {
+    display: none;
+
+    width: 42px;
+    height: 42px;
+
+    place-items: center;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.35);
+
+    border-radius:
+        var(--radius-md);
+
+    background:
+        rgba(255, 255, 255, 0.14);
+
+    color:
+        #ffffff;
+
+    cursor:
+        pointer;
+
+    font-size:
+        1.25rem;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0, 70, 45, 0.12);
+
+    transition:
+        background-color var(--transition-fast),
+        border-color var(--transition-fast),
+        transform var(--transition-fast);
+}
+
+.navbar-mobile-toggle:hover {
+    background:
+        rgba(255, 255, 255, 0.22);
+
+    border-color:
+        rgba(255, 255, 255, 0.48);
+
+    transform:
+        translateY(-1px);
+}
+
+
+/* ==========================================================
+   MENÚ DESPLEGABLE MÓVIL
+   ========================================================== */
+
+.navbar-mobile-menu {
+    display: none;
+
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    background:
+        linear-gradient(
+            180deg,
+            var(--sulpaa-green-900) 0%,
+            #075d40 100%
+        );
+
+    box-shadow:
+        0 12px 24px
+        rgba(0, 55, 35, 0.14);
+}
+
+.navbar-mobile-menu.is-open {
+    display: block;
+}
+
+.navbar-mobile-content {
+    display: grid;
+
+    gap: 0.25rem;
+
+    padding-top:
+        0.85rem;
+
+    padding-bottom:
+        1rem;
+}
+
+.navbar-mobile-link {
+    padding:
+        0.85rem
+        0.9rem;
+
+    border-radius:
+        var(--radius-md);
+
+    color:
+        rgba(255, 255, 255, 0.90);
+
+    font-weight:
+        700;
+
+    transition:
+        color var(--transition-fast),
+        background-color var(--transition-fast);
+}
+
+.navbar-mobile-link:hover {
+    background:
+        rgba(255, 255, 255, 0.10);
+
+    color:
+        #ffffff;
+}
+
+.navbar-mobile-logout {
+    width: 100%;
+
+    margin-top:
+        0.5rem;
+
+    padding:
+        0.85rem
+        0.9rem;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.18);
+
+    border-radius:
+        var(--radius-md);
+
+    background:
+        rgba(255, 255, 255, 0.10);
+
+    color:
+        #ffffff;
+
+    cursor:
+        pointer;
+
+    text-align:
+        left;
+
+    font-weight:
+        750;
+
+    transition:
+        background-color var(--transition-fast);
+}
+
+.navbar-mobile-logout:hover {
+    background:
+        rgba(255, 255, 255, 0.17);
+}
+
+
+/* ==========================================================
+   RESPONSIVE - TABLET
+   ========================================================== */
+
+@media (max-width: 980px) {
+
+    /*
+    Ocultamos los elementos extensos.
+
+    El logo NO se oculta.
+    */
+    .navbar-menu,
+    .navbar-user,
+    .navbar-logout-form {
+        display: none;
+    }
+
+    .navbar-mobile-toggle {
+        display: grid;
+    }
+
+    .navbar-container {
+        min-height: 68px;
+
+        gap: 1rem;
+    }
+
+    .navbar-brand {
+        min-width: 112px;
+    }
+
+    .navbar-logo {
+        width: 112px;
+    }
+
+    /*
+    En tablet mantenemos más verde que en escritorio.
+    */
+    .site-header {
+        background:
+            linear-gradient(
+                105deg,
+                var(--sulpaa-green-900) 0%,
+                var(--sulpaa-green-800) 46%,
+                #7dbb9d 76%,
+                #d8eee3 100%
+            );
+    }
+
+    .navbar-actions {
+        margin-left: auto;
+    }
+}
+
+
+/* ==========================================================
+   RESPONSIVE - CELULAR
+   ========================================================== */
+
+@media (max-width: 480px) {
+
+    .navbar-container {
+        min-height: 64px;
+
+        gap: 0.65rem;
+    }
+
+    .navbar-brand {
+        min-width: 104px;
+    }
+
+    .navbar-logo {
+        width: 104px;
+    }
+
+    .navbar-actions {
+        gap: 0.45rem;
+    }
+
+    /*
+    En móvil carrito y hamburguesa comparten
+    el mismo lenguaje visual.
+
+    Ambos tienen fondo blanco semitransparente
+    y buen contraste sobre el verde.
+    */
+    .navbar-icon-button,
+    .navbar-mobile-toggle {
+        width: 40px;
+        height: 40px;
+
+        border:
+            1px solid
+            rgba(255, 255, 255, 0.35);
+
+        background:
+            rgba(255, 255, 255, 0.16);
+
+        color:
+            #ffffff;
+
+        box-shadow:
+            0 3px 10px
+            rgba(0, 60, 40, 0.10);
+    }
+
+    .navbar-icon-button:hover,
+    .navbar-mobile-toggle:hover {
+        background:
+            rgba(255, 255, 255, 0.24);
+
+        border-color:
+            rgba(255, 255, 255, 0.50);
+    }
+
+    /*
+    CAMBIO PRINCIPAL:
+
+    En celular NO llegamos a blanco puro.
+
+    Así:
+    - el logo sigue teniendo contraste;
+    - el botón hamburguesa se distingue;
+    - el navbar mantiene identidad institucional.
+    */
+    .site-header {
+        background:
+            linear-gradient(
+                105deg,
+                var(--sulpaa-green-900) 0%,
+                var(--sulpaa-green-800) 58%,
+                #5fae87 82%,
+                #a8d7c0 100%
+            );
+    }
+
+    /*
+    El contador del carrito mantiene
+    su borde blanco para separarse del botón.
+    */
+    .navbar-cart-count {
+        border-color:
+            rgba(255, 255, 255, 0.95);
+    }
+}
+
+
+/* ==========================================================
+   RESPONSIVE - CELULARES MUY PEQUEÑOS
+   ========================================================== */
+
+@media (max-width: 360px) {
+
+    .navbar-brand {
+        min-width: 94px;
+    }
+
+    .navbar-logo {
+        width: 94px;
+    }
+
+    .navbar-container {
+        gap: 0.45rem;
+    }
+
+    .navbar-actions {
+        gap: 0.35rem;
+    }
+
+    .navbar-icon-button,
+    .navbar-mobile-toggle {
+        width: 36px;
+        height: 36px;
+    }
+
+    /*
+    Incluso en celulares muy estrechos
+    mantenemos el navbar predominantemente verde.
+    */
+    .site-header {
+        background:
+            linear-gradient(
+                105deg,
+                var(--sulpaa-green-900) 0%,
+                var(--sulpaa-green-800) 62%,
+                #66b38e 84%,
+                #a8d7c0 100%
+            );
+    }
+}
