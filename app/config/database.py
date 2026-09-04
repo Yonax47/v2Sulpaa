@@ -83,6 +83,8 @@ class CursorDiccionario:
     def execute(self, consulta, parametros=()):
         consulta = re.sub(r"%s", "?", consulta)
         consulta = re.sub(r"\bNOW\(\)", "GETDATE()", consulta, flags=re.IGNORECASE)
+        consulta = re.sub(r"\bTRUE\b", "1", consulta, flags=re.IGNORECASE)
+        consulta = re.sub(r"\bFALSE\b", "0", consulta, flags=re.IGNORECASE)
         consulta = re.sub(r"\s+FOR\s+UPDATE\b", "", consulta, flags=re.IGNORECASE)
         consulta = self._adaptar_limit(consulta)
         return self._cursor.execute(consulta, parametros)
@@ -165,9 +167,15 @@ def crear_conexion(nombre_base_datos=None, prefijo=None):
         "no",
     ).lower() in {"1", "true", "yes"}
 
+    servidor_sql = (
+        servidor
+        if servidor.lower().startswith(("lpc:", "np:", "admin:"))
+        else f"{servidor},{puerto}"
+    )
+
     partes = [
         f"DRIVER={{{controlador}}}",
-        f"SERVER={servidor},{puerto}",
+        f"SERVER={servidor_sql}",
         f"DATABASE={nombre_base_datos}",
         f"Encrypt={_variable_por_dominio(prefijo, 'ENCRYPT', 'yes')}",
         "TrustServerCertificate="
