@@ -93,19 +93,19 @@ def obtener_variantes_comerciales_tienda():
                     )
 
                 ORDER BY
-                    FIELD(
-                        s.nombre,
-                        'Café',
-                        'Jamaica',
-                        'Limón',
-                        'Kion'
-                    ),
-                    FIELD(
-                        p.nombre,
-                        'Botella 1 L',
-                        'Barril 30 L',
-                        'Barril 50 L'
-                    )
+                    CASE s.nombre
+                        WHEN 'Café' THEN 1
+                        WHEN 'Jamaica' THEN 2
+                        WHEN 'Limón' THEN 3
+                        WHEN 'Kion' THEN 4
+                        ELSE 99
+                    END,
+                    CASE p.nombre
+                        WHEN 'Botella 1 L' THEN 1
+                        WHEN 'Barril 30 L' THEN 2
+                        WHEN 'Barril 50 L' THEN 3
+                        ELSE 99
+                    END
             """
 
             cursor.execute(consulta)
@@ -161,13 +161,13 @@ def obtener_variantes_330ml_tienda():
                     AND p.nombre = 'Botella 330 ml'
 
                 ORDER BY
-                    FIELD(
-                        s.nombre,
-                        'Café',
-                        'Jamaica',
-                        'Limón',
-                        'Kion'
-                    )
+                    CASE s.nombre
+                        WHEN 'Café' THEN 1
+                        WHEN 'Jamaica' THEN 2
+                        WHEN 'Limón' THEN 3
+                        WHEN 'Kion' THEN 4
+                        ELSE 99
+                    END
             """
 
             cursor.execute(consulta)
@@ -911,14 +911,11 @@ def actualizar_cantidad_detalle_carrito(
 
             cursor.execute(
                 """
-                UPDATE carrito_detalles AS cd
-
+                UPDATE cd
+                SET cd.cantidad = %s
+                FROM carrito_detalles AS cd
                 INNER JOIN carritos AS c
                     ON c.id = cd.carrito_id
-
-                SET
-                    cd.cantidad = %s
-
                 WHERE
                     cd.id = %s
                     AND c.usuario_id = %s
