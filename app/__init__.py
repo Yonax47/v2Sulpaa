@@ -49,6 +49,8 @@ load_dotenv()
 
 from app.identidad.routes import identidad_bp
 from app.comercio.routes import comercio_bp
+from app.inventario.routes import inventario_bp
+from app.operaciones.routes import operaciones_bp
 
 
 # ============================================================
@@ -162,8 +164,16 @@ def create_app():
         identidad_bp
     )
 
-    app.register_blueprint(
+    app.register_blueprint( 
         comercio_bp
+    )
+
+    app.register_blueprint(
+        inventario_bp
+    )
+
+    app.register_blueprint(
+        operaciones_bp
     )
 
 

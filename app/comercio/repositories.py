@@ -7,7 +7,7 @@ Responsabilidades:
 - variantes;
 - packs;
 - precios;
-- reglas comerciales;
+- reglas comerciales; 
 - carrito persistente.
 
 IMPORTANTE:

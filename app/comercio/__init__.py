@@ -17,3 +17,9 @@ La lógica de acceso a datos y reglas comerciales
 se irá separando posteriormente en services.py
 y repositories.py.
 """
+
+__all__ = [
+	"repositories",
+	"routes",
+	"services",
+]
