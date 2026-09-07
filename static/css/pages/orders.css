@@ -1,0 +1,1401 @@
+/*
+============================================================
+SULPAA V2 - MIS PEDIDOS
+CSS COMPATIBLE CON:
+templates/cliente/pedidos.html
+
+- Diseño SULPAA
+- Responsive
+- Animaciones seguras
+- No oculta contenido si falla JavaScript
+============================================================
+*/
+
+
+/* ==========================================================
+   1. BASE
+   ========================================================== */
+
+.orders-page {
+    min-height: 100vh;
+    overflow: hidden;
+    background: #fffdf8;
+    color: #173d31;
+}
+
+.orders-page *,
+.orders-page *::before,
+.orders-page *::after {
+    box-sizing: border-box;
+}
+
+.orders-page .container {
+    width: min(1180px, calc(100% - 40px));
+    margin: 0 auto;
+}
+
+.orders-page a {
+    text-decoration: none;
+}
+
+.orders-page img {
+    display: block;
+    max-width: 100%;
+}
+
+.orders-kicker {
+    display: inline-block;
+    margin-bottom: 0.8rem;
+
+    color: #62a957;
+
+    font-size: 0.7rem;
+    font-weight: 800;
+
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+
+/* ==========================================================
+   2. HERO
+   ========================================================== */
+
+.orders-hero {
+    position: relative;
+    overflow: hidden;
+
+    padding:
+        clamp(4rem, 7vw, 6.5rem)
+        0
+        clamp(4rem, 6vw, 5.5rem);
+
+    background:
+        linear-gradient(
+            125deg,
+            #fffdf8 0%,
+            #f7fbf1 52%,
+            #eaf7e9 100%
+        );
+}
+
+.orders-hero::before {
+    content: "";
+
+    position: absolute;
+
+    width: 380px;
+    height: 380px;
+
+    left: -190px;
+    bottom: -220px;
+
+    border-radius: 50%;
+
+    background: rgba(98, 169, 87, 0.08);
+
+    pointer-events: none;
+}
+
+.orders-hero::after {
+    content: "";
+
+    position: absolute;
+
+    width: 320px;
+    height: 320px;
+
+    right: -130px;
+    top: -150px;
+
+    border-radius: 50%;
+
+    background: rgba(217, 244, 95, 0.18);
+
+    pointer-events: none;
+}
+
+.orders-hero-grid {
+    position: relative;
+    z-index: 2;
+
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 1.1fr)
+        minmax(300px, 0.9fr);
+
+    align-items: center;
+
+    gap: 3rem;
+}
+
+.orders-hero-copy {
+    max-width: 720px;
+}
+
+.orders-hero-copy h1 {
+    margin: 0;
+
+    color: #163d30;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size:
+        clamp(3rem, 6vw, 5.8rem);
+
+    line-height: 0.94;
+
+    letter-spacing: -0.05em;
+}
+
+.orders-hero-copy h1 span {
+    display: block;
+    color: #65aa54;
+}
+
+.orders-hero-copy p {
+    max-width: 600px;
+
+    margin: 1.4rem 0 0;
+
+    color: #687a72;
+
+    font-size: 0.95rem;
+
+    line-height: 1.8;
+}
+
+.orders-hero-actions {
+    display: flex;
+
+    align-items: center;
+
+    gap: 0.8rem;
+
+    margin-top: 1.8rem;
+}
+
+
+/* ==========================================================
+   3. BOTONES PRINCIPALES
+   ========================================================== */
+
+.orders-btn {
+    min-height: 45px;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 0.65rem;
+
+    padding:
+        0.7rem
+        1.15rem;
+
+    border-radius: 12px;
+
+    font-size: 0.7rem;
+    font-weight: 800;
+
+    transition:
+        transform 180ms ease,
+        box-shadow 180ms ease,
+        background-color 180ms ease;
+}
+
+.orders-btn:hover {
+    transform: translateY(-2px);
+}
+
+.orders-btn-primary {
+    background: #176d49;
+    color: #ffffff;
+
+    box-shadow:
+        0 10px 24px rgba(23, 109, 73, 0.16);
+}
+
+.orders-btn-primary:hover {
+    background: #105b3d;
+    color: #ffffff;
+
+    box-shadow:
+        0 14px 30px rgba(23, 109, 73, 0.22);
+}
+
+.orders-btn-white {
+    background: #ffffff;
+    color: #176d49;
+
+    box-shadow:
+        0 10px 25px rgba(0, 0, 0, 0.10);
+}
+
+.orders-btn-white:hover {
+    background: #f4f8f0;
+    color: #105b3d;
+}
+
+
+/* ==========================================================
+   4. VISUAL HERO
+   ========================================================== */
+
+.orders-hero-visual {
+    position: relative;
+
+    min-height: 330px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+}
+
+.orders-hero-circle {
+    position: absolute;
+
+    width: 280px;
+    height: 280px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle at 35% 30%,
+            #f4fadf 0%,
+            #dcefcf 45%,
+            #c6e2bb 100%
+        );
+
+    box-shadow:
+        inset 0 0 0 1px rgba(23, 109, 73, 0.04),
+        0 25px 55px rgba(58, 100, 70, 0.10);
+}
+
+.orders-hero-circle::before {
+    content: "";
+
+    position: absolute;
+
+    width: 185px;
+    height: 185px;
+
+    top: 35px;
+    left: 25px;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(23, 109, 73, 0.08);
+}
+
+.orders-hero-card {
+    position: relative;
+    z-index: 2;
+
+    width: min(310px, 80%);
+
+    padding: 2rem 1.7rem;
+
+    border: 1px solid rgba(23, 109, 73, 0.08);
+
+    border-radius: 25px;
+
+    background: rgba(255, 255, 255, 0.92);
+
+    box-shadow:
+        0 25px 55px rgba(48, 78, 59, 0.13);
+
+    text-align: center;
+
+    backdrop-filter: blur(8px);
+}
+
+.orders-hero-icon {
+    width: 58px;
+    height: 58px;
+
+    display: grid;
+    place-items: center;
+
+    margin: 0 auto 1rem;
+
+    border-radius: 50%;
+
+    background: #edf7e9;
+
+    color: #5b9958;
+
+    font-size: 1.2rem;
+}
+
+.orders-hero-card strong {
+    display: block;
+
+    color: #173d31;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 1.55rem;
+}
+
+.orders-hero-card small {
+    display: block;
+
+    margin-top: 0.45rem;
+
+    color: #829088;
+
+    font-size: 0.68rem;
+}
+
+
+/* ==========================================================
+   5. RESUMEN
+   ========================================================== */
+
+.orders-summary {
+    position: relative;
+    z-index: 5;
+
+    margin-top: -35px;
+
+    padding-bottom: 3.5rem;
+}
+
+.orders-summary-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 1rem;
+}
+
+.orders-summary-card {
+    min-height: 120px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 1rem;
+
+    padding: 1.25rem 1.4rem;
+
+    border: 1px solid rgba(23, 109, 73, 0.08);
+
+    border-radius: 21px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 14px 35px rgba(49, 78, 62, 0.08);
+
+    transition:
+        transform 220ms ease,
+        box-shadow 220ms ease;
+}
+
+.orders-summary-card:hover {
+    transform: translateY(-4px);
+
+    box-shadow:
+        0 20px 42px rgba(49, 78, 62, 0.12);
+}
+
+.orders-summary-number {
+    min-width: 65px;
+
+    color: #176d49;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 2.8rem;
+
+    line-height: 1;
+
+    text-align: center;
+}
+
+.orders-summary-card strong {
+    display: block;
+
+    color: #173d31;
+
+    font-size: 0.82rem;
+    font-weight: 850;
+}
+
+.orders-summary-card p {
+    margin: 0.35rem 0 0;
+
+    color: #7b8983;
+
+    font-size: 0.68rem;
+
+    line-height: 1.5;
+}
+
+.orders-summary-highlight {
+    background:
+        linear-gradient(
+            135deg,
+            #075f40,
+            #01915a
+        );
+}
+
+.orders-summary-highlight strong {
+    color: #ffffff;
+}
+
+.orders-summary-highlight p {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.orders-summary-icon {
+    width: 50px;
+    height: 50px;
+
+    flex: 0 0 auto;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+
+    background: rgba(255, 255, 255, 0.13);
+
+    color: #d8f47a;
+
+    font-size: 1rem;
+}
+
+
+/* ==========================================================
+   6. LISTADO
+   ========================================================== */
+
+.orders-list {
+    padding:
+        1rem
+        0
+        clamp(5rem, 8vw, 8rem);
+
+    background: #fffdf8;
+}
+
+.orders-section-heading {
+    display: flex;
+
+    align-items: flex-end;
+    justify-content: space-between;
+
+    gap: 2rem;
+
+    margin-bottom: 1.8rem;
+}
+
+.orders-section-heading h2 {
+    margin: 0;
+
+    color: #173d31;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size:
+        clamp(2.4rem, 4.5vw, 4rem);
+
+    line-height: 0.98;
+
+    letter-spacing: -0.04em;
+}
+
+.orders-section-heading h2 span {
+    color: #65aa54;
+}
+
+.orders-section-heading p {
+    max-width: 330px;
+
+    margin: 0;
+
+    color: #7a8882;
+
+    font-size: 0.72rem;
+
+    line-height: 1.6;
+}
+
+
+/* ==========================================================
+   7. GRID DE PEDIDOS
+   ========================================================== */
+
+.orders-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 1rem;
+}
+
+.order-card {
+    overflow: hidden;
+
+    border: 1px solid rgba(31, 68, 49, 0.08);
+
+    border-radius: 22px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 14px 34px rgba(53, 71, 60, 0.06);
+
+    transition:
+        transform 220ms ease,
+        box-shadow 220ms ease;
+}
+
+.order-card:hover {
+    transform: translateY(-4px);
+
+    box-shadow:
+        0 22px 45px rgba(45, 66, 54, 0.11);
+}
+
+
+/* ==========================================================
+   8. CABECERA PEDIDO
+   ========================================================== */
+
+.order-card-header {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 1rem;
+
+    padding: 1.2rem 1.3rem;
+
+    border-bottom: 1px solid #edf0ee;
+}
+
+.order-label {
+    display: block;
+
+    margin-bottom: 0.3rem;
+
+    color: #8a9690;
+
+    font-size: 0.58rem;
+    font-weight: 850;
+
+    letter-spacing: 0.12em;
+}
+
+.order-card-header h3 {
+    margin: 0;
+
+    overflow: hidden;
+
+    color: #173d31;
+
+    font-size: 0.92rem;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ==========================================================
+   9. ESTADO
+   ========================================================== */
+
+.order-status {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 0.45rem;
+
+    min-height: 30px;
+
+    padding: 0.35rem 0.7rem;
+
+    border-radius: 999px;
+
+    background: #f1f5f2;
+
+    color: #5c7167;
+
+    font-size: 0.61rem;
+    font-weight: 850;
+
+    white-space: nowrap;
+}
+
+.order-status-dot {
+    width: 7px;
+    height: 7px;
+
+    flex: 0 0 auto;
+
+    border-radius: 50%;
+
+    background: #8c9b94;
+}
+
+
+/* PENDIENTE */
+
+.status-pending {
+    background: #e5a52b;
+}
+
+.status-pending-text {
+    color: #a56a18;
+}
+
+
+/* CONFIRMADO */
+
+.status-confirmed {
+    background: #6aa957;
+}
+
+.status-confirmed-text {
+    color: #4d7f42;
+}
+
+
+/* PREPARACIÓN */
+
+.status-preparing {
+    background: #6793ae;
+}
+
+.status-preparing-text {
+    color: #4d718a;
+}
+
+
+/* ENVIADO */
+
+.status-shipped {
+    background: #36946b;
+}
+
+.status-shipped-text {
+    color: #277653;
+}
+
+
+/* ENTREGADO */
+
+.status-delivered {
+    background: #4caf68;
+}
+
+.status-delivered-text {
+    color: #35794a;
+}
+
+
+/* CANCELADO */
+
+.status-cancelled {
+    background: #c05252;
+}
+
+.status-cancelled-text {
+    color: #a44343;
+}
+
+
+/* ==========================================================
+   10. INFORMACIÓN DEL PEDIDO
+   ========================================================== */
+
+.order-card-info {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 0;
+
+    padding: 1.3rem;
+}
+
+.order-info-item {
+    padding-right: 1rem;
+}
+
+.order-info-item + .order-info-item {
+    padding-left: 1rem;
+
+    border-left: 1px solid #edf0ee;
+}
+
+.order-info-item span {
+    display: block;
+
+    margin-bottom: 0.4rem;
+
+    color: #8a9690;
+
+    font-size: 0.59rem;
+    font-weight: 750;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.08em;
+}
+
+.order-info-item strong {
+    display: block;
+
+    color: #315443;
+
+    font-size: 0.82rem;
+}
+
+.order-info-item .order-total {
+    color: #176d49;
+
+    font-size: 1rem;
+}
+
+
+/* ==========================================================
+   11. SEPARADOR
+   ========================================================== */
+
+.order-card-divider {
+    height: 1px;
+
+    margin: 0 1.3rem;
+
+    background: #edf0ee;
+}
+
+
+/* ==========================================================
+   12. FOOTER
+   ========================================================== */
+
+.order-card-footer {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 1rem;
+
+    padding: 1rem 1.3rem;
+
+    background: #fcfdfb;
+}
+
+.order-card-footer > span {
+    color: #7c8a84;
+
+    font-size: 0.65rem;
+
+    line-height: 1.4;
+}
+
+.order-detail-btn {
+    min-height: 39px;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 auto;
+
+    gap: 0.45rem;
+
+    padding:
+        0.55rem
+        0.85rem;
+
+    border-radius: 10px;
+
+    background: #176d49;
+
+    color: #ffffff;
+
+    font-size: 0.65rem;
+    font-weight: 850;
+
+    transition:
+        transform 180ms ease,
+        background-color 180ms ease;
+}
+
+.order-detail-btn:hover {
+    transform: translateY(-2px);
+
+    background: #105b3d;
+
+    color: #ffffff;
+}
+
+
+/* ==========================================================
+   13. ESTADO VACÍO
+   ========================================================== */
+
+.orders-empty {
+    max-width: 650px;
+
+    margin: 2rem auto 0;
+
+    padding: 4rem 2rem;
+
+    border: 1px solid rgba(31, 68, 49, 0.07);
+
+    border-radius: 26px;
+
+    background: #ffffff;
+
+    text-align: center;
+
+    box-shadow:
+        0 16px 40px rgba(47, 74, 59, 0.07);
+}
+
+.orders-empty-visual {
+    position: relative;
+
+    width: 100px;
+    height: 100px;
+
+    display: grid;
+    place-items: center;
+
+    margin: 0 auto 1.3rem;
+}
+
+.orders-empty-circle {
+    position: absolute;
+
+    inset: 0;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            #f0f8e9 0%,
+            #e3f0dc 100%
+        );
+}
+
+.orders-empty-visual > span {
+    position: relative;
+    z-index: 2;
+
+    color: #65a95a;
+
+    font-size: 1.6rem;
+}
+
+.orders-empty-content h3 {
+    margin: 0;
+
+    color: #173d31;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size:
+        clamp(2rem, 4vw, 2.7rem);
+
+    line-height: 1;
+}
+
+.orders-empty-content p {
+    max-width: 450px;
+
+    margin:
+        0.9rem
+        auto
+        1.5rem;
+
+    color: #75847d;
+
+    font-size: 0.75rem;
+
+    line-height: 1.7;
+}
+
+
+/* ==========================================================
+   14. CTA FINAL
+   ========================================================== */
+
+.orders-cta {
+    padding:
+        0
+        0
+        5rem;
+
+    background: #fffdf8;
+}
+
+.orders-cta-card {
+    position: relative;
+
+    overflow: hidden;
+
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 1.2fr)
+        minmax(260px, 0.8fr);
+
+    align-items: center;
+
+    gap: 2rem;
+
+    padding:
+        clamp(2rem, 5vw, 4rem);
+
+    border-radius: 28px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #075f40,
+            #01915a
+        );
+
+    box-shadow:
+        0 25px 55px rgba(23, 109, 73, 0.17);
+}
+
+.orders-cta-card::before {
+    content: "";
+
+    position: absolute;
+
+    width: 330px;
+    height: 330px;
+
+    right: -120px;
+    top: -150px;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.orders-cta-card::after {
+    content: "";
+
+    position: absolute;
+
+    width: 200px;
+    height: 200px;
+
+    right: 80px;
+    bottom: -140px;
+
+    border-radius: 50%;
+
+    background: rgba(217, 244, 95, 0.08);
+}
+
+.orders-kicker-light {
+    color: #d8f47a;
+}
+
+.orders-cta-copy {
+    position: relative;
+    z-index: 2;
+}
+
+.orders-cta-copy h2 {
+    margin: 0;
+
+    color: #ffffff;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size:
+        clamp(2.4rem, 5vw, 4.5rem);
+
+    line-height: 0.95;
+
+    letter-spacing: -0.04em;
+}
+
+.orders-cta-copy h2 span {
+    color: #d8f47a;
+}
+
+.orders-cta-copy p {
+    max-width: 560px;
+
+    margin:
+        1.1rem
+        0
+        1.5rem;
+
+    color: rgba(255, 255, 255, 0.72);
+
+    font-size: 0.78rem;
+
+    line-height: 1.7;
+}
+
+.orders-cta-decoration {
+    position: relative;
+    z-index: 2;
+
+    min-height: 190px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+}
+
+.orders-cta-decoration > span {
+    color: #d8f47a;
+
+    font-size: 1.5rem;
+}
+
+.orders-cta-decoration strong {
+    margin-top: 0.5rem;
+
+    color: #ffffff;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 3rem;
+
+    letter-spacing: 0.08em;
+}
+
+.orders-cta-decoration small {
+    margin-top: 0.25rem;
+
+    color: rgba(255, 255, 255, 0.60);
+
+    font-size: 0.65rem;
+}
+
+
+/* ==========================================================
+   15. ANIMACIONES
+   ========================================================== */
+
+/*
+   IMPORTANTE:
+   Los elementos SON VISIBLES aunque JavaScript no funcione.
+
+   Esto evita que la página quede completamente blanca.
+*/
+
+.orders-page .reveal {
+    opacity: 1;
+
+    transform: translateY(0);
+
+    transition:
+        opacity 600ms ease,
+        transform 600ms ease;
+
+    transition-delay:
+        var(--reveal-delay, 0ms);
+}
+
+/*
+   Si main.js / otro JS agrega .is-visible,
+   simplemente mantenemos el estado visible.
+*/
+
+.orders-page .reveal.is-visible {
+    opacity: 1;
+
+    transform: translateY(0);
+}
+
+
+/* ==========================================================
+   16. TABLET
+   ========================================================== */
+
+@media (max-width: 950px) {
+
+    .orders-hero-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .orders-hero-copy {
+        max-width: 800px;
+    }
+
+    .orders-hero-visual {
+        min-height: 280px;
+    }
+
+    .orders-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .orders-cta-card {
+        grid-template-columns: 1fr;
+    }
+
+    .orders-cta-decoration {
+        min-height: 130px;
+    }
+}
+
+
+/* ==========================================================
+   17. TABLET PEQUEÑA
+   ========================================================== */
+
+@media (max-width: 700px) {
+
+    .orders-page .container {
+        width: min(100% - 28px, 1180px);
+    }
+
+    .orders-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .orders-section-heading {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 0.7rem;
+    }
+
+    .orders-section-heading p {
+        max-width: 500px;
+    }
+
+    .order-card-header {
+        align-items: flex-start;
+
+        flex-direction: column;
+    }
+
+    .order-status {
+        align-self: flex-start;
+    }
+}
+
+
+/* ==========================================================
+   18. MÓVIL
+   ========================================================== */
+
+@media (max-width: 600px) {
+
+    .orders-hero {
+        padding-top: 3.5rem;
+    }
+
+    .orders-hero-copy h1 {
+        font-size:
+            clamp(
+                2.8rem,
+                14vw,
+                4.2rem
+            );
+    }
+
+    .orders-hero-copy p {
+        font-size: 0.86rem;
+    }
+
+    .orders-hero-visual {
+        min-height: 240px;
+    }
+
+    .orders-hero-circle {
+        width: 220px;
+        height: 220px;
+    }
+
+    .orders-hero-card {
+        width: min(280px, 90%);
+
+        padding: 1.5rem;
+    }
+
+    .orders-summary {
+        margin-top: -18px;
+    }
+
+    .orders-summary-card {
+        min-height: 100px;
+
+        padding: 1rem;
+    }
+
+    .orders-summary-number {
+        min-width: 50px;
+
+        font-size: 2.3rem;
+    }
+
+    .orders-section-heading h2 {
+        font-size: 2.7rem;
+    }
+
+    .order-card-info {
+        grid-template-columns: 1fr;
+
+        gap: 1rem;
+    }
+
+    .order-info-item {
+        padding: 0;
+    }
+
+    .order-info-item + .order-info-item {
+        padding-left: 0;
+
+        padding-top: 1rem;
+
+        border-left: 0;
+
+        border-top: 1px solid #edf0ee;
+    }
+
+    .order-card-footer {
+        align-items: stretch;
+
+        flex-direction: column;
+    }
+
+    .order-detail-btn {
+        width: 100%;
+    }
+
+    .orders-empty {
+        padding:
+            3rem
+            1.2rem;
+    }
+
+    .orders-cta-card {
+        padding: 2rem 1.4rem;
+
+        border-radius: 22px;
+    }
+
+    .orders-cta-copy h2 {
+        font-size: 2.8rem;
+    }
+
+    .orders-cta-decoration strong {
+        font-size: 2.4rem;
+    }
+}
+
+
+/* ==========================================================
+   19. MÓVIL PEQUEÑO
+   ========================================================== */
+
+@media (max-width: 380px) {
+
+    .orders-page .container {
+        width: calc(100% - 22px);
+    }
+
+    .orders-hero-actions {
+        width: 100%;
+    }
+
+    .orders-btn {
+        width: 100%;
+    }
+
+    .order-card {
+        border-radius: 18px;
+    }
+
+    .orders-empty h3 {
+        font-size: 1.9rem;
+    }
+}
+
+
+/* ==========================================================
+   20. ACCESIBILIDAD
+   ========================================================== */
+
+.orders-page a:focus-visible,
+.orders-page button:focus-visible {
+    outline: 3px solid rgba(105, 174, 83, 0.35);
+
+    outline-offset: 3px;
+}
+
+
+/* ==========================================================
+   21. REDUCIR MOVIMIENTO
+   ========================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .orders-page .reveal,
+    .order-card,
+    .orders-summary-card,
+    .orders-btn,
+    .order-detail-btn {
+        transition: none;
+    }
+
+    .orders-page .reveal {
+        opacity: 1;
+
+        transform: none;
+    }
+}
+

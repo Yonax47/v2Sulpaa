@@ -9,6 +9,7 @@ Responsabilidades:
 - precios;
 - reglas comerciales;
 - carrito persistente.
+- pedidos
 
 IMPORTANTE:
 
@@ -17,7 +18,7 @@ El stock se consulta exclusivamente mediante Inventario.
 """
 
 import uuid
-
+from datetime import datetime
 from app.config.database import conexion_comercio
 
 
@@ -1054,3 +1055,524 @@ def eliminar_detalle_carrito(
     finally:
 
         conexion.close()
+# ============================================================
+# PEDIDOS
+# ============================================================
+
+def generar_numero_pedido():
+    """
+    Genera un número único y legible para el pedido.
+
+    Ejemplo:
+    PED-20260905-A1B2C3
+    """
+
+    fecha = datetime.now().strftime("%Y%m%d")
+    codigo = uuid.uuid4().hex[:6].upper()
+
+    return f"PED-{fecha}-{codigo}"
+
+
+def crear_pedido_completo(
+    usuario_id,
+    origen,
+    subtotal,
+    descuento_total,
+    costo_entrega,
+    total,
+    moneda,
+    detalles,
+    datos_cliente,
+    datos_facturacion
+):
+    """
+    Crea el pedido completo en una sola transacción.
+
+    Inserta:
+        pedidos
+        pedido_detalles
+        pedidos_composiciones
+        pedido_datos_cliente
+        pedido_facturacion
+        pedido_historial
+
+    Si algo falla, se hace ROLLBACK.
+    """
+
+    conn = conexion_comercio()
+    cursor = conn.cursor()
+
+    try:
+
+        # ----------------------------------------------------
+        # 1. CABECERA DEL PEDIDO
+        # ----------------------------------------------------
+
+        pedido_id = str(uuid.uuid4())
+        numero_pedido = generar_numero_pedido()
+
+        sql_pedido = """
+            INSERT INTO pedidos (
+                id,
+                numero_pedido,
+                usuario_id,
+                origen,
+                subtotal,
+                descuento_total,
+                costo_entrega,
+                total,
+                moneda,
+                estado,
+                creado_en,
+                actualizado_en
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                'PENDIENTE',
+                NOW(),
+                NOW()
+            )
+        """
+
+        cursor.execute(sql_pedido, (
+            pedido_id,
+            numero_pedido,
+            usuario_id,
+            origen,
+            subtotal,
+            descuento_total,
+            costo_entrega,
+            total,
+            moneda
+        ))
+
+        # ----------------------------------------------------
+        # 2. DETALLES DEL PEDIDO
+        # ----------------------------------------------------
+
+        sql_detalle = """
+            INSERT INTO pedido_detalles (
+                id,
+                pedido_id,
+                articulo_venta_id,
+                nombre_articulo,
+                cantidad,
+                precio_unitario,
+                descuento_unitario,
+                subtotal_linea
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s
+            )
+        """
+
+        # ----------------------------------------------------
+        # 3. COMPOSICIONES
+        # ----------------------------------------------------
+
+        sql_composicion = """
+            INSERT INTO pedidos_composiciones (
+                id,
+                pedido_detalle_id,
+                variante_id,
+                nombre_variante,
+                cantidad
+            )
+            VALUES (
+                %s, %s, %s, %s, %s
+            )
+        """
+
+        for detalle in detalles:
+
+            pedido_detalle_id = str(uuid.uuid4())
+
+            cursor.execute(sql_detalle, (
+                pedido_detalle_id,
+                pedido_id,
+                detalle["articulo_venta_id"],
+                detalle["nombre_articulo"],
+                detalle["cantidad"],
+                detalle["precio_unitario"],
+                detalle["descuento_unitario"],
+                detalle["subtotal_linea"]
+            ))
+
+            # Composiciones del pack
+            for composicion in detalle.get(
+                "composiciones",
+                []
+            ):
+
+                cursor.execute(sql_composicion, (
+                    str(uuid.uuid4()),
+                    pedido_detalle_id,
+                    composicion["variante_id"],
+                    composicion["nombre_variante"],
+                    composicion["cantidad"]
+                ))
+
+        # ----------------------------------------------------
+        # 4. DATOS DEL CLIENTE
+        # ----------------------------------------------------
+
+        sql_cliente = """
+            INSERT INTO pedido_datos_cliente (
+                pedido_id,
+                nombres,
+                apellido_paterno,
+                apellido_materno,
+                dni,
+                telefono,
+                correo
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s
+            )
+        """
+
+        cursor.execute(sql_cliente, (
+            pedido_id,
+            datos_cliente.get("nombres"),
+            datos_cliente.get("apellido_paterno"),
+            datos_cliente.get("apellido_materno"),
+            datos_cliente.get("dni"),
+            datos_cliente.get("telefono"),
+            datos_cliente.get("correo")
+        ))
+
+        # ----------------------------------------------------
+        # 5. FACTURACIÓN
+        # ----------------------------------------------------
+
+        sql_facturacion = """
+            INSERT INTO pedido_facturacion (
+                pedido_id,
+                tipo,
+                dni,
+                ruc,
+                nombre_facturacion,
+                razon_social,
+                distrito_id,
+                direccion_fiscal
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s
+            )
+        """
+
+        cursor.execute(sql_facturacion, (
+            pedido_id,
+            datos_facturacion.get("tipo"),
+            datos_facturacion.get("dni"),
+            datos_facturacion.get("ruc"),
+            datos_facturacion.get("nombre_facturacion"),
+            datos_facturacion.get("razon_social"),
+            datos_facturacion.get("distrito_id"),
+            datos_facturacion.get("direccion_fiscal")
+        ))
+
+        # ----------------------------------------------------
+        # 6. HISTORIAL
+        # ----------------------------------------------------
+
+        sql_historial = """
+            INSERT INTO pedido_historial (
+                id,
+                pedido_id,
+                estado_anterior,
+                estado_nuevo,
+                cambiado_por_usuario_id,
+                origen,
+                comentario,
+                creado_en
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, NOW()
+            )
+        """
+
+        cursor.execute(sql_historial, (
+            str(uuid.uuid4()),
+            pedido_id,
+            None,
+            "PENDIENTE",
+            usuario_id,
+            origen,
+            "Pedido creado desde el checkout."
+        ))
+
+        # ----------------------------------------------------
+        # CONFIRMAR TODA LA TRANSACCIÓN
+        # ----------------------------------------------------
+
+        conn.commit()
+
+        return {
+            "id": pedido_id,
+            "numero_pedido": numero_pedido
+        }
+
+    except Exception:
+
+        conn.rollback()
+        raise
+
+    finally:
+
+        cursor.close()
+        conn.close()
+
+def obtener_pedidos_usuario(usuario_id):
+    """
+    Obtiene todos los pedidos realizados por el usuario autenticado.
+
+    Devuelve los pedidos ordenados del más reciente
+    al más antiguo.
+    """
+
+    conn = conexion_comercio()
+
+    try:
+
+        with conn.cursor() as cursor:
+
+            sql = """
+                SELECT
+                    id,
+                    numero_pedido,
+                    usuario_id,
+                    origen,
+                    subtotal,
+                    descuento_total,
+                    costo_entrega,
+                    total,
+                    moneda,
+                    estado,
+                    creado_en,
+                    actualizado_en
+                FROM pedidos
+                WHERE usuario_id = %s
+                ORDER BY creado_en DESC
+            """
+
+            cursor.execute(
+                sql,
+                (usuario_id,)
+            )
+
+            filas = cursor.fetchall()
+
+            # ------------------------------------------------
+            # Si el cursor ya devuelve diccionarios
+            # ------------------------------------------------
+
+            if not filas:
+                return []
+
+            if isinstance(filas[0], dict):
+                return filas
+
+            # ------------------------------------------------
+            # Si el cursor devuelve tuplas
+            # ------------------------------------------------
+
+            columnas = [
+                columna[0]
+                for columna in cursor.description
+            ]
+
+            return [
+                dict(zip(columnas, fila))
+                for fila in filas
+            ]
+
+    finally:
+
+        conn.close()
+
+def obtener_pedido_usuario(
+    pedido_id,
+    usuario_id
+):
+    """
+    Obtiene un pedido específico.
+
+    IMPORTANTE:
+    El pedido debe pertenecer al usuario autenticado.
+    """
+
+    conn = conexion_comercio()
+
+    try:
+
+        with conn.cursor() as cursor:
+
+            sql = """
+                SELECT
+                    id,
+                    numero_pedido,
+                    usuario_id,
+                    origen,
+                    subtotal,
+                    descuento_total,
+                    costo_entrega,
+                    total,
+                    moneda,
+                    estado,
+                    creado_en,
+                    actualizado_en
+                FROM pedidos
+                WHERE id = %s
+                  AND usuario_id = %s
+                LIMIT 1
+            """
+
+            cursor.execute(
+                sql,
+                (
+                    pedido_id,
+                    usuario_id
+                )
+            )
+
+            fila = cursor.fetchone()
+
+            if not fila:
+                return None
+
+            if isinstance(fila, dict):
+                return fila
+
+            columnas = [
+                columna[0]
+                for columna in cursor.description
+            ]
+
+            return dict(
+                zip(
+                    columnas,
+                    fila
+                )
+            )
+
+    finally:
+
+        conn.close()
+
+def obtener_detalles_pedido(pedido_id):
+    """
+    Obtiene los productos pertenecientes a un pedido.
+    """
+
+    conn = conexion_comercio()
+
+    try:
+
+        with conn.cursor() as cursor:
+
+            sql = """
+                SELECT
+                    id,
+                    pedido_id,
+                    articulo_venta_id,
+                    nombre_articulo,
+                    cantidad,
+                    precio_unitario,
+                    descuento_unitario,
+                    subtotal_linea
+                FROM pedido_detalles
+                WHERE pedido_id = %s
+                ORDER BY id
+            """
+
+            cursor.execute(
+                sql,
+                (pedido_id,)
+            )
+
+            filas = cursor.fetchall()
+
+            if not filas:
+                return []
+
+            if isinstance(filas[0], dict):
+                return filas
+
+            columnas = [
+                columna[0]
+                for columna in cursor.description
+            ]
+
+            return [
+                dict(zip(columnas, fila))
+                for fila in filas
+            ]
+
+    finally:
+
+        conn.close()
+
+def obtener_composiciones_pedido(
+    pedido_detalle_id
+):
+
+    conn = conexion_comercio()
+
+    try:
+
+        with conn.cursor() as cursor:
+
+            sql = """
+                SELECT
+                    variante_id,
+                    nombre_variante,
+                    cantidad
+                FROM pedidos_composiciones
+                WHERE pedido_detalle_id = %s
+                ORDER BY variante_id
+            """
+
+            cursor.execute(
+                sql,
+                (pedido_detalle_id,)
+            )
+
+            filas = cursor.fetchall()
+
+            columnas = [
+                columna[0]
+                for columna in cursor.description
+            ]
+
+            composiciones = [
+                dict(zip(columnas, fila))
+                for fila in filas
+            ]
+
+            return composiciones
+
+    finally:
+
+        conn.close()
+
+def cerrar_carrito_usuario(usuario_id):
+
+    conn = conexion_comercio()
+    cursor = conn.cursor()
+
+    sql = """
+        UPDATE carritos
+        SET
+            estado = 'CERRADO',
+            actualizado_en = NOW()
+        WHERE usuario_id = %s
+          AND estado = 'ACTIVO'
+    """
+
+    cursor.execute(sql, (usuario_id,))
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
