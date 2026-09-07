@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Mis pedidos | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/orders.css') }}"
+>
+
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="orders-page">
+
+
+    <!-- ======================================================
+         1. HERO
+         ====================================================== -->
+
+    <section class="orders-hero">
+
+        <span
+            class="orders-hero-shape orders-hero-shape-one"
+            aria-hidden="true"
+        ></span>
+
+        <span
+            class="orders-hero-shape orders-hero-shape-two"
+            aria-hidden="true"
+        ></span>
+
+
+        <div class="container orders-hero-grid">
+
+            <div class="orders-hero-copy reveal reveal-left">
+
+                <span class="orders-kicker">
+                    MI CUENTA · SULPAA
+                </span>
+
+                <h1>
+                    Tus pedidos,
+                    <span>siempre contigo.</span>
+                </h1>
+
+                <p>
+                    Consulta tus compras, revisa el estado de cada pedido
+                    y vuelve a descubrir tus productos favoritos.
+                </p>
+
+                <div class="orders-hero-actions">
+
+                    <a
+                        href="{{ url_for('comercio.tienda') }}"
+                        class="orders-btn orders-btn-primary"
+                    >
+                        Seguir comprando
+                        <span aria-hidden="true">→</span>
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <div class="orders-hero-visual reveal reveal-right">
+
+                <div
+                    class="orders-hero-circle"
+                    aria-hidden="true"
+                ></div>
+
+                <div class="orders-hero-card">
+
+                    <span class="orders-hero-icon">
+                        ✦
+                    </span>
+
+                    <strong>
+                        Tu historial SULPAA
+                    </strong>
+
+                    <small>
+                        Compra · disfruta · repite
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         2. RESUMEN
+         ====================================================== -->
+
+    <section class="orders-summary">
+
+        <div class="container">
+
+            <div class="orders-summary-grid">
+
+                <article class="orders-summary-card reveal">
+
+                    <span class="orders-summary-number">
+                        {{ pedidos|length }}
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Pedidos realizados
+                        </strong>
+
+                        <p>
+                            Tu historial de compras.
+                        </p>
+
+                    </div>
+
+                </article>
+
+
+                <article class="orders-summary-card orders-summary-highlight reveal">
+
+                    <span class="orders-summary-icon">
+                        ✦
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Compra con tranquilidad
+                        </strong>
+
+                        <p>
+                            Consulta el estado de cada pedido.
+                        </p>
+
+                    </div>
+
+                </article>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         3. LISTADO DE PEDIDOS
+         ====================================================== -->
+
+    <section class="orders-list">
+
+        <div class="container">
+
+
+            <div class="orders-section-heading reveal">
+
+                <div>
+
+                    <span class="orders-kicker">
+                        HISTORIAL DE COMPRAS
+                    </span>
+
+                    <h2>
+                        Tus pedidos
+                        <span>en un solo lugar.</span>
+                    </h2>
+
+                </div>
+
+                <p>
+                    Revisa la información de tus compras
+                    y consulta el detalle cuando quieras.
+                </p>
+
+            </div>
+
+
+            {% if pedidos %}
+
+
+                <div class="orders-grid">
+
+                    {% for pedido in pedidos %}
+
+                        <article
+                            class="order-card reveal"
+                            style="--reveal-delay: {{ loop.index0 * 80 }}ms;"
+                        >
+
+
+                            <!-- CABECERA -->
+
+                            <div class="order-card-header">
+
+                                <div>
+
+                                    <span class="order-label">
+                                        PEDIDO
+                                    </span>
+
+                                    <h3>
+                                        {{ pedido.numero_pedido }}
+                                    </h3>
+
+                                </div>
+
+
+                                <div class="order-status">
+
+                                    {% if pedido.estado == 'PENDIENTE' %}
+
+                                        <span class="order-status-dot status-pending"></span>
+
+                                        <span class="order-status-text status-pending-text">
+                                            Pendiente
+                                        </span>
+
+                                    {% elif pedido.estado == 'CONFIRMADO' %}
+
+                                        <span class="order-status-dot status-confirmed"></span>
+
+                                        <span class="order-status-text status-confirmed-text">
+                                            Confirmado
+                                        </span>
+
+                                    {% elif pedido.estado == 'EN_PREPARACION' %}
+
+                                        <span class="order-status-dot status-preparing"></span>
+
+                                        <span class="order-status-text status-preparing-text">
+                                            En preparación
+                                        </span>
+
+                                    {% elif pedido.estado == 'ENVIADO' %}
+
+                                        <span class="order-status-dot status-shipped"></span>
+
+                                        <span class="order-status-text status-shipped-text">
+                                            Enviado
+                                        </span>
+
+                                    {% elif pedido.estado == 'ENTREGADO' %}
+
+                                        <span class="order-status-dot status-delivered"></span>
+
+                                        <span class="order-status-text status-delivered-text">
+                                            Entregado
+                                        </span>
+
+                                    {% elif pedido.estado == 'CANCELADO' %}
+
+                                        <span class="order-status-dot status-cancelled"></span>
+
+                                        <span class="order-status-text status-cancelled-text">
+                                            Cancelado
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="order-status-dot status-default"></span>
+
+                                        <span class="order-status-text">
+                                            {{ pedido.estado }}
+                                        </span>
+
+                                    {% endif %}
+
+                                </div>
+
+                            </div>
+
+
+                            <!-- INFORMACIÓN -->
+
+                            <div class="order-card-info">
+
+
+                                <div class="order-info-item">
+
+                                    <span>
+                                        Fecha
+                                    </span>
+
+                                    <strong>
+
+                                        {% if pedido.creado_en %}
+
+                                            {{ pedido.creado_en.strftime(
+                                                '%d/%m/%Y'
+                                            ) }}
+
+                                        {% else %}
+
+                                            —
+
+                                        {% endif %}
+
+                                    </strong>
+
+                                </div>
+
+
+                                <div class="order-info-item">
+
+                                    <span>
+                                        Hora
+                                    </span>
+
+                                    <strong>
+
+                                        {% if pedido.creado_en %}
+
+                                            {{ pedido.creado_en.strftime(
+                                                '%H:%M'
+                                            ) }}
+
+                                        {% else %}
+
+                                            —
+
+                                        {% endif %}
+
+                                    </strong>
+
+                                </div>
+
+
+                                <div class="order-info-item">
+
+                                    <span>
+                                        Total
+                                    </span>
+
+                                    <strong class="order-total">
+
+                                        S/
+                                        {{ "%.2f"|format(
+                                            pedido.total|float
+                                        ) }}
+
+                                    </strong>
+
+                                </div>
+
+                            </div>
+
+
+                            <!-- SEPARADOR -->
+
+                            <div class="order-card-divider"></div>
+
+
+                            <!-- FOOTER -->
+
+                            <div class="order-card-footer">
+
+                                <span>
+                                    Consulta todos los productos
+                                    de este pedido.
+                                </span>
+
+
+                                <a
+                                    href="{{ url_for(
+                                        'comercio.detalle_pedido',
+                                        pedido_id=pedido.id
+                                    ) }}"
+                                    class="order-detail-btn"
+                                >
+                                    Ver detalle
+                                    <span aria-hidden="true">→</span>
+                                </a>
+
+                            </div>
+
+                        </article>
+
+                    {% endfor %}
+
+                </div>
+
+
+            {% else %}
+
+
+                <!-- ==================================================
+                     ESTADO VACÍO
+                     ================================================== -->
+
+                <div class="orders-empty reveal">
+
+                    <div class="orders-empty-visual">
+
+                        <div
+                            class="orders-empty-circle"
+                            aria-hidden="true"
+                        ></div>
+
+                        <span aria-hidden="true">
+                            ✦
+                        </span>
+
+                    </div>
+
+
+                    <div class="orders-empty-content">
+
+                        <span class="orders-kicker">
+                            TU HISTORIAL
+                        </span>
+
+                        <h3>
+                            Todavía no tienes pedidos.
+                        </h3>
+
+                        <p>
+                            Cuando realices tu primera compra,
+                            podrás verla aquí junto con todos
+                            sus detalles y estado.
+                        </p>
+
+
+                        <a
+                            href="{{ url_for('comercio.tienda') }}"
+                            class="orders-btn orders-btn-primary"
+                        >
+                            Descubrir SULPAA
+                            <span aria-hidden="true">→</span>
+                        </a>
+
+                    </div>
+
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         4. CTA
+         ====================================================== -->
+
+    <section class="orders-cta">
+
+        <div class="container">
+
+            <div class="orders-cta-card reveal">
+
+                <div class="orders-cta-copy">
+
+                    <span class="orders-kicker orders-kicker-light">
+                        SULPAA TE ESPERA
+                    </span>
+
+                    <h2>
+                        ¿Quieres descubrir
+                        <span>algo nuevo?</span>
+                    </h2>
+
+                    <p>
+                        Explora nuestros sabores, arma tu pack
+                        y encuentra tu próxima combinación favorita.
+                    </p>
+
+                    <a
+                        href="{{ url_for('comercio.tienda') }}"
+                        class="orders-btn orders-btn-white"
+                    >
+                        Ir a la tienda
+                        <span aria-hidden="true">→</span>
+                    </a>
+
+                </div>
+
+
+                <div class="orders-cta-decoration">
+
+                    <span>✦</span>
+                    <strong>
+                        SULPAA
+                    </strong>
+                    <small>
+                        Sabores para descubrir.
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+{% endblock %}
+
+
+{% block page_js %}
+
+<script
+    src="{{ url_for('static', filename='js/modules/navbar.js') }}"
+    defer
+></script>
+
+{% endblock %}
+
