@@ -26,10 +26,22 @@ from app.comercio.repositories import (
     guardar_item_carrito,
     actualizar_cantidad_detalle_carrito,
     eliminar_detalle_carrito,
+    obtener_carrito_activo_usuario,
 )
 
 from app.inventario.services import (
     obtener_disponibilidad_variantes,
+)
+
+from decimal import Decimal
+
+from app.comercio.repositories import (
+    crear_pedido_completo,
+    cerrar_carrito_usuario,
+    obtener_pedidos_usuario,
+    obtener_pedido_usuario,
+    obtener_detalles_pedido,
+    obtener_composiciones_pedido,
 )
 
 
@@ -1575,3 +1587,398 @@ def eliminar_item_carrito(
                 usuario_id
             ),
     }
+
+def validar_stock_carrito_pedido(usuario_id):
+
+    detalles = obtener_detalles_carrito_usuario(
+        usuario_id
+    )
+
+    consumo = {}
+
+    for detalle in detalles:
+
+        articulo = obtener_articulo_venta_por_id(
+            detalle["articulo_venta_id"]
+        )
+
+        if not articulo:
+            continue
+
+        cantidad_item = int(
+            detalle["cantidad"]
+        )
+
+        # --------------------------------------------
+        # VARIANTE
+        # --------------------------------------------
+
+        if articulo["tipo"] == "VARIANTE":
+
+            variante_id = articulo["variante_id"]
+
+            consumo[variante_id] = (
+                consumo.get(variante_id, 0)
+                + cantidad_item
+            )
+
+        # --------------------------------------------
+        # PACK
+        # --------------------------------------------
+
+        elif articulo["tipo"] == "PACK":
+
+            # PACK FIJO
+            if articulo.get("tipo_pack") == "FIJO":
+
+                componentes = obtener_componentes_packs(
+                    [articulo["pack_id"]]
+                )
+
+                for componente in componentes:
+
+                    variante_id = componente["variante_id"]
+
+                    cantidad = (
+                        int(componente["cantidad"])
+                        * cantidad_item
+                    )
+
+                    consumo[variante_id] = (
+                        consumo.get(variante_id, 0)
+                        + cantidad
+                    )
+
+            # PACK PERSONALIZABLE
+            else:
+
+                composiciones = obtener_composiciones_carrito(
+                    [detalle["id"]]
+                )
+
+                for composicion in composiciones:
+
+                    variante_id = composicion["variante_id"]
+
+                    cantidad = (
+                        int(composicion["cantidad"])
+                        * cantidad_item
+                    )
+
+                    consumo[variante_id] = (
+                        consumo.get(variante_id, 0)
+                        + cantidad
+                    )
+
+    if not consumo:
+
+        return {
+            "valido": True,
+            "errores": []
+        }
+
+    disponibilidad = obtener_disponibilidad_variantes(
+        list(consumo.keys())
+    )
+
+    errores = []
+
+    for variante_id, cantidad_solicitada in consumo.items():
+
+        stock = disponibilidad.get(
+            variante_id,
+            {}
+        )
+
+        stock_disponible = int(
+            stock.get(
+                "stock_disponible",
+                0
+            )
+        )
+
+        if cantidad_solicitada > stock_disponible:
+
+            errores.append({
+                "variante_id": variante_id,
+                "solicitado": cantidad_solicitada,
+                "disponible": stock_disponible
+            })
+
+    return {
+        "valido": len(errores) == 0,
+        "errores": errores
+    }
+
+def confirmar_pedido(
+    usuario_id,
+    datos_cliente,
+    datos_facturacion,
+    costo_entrega=Decimal("0.00")
+):
+
+    # ==================================================
+    # 1. COMPROBAR CARRITO
+    # ==================================================
+
+    carrito = obtener_carrito_activo_usuario(
+        usuario_id
+    )
+
+    if not carrito:
+
+        return {
+            "ok": False,
+            "mensaje": "No tienes un carrito activo."
+        }
+
+    detalles_carrito = obtener_detalles_carrito_usuario(
+        usuario_id
+    )
+
+    if not detalles_carrito:
+
+        return {
+            "ok": False,
+            "mensaje": "El carrito está vacío."
+        }
+
+    # ==================================================
+    # 2. VALIDAR STOCK NUEVAMENTE
+    # ==================================================
+
+    validacion = validar_stock_carrito_pedido(
+        usuario_id
+    )
+
+    if not validacion["valido"]:
+
+        return {
+            "ok": False,
+            "mensaje": (
+                "Algunos productos ya no tienen "
+                "stock suficiente."
+            ),
+            "errores": validacion["errores"]
+        }
+
+    # ==================================================
+    # 3. CALCULAR TOTALES
+    # ==================================================
+
+    subtotal = Decimal("0.00")
+    descuento_total = Decimal("0.00")
+
+    detalles_pedido = []
+
+    for detalle in detalles_carrito:
+
+        cantidad = int(
+            detalle["cantidad"]
+        )
+
+        precio_unitario = Decimal(
+            str(
+                detalle.get(
+                    "precio",
+                    0
+                )
+            )
+        )
+
+        descuento_unitario = Decimal(
+            str(
+                detalle.get(
+                    "descuento_unitario",
+                    0
+                )
+            )
+        )
+
+        subtotal_linea = (
+            precio_unitario
+            * cantidad
+        )
+
+        descuento_linea = (
+            descuento_unitario
+            * cantidad
+        )
+
+        subtotal += subtotal_linea
+
+        descuento_total += descuento_linea
+
+        # ----------------------------------------------
+        # COMPOSICIONES DEL CARRITO
+        # ----------------------------------------------
+
+        composiciones_carrito = (
+            obtener_composiciones_carrito(
+                [detalle["id"]]
+            )
+        )
+
+        composiciones_pedido = []
+
+        for composicion in composiciones_carrito:
+
+            composiciones_pedido.append({
+                "variante_id": composicion["variante_id"],
+                "nombre_variante": composicion.get(
+                    "nombre_variante",
+                    ""
+                ),
+                "cantidad": composicion["cantidad"]
+            })
+
+        detalles_pedido.append({
+
+            "articulo_venta_id": (
+                detalle["articulo_venta_id"]
+            ),
+
+            "nombre_articulo": (
+                detalle.get(
+                    "nombre_articulo",
+                    "Producto"
+                )
+            ),
+
+            "cantidad": cantidad,
+
+            "precio_unitario": (
+                precio_unitario
+            ),
+
+            "descuento_unitario": (
+                descuento_unitario
+            ),
+
+            "subtotal_linea": (
+                subtotal_linea
+            ),
+
+            "composiciones": (
+                composiciones_pedido
+            )
+        })
+
+    # ==================================================
+    # 4. TOTAL
+    # ==================================================
+
+    costo_entrega = Decimal(
+        str(costo_entrega)
+    )
+
+    total = (
+        subtotal
+        - descuento_total
+        + costo_entrega
+    )
+
+    if total < 0:
+
+        return {
+            "ok": False,
+            "mensaje": "El total del pedido no puede ser negativo."
+        }
+
+    # ==================================================
+    # 5. CREAR PEDIDO
+    # ==================================================
+
+    pedido = crear_pedido_completo(
+
+        usuario_id=usuario_id,
+
+        origen="WEB",
+
+        subtotal=subtotal,
+
+        descuento_total=descuento_total,
+
+        costo_entrega=costo_entrega,
+
+        total=total,
+
+        moneda="PEN",
+
+        detalles=detalles_pedido,
+
+        datos_cliente=datos_cliente,
+
+        datos_facturacion=datos_facturacion
+    )
+
+    # ==================================================
+    # 6. CERRAR CARRITO
+    # ==================================================
+
+    cerrar_carrito_usuario(
+        usuario_id
+    )
+
+    # ==================================================
+    # 7. RESPUESTA
+    # ==================================================
+
+    return {
+
+        "ok": True,
+
+        "pedido_id": pedido["id"],
+
+        "numero_pedido": (
+            pedido["numero_pedido"]
+        ),
+
+        "subtotal": subtotal,
+
+        "descuento_total": (
+            descuento_total
+        ),
+
+        "costo_entrega": (
+            costo_entrega
+        ),
+
+        "total": total
+    }
+
+def obtener_mis_pedidos(usuario_id):
+
+    return obtener_pedidos_usuario(
+        usuario_id
+    )
+
+def obtener_mi_pedido(
+    pedido_id,
+    usuario_id
+):
+
+    pedido = obtener_pedido_usuario(
+        pedido_id,
+        usuario_id
+    )
+
+    if not pedido:
+        return None
+
+    detalles = obtener_detalles_pedido(
+        pedido_id
+    )
+
+    for detalle in detalles:
+
+        detalle["composiciones"] = (
+            obtener_composiciones_pedido(
+                detalle["id"]
+            )
+        )
+
+    pedido["detalles"] = detalles
+
+    return pedido
+

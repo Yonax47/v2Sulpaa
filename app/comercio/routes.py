@@ -26,6 +26,9 @@ from app.comercio.services import (
     obtener_carrito_usuario,
     actualizar_item_carrito,
     eliminar_item_carrito,
+    confirmar_pedido,
+    obtener_mis_pedidos,
+    obtener_mi_pedido,
 )
 
 from app.identidad.services import (
@@ -433,20 +436,90 @@ def checkout():
         departamentos=departamentos,
     )
 
-    # --------------------------------------------------------
-    # Datos del cliente
-    # --------------------------------------------------------
+@comercio_bp.route(
+    "/api/pedidos/crear",
+    methods=["POST"]
+)
+@login_required
+def crear_pedido():
 
-    datos_checkout = obtener_checkout_usuario(
+    usuario_id = session["usuario_id"]
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "ok": False,
+            "mensaje": "No se recibieron datos."
+        }), 400
+
+    datos_cliente = data.get(
+        "cliente",
+        {}
+    )
+
+    datos_facturacion = data.get(
+        "facturacion",
+        {}
+    )
+
+    costo_entrega = data.get(
+        "costo_entrega",
+        0
+    )
+
+    resultado = confirmar_pedido(
+
+        usuario_id=usuario_id,
+
+        datos_cliente=datos_cliente,
+
+        datos_facturacion=datos_facturacion,
+
+        costo_entrega=costo_entrega
+    )
+
+    if not resultado["ok"]:
+
+        return jsonify(resultado), 400
+
+    return jsonify(resultado), 201
+
+@comercio_bp.route("/pedidos")
+@login_required
+def mis_pedidos():
+    usuario_id = session["usuario_id"]
+    pedidos = obtener_mis_pedidos(usuario_id)
+
+    return render_template(
+        "cliente/pedidos.html",
+        pedidos=pedidos
+    )
+
+@comercio_bp.route(
+    "/pedidos/<pedido_id>"
+)
+@login_required
+def detalle_pedido(pedido_id):
+
+    usuario_id = session["usuario_id"]
+
+    pedido = obtener_mi_pedido(
+        pedido_id,
         usuario_id
     )
 
+    if not pedido:
+
+        return render_template(
+            "cliente/pedido_detalle.html",
+            pedido=None,
+            detalles=[]
+        ), 404
+
     return render_template(
-        "cliente/checkout.html",
-
-        carrito=carrito,
-
-        checkout=datos_checkout,
-
-        carrito_vacio=False,
+        "cliente/pedido_detalle.html",
+        pedido=pedido,
+        detalles=pedido["detalles"]
     )
+
