@@ -44,6 +44,7 @@ from app.identidad.services import (
     registrar_direccion_usuario,
     validar_dni_con_perfil,
     validar_ruc_facturacion,
+    registrar_facturacion_checkout,
 )
 
 
@@ -503,6 +504,43 @@ def verificar_ruc_facturacion():
 
     resultado = validar_ruc_facturacion(
         ruc=datos.get("ruc"),
+    )
+
+    if not resultado["ok"]:
+        return jsonify(
+            resultado
+        ), 400
+
+    return jsonify(
+        resultado
+    ), 200
+
+# ============================================================
+# GUARDAR FACTURACIÓN DEL CHECKOUT
+# Implementación rama: serna
+# ============================================================
+
+@identidad_bp.route(
+    "/api/facturacion/guardar",
+    methods=["POST"],
+)
+@login_required
+def guardar_facturacion_checkout():
+    """
+    Guarda los datos de facturación del usuario autenticado.
+
+    El documento se vuelve a verificar desde el backend
+    antes de persistir la información.
+    """
+
+    datos = request.get_json(
+        silent=True
+    ) or {}
+
+    resultado = registrar_facturacion_checkout(
+        usuario_id=session["usuario_id"],
+        tipo=datos.get("tipo"),
+        documento=datos.get("documento"),
     )
 
     if not resultado["ok"]:

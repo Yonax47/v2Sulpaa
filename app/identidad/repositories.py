@@ -562,3 +562,195 @@ def buscar_distrito_activo(
 
     finally:
         conexion.close()
+
+# ============================================================
+# GUARDAR DATOS DE FACTURACIÓN
+# Implementación rama: serna
+# ============================================================
+
+def guardar_datos_facturacion(
+    facturacion_id,
+    usuario_id,
+    tipo,
+    dni=None,
+    ruc=None,
+    nombre_facturacion=None,
+    razon_social=None,
+    distrito_id=None,
+    direccion_fiscal=None,
+):
+    """
+    Guarda los datos de facturación verificados del usuario.
+
+    Si el mismo documento ya existe como registro activo,
+    se actualiza en lugar de crear un duplicado.
+
+    El registro utilizado queda marcado como predeterminado.
+    """
+
+    conexion = conexion_identidad()
+
+    try:
+        with conexion.cursor() as cursor:
+
+            # ------------------------------------------------
+            # 1. Buscar un registro existente
+            # ------------------------------------------------
+
+            if tipo == "PERSONA":
+
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM datos_facturacion
+                    WHERE
+                        usuario_id = %s
+                        AND tipo = 'PERSONA'
+                        AND dni = %s
+                        AND estado = 'ACTIVO'
+                    LIMIT 1
+                    FOR UPDATE
+                    """,
+                    (
+                        usuario_id,
+                        dni,
+                    ),
+                )
+
+            elif tipo == "EMPRESA":
+
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM datos_facturacion
+                    WHERE
+                        usuario_id = %s
+                        AND tipo = 'EMPRESA'
+                        AND ruc = %s
+                        AND estado = 'ACTIVO'
+                    LIMIT 1
+                    FOR UPDATE
+                    """,
+                    (
+                        usuario_id,
+                        ruc,
+                    ),
+                )
+
+            else:
+                raise ValueError(
+                    "Tipo de facturación inválido."
+                )
+
+            existente = cursor.fetchone()
+
+            # ------------------------------------------------
+            # 2. Quitar condición de predeterminado
+            #    a los registros anteriores
+            # ------------------------------------------------
+
+            cursor.execute(
+                """
+                UPDATE datos_facturacion
+                SET es_predeterminado = 0
+                WHERE
+                    usuario_id = %s
+                    AND estado = 'ACTIVO'
+                """,
+                (
+                    usuario_id,
+                ),
+            )
+
+            # ------------------------------------------------
+            # 3. Actualizar si ya existe
+            # ------------------------------------------------
+
+            if existente:
+
+                cursor.execute(
+                    """
+                    UPDATE datos_facturacion
+                    SET
+                        dni = %s,
+                        ruc = %s,
+                        nombre_facturacion = %s,
+                        razon_social = %s,
+                        distrito_id = %s,
+                        direccion_fiscal = %s,
+                        es_predeterminado = 1
+                    WHERE id = %s
+                    """,
+                    (
+                        dni,
+                        ruc,
+                        nombre_facturacion,
+                        razon_social,
+                        distrito_id,
+                        direccion_fiscal,
+                        existente["id"],
+                    ),
+                )
+
+                resultado_id = existente["id"]
+
+            # ------------------------------------------------
+            # 4. Crear si todavía no existe
+            # ------------------------------------------------
+
+            else:
+
+                cursor.execute(
+                    """
+                    INSERT INTO datos_facturacion (
+                        id,
+                        usuario_id,
+                        tipo,
+                        dni,
+                        ruc,
+                        nombre_facturacion,
+                        razon_social,
+                        distrito_id,
+                        direccion_fiscal,
+                        es_predeterminado,
+                        estado
+                    )
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        1,
+                        'ACTIVO'
+                    )
+                    """,
+                    (
+                        facturacion_id,
+                        usuario_id,
+                        tipo,
+                        dni,
+                        ruc,
+                        nombre_facturacion,
+                        razon_social,
+                        distrito_id,
+                        direccion_fiscal,
+                    ),
+                )
+
+                resultado_id = facturacion_id
+
+        conexion.commit()
+
+        return resultado_id
+
+    except Exception:
+        conexion.rollback()
+        raise
+
+    finally:
+        conexion.close()

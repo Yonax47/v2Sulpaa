@@ -1,6 +1,5 @@
 "use strict";
 
-
 document.addEventListener(
     "DOMContentLoaded",
     () => {
@@ -9,9 +8,9 @@ document.addEventListener(
         // ELEMENTOS DE COMPROBANTE
         // Implementación rama: serna
         //
-        // Este módulo controla la selección entre
-        // BOLETA y FACTURA, además de las verificaciones
-        // de identidad y datos tributarios mediante backend.
+        // Controla la selección entre BOLETA y FACTURA,
+        // la verificación de DNI/RUC mediante backend
+        // y la persistencia de los datos de facturación.
         // ====================================================
 
         const boletaRadio = document.getElementById(
@@ -146,7 +145,61 @@ document.addEventListener(
 
 
         // ====================================================
-        // VERIFICAR DNI
+        // GUARDAR FACTURACIÓN VERIFICADA
+        // Implementación rama: serna
+        //
+        // El frontend envía únicamente:
+        // - tipo de comprobante
+        // - documento
+        //
+        // El backend vuelve a verificar la información
+        // antes de guardarla en datos_facturacion.
+        // ====================================================
+
+        async function saveBilling(
+            type,
+            documentNumber
+        ) {
+
+            const response = await fetch(
+                "/identidad/api/facturacion/guardar",
+                {
+                    method: "POST",
+
+                    credentials: "same-origin",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        tipo: type,
+                        documento: documentNumber
+                    })
+                }
+            );
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.mensaje
+                    || "No se pudieron guardar los datos de facturación."
+                );
+            }
+
+
+            return data;
+        }
+
+
+        // ====================================================
+        // VERIFICAR Y GUARDAR DNI
         // ====================================================
 
         if (
@@ -170,6 +223,8 @@ document.addEventListener(
                     dniMessage.textContent = "";
                     dniResult.hidden = true;
 
+                    delete dniResult.dataset.facturacionId;
+
 
                     if (dni.length !== 8) {
 
@@ -192,6 +247,10 @@ document.addEventListener(
 
 
                     try {
+
+                        // ------------------------------------
+                        // 1. Verificar DNI
+                        // ------------------------------------
 
                         const response = await fetch(
                             "/identidad/api/facturacion/verificar-dni",
@@ -229,6 +288,10 @@ document.addEventListener(
                             data.persona;
 
 
+                        // ------------------------------------
+                        // 2. Mostrar titular verificado
+                        // ------------------------------------
+
                         dniName.textContent = [
                             persona.nombres,
                             persona.apellido_paterno,
@@ -238,8 +301,27 @@ document.addEventListener(
                             .join(" ");
 
 
+                        // ------------------------------------
+                        // 3. Guardar facturación
+                        // ------------------------------------
+
+                        const billingData =
+                            await saveBilling(
+                                "BOLETA",
+                                dni
+                            );
+
+
+                        // ------------------------------------
+                        // 4. Conservar facturacion_id
+                        // ------------------------------------
+
+                        dniResult.dataset.facturacionId =
+                            billingData.facturacion_id;
+
+
                         dniMessage.textContent =
-                            data.mensaje;
+                            billingData.mensaje;
 
                         dniResult.hidden = false;
 
@@ -248,6 +330,11 @@ document.addEventListener(
 
                         dniMessage.textContent =
                             error.message;
+
+                        dniResult.hidden = true;
+
+                        delete dniResult.dataset.facturacionId;
+
 
                     } finally {
 
@@ -262,13 +349,11 @@ document.addEventListener(
 
 
         // ====================================================
-        // VERIFICAR RUC
+        // VERIFICAR Y GUARDAR RUC
         // Implementación rama: serna
         //
-        // El navegador envía únicamente el RUC.
-        // El backend realiza la consulta a APIsPERU
-        // y devuelve los datos tributarios verificados.
-        // El token privado nunca se expone al frontend.
+        // El token de APIsPERU permanece exclusivamente
+        // en backend y nunca se expone al navegador.
         // ====================================================
 
         if (
@@ -296,6 +381,8 @@ document.addEventListener(
                     rucMessage.textContent = "";
                     rucResult.hidden = true;
 
+                    delete rucResult.dataset.facturacionId;
+
 
                     if (ruc.length !== 11) {
 
@@ -318,6 +405,10 @@ document.addEventListener(
 
 
                     try {
+
+                        // ------------------------------------
+                        // 1. Verificar RUC
+                        // ------------------------------------
 
                         const response = await fetch(
                             "/identidad/api/facturacion/verificar-ruc",
@@ -355,6 +446,10 @@ document.addEventListener(
                             data.empresa;
 
 
+                        // ------------------------------------
+                        // 2. Mostrar empresa verificada
+                        // ------------------------------------
+
                         rucBusinessName.textContent =
                             empresa.razon_social
                             || "No disponible";
@@ -385,8 +480,27 @@ document.addEventListener(
                             || "No disponible";
 
 
+                        // ------------------------------------
+                        // 3. Guardar facturación
+                        // ------------------------------------
+
+                        const billingData =
+                            await saveBilling(
+                                "FACTURA",
+                                ruc
+                            );
+
+
+                        // ------------------------------------
+                        // 4. Conservar facturacion_id
+                        // ------------------------------------
+
+                        rucResult.dataset.facturacionId =
+                            billingData.facturacion_id;
+
+
                         rucMessage.textContent =
-                            data.mensaje;
+                            billingData.mensaje;
 
                         rucResult.hidden = false;
 
@@ -395,6 +509,11 @@ document.addEventListener(
 
                         rucMessage.textContent =
                             error.message;
+
+                        rucResult.hidden = true;
+
+                        delete rucResult.dataset.facturacionId;
+
 
                     } finally {
 

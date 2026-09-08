@@ -30,6 +30,7 @@ from app.identidad.repositories import (
     obtener_distritos_por_provincia,
     crear_direccion_usuario,
     buscar_distrito_activo,
+    guardar_datos_facturacion,
 )
 
 from app.shared.validators import (
@@ -1078,4 +1079,121 @@ def validar_ruc_facturacion(ruc):
             "distrito":
                 distrito,
         },
+    }
+
+# ============================================================
+# GUARDAR FACTURACIÓN VERIFICADA DEL CHECKOUT
+# Implementación rama: serna
+# ============================================================
+
+def registrar_facturacion_checkout(
+    usuario_id,
+    tipo,
+    documento,
+):
+    """
+    Verifica nuevamente el documento desde el backend
+    antes de guardar los datos de facturación.
+
+    El navegador únicamente indica el tipo de comprobante
+    y el documento. Los nombres oficiales, razón social
+    y dirección fiscal provienen de la validación backend.
+    """
+
+    tipo = (tipo or "").strip().upper()
+    documento = (documento or "").strip()
+
+    # --------------------------------------------------------
+    # BOLETA
+    # --------------------------------------------------------
+
+    if tipo == "BOLETA":
+
+        resultado = validar_dni_con_perfil(
+            usuario_id=usuario_id,
+            dni=documento,
+        )
+
+        if not resultado.get("ok"):
+            return resultado
+
+        persona = resultado["persona"]
+
+        facturacion_id = str(
+            uuid.uuid4()
+        )
+
+        resultado_id = guardar_datos_facturacion(
+            facturacion_id=facturacion_id,
+            usuario_id=usuario_id,
+            tipo="PERSONA",
+            dni=persona["dni"],
+            ruc=None,
+            nombre_facturacion=persona["nombre_completo"],
+            razon_social=None,
+            distrito_id=None,
+            direccion_fiscal=None,
+        )
+
+        return {
+            "ok": True,
+            "mensaje":
+                "Datos de boleta guardados correctamente.",
+            "facturacion_id":
+                resultado_id,
+            "tipo":
+                "BOLETA",
+        }
+
+    # --------------------------------------------------------
+    # FACTURA
+    # --------------------------------------------------------
+
+    if tipo == "FACTURA":
+
+        resultado = validar_ruc_facturacion(
+            documento
+        )
+
+        if not resultado.get("ok"):
+            return resultado
+
+        empresa = resultado["empresa"]
+
+        facturacion_id = str(
+            uuid.uuid4()
+        )
+
+        resultado_id = guardar_datos_facturacion(
+            facturacion_id=facturacion_id,
+            usuario_id=usuario_id,
+            tipo="EMPRESA",
+            dni=None,
+            ruc=empresa["ruc"],
+            nombre_facturacion=None,
+            razon_social=empresa["razon_social"],
+            distrito_id=None,
+            direccion_fiscal=(
+                empresa["direccion"] or None
+            ),
+        )
+
+        return {
+            "ok": True,
+            "mensaje":
+                "Datos de factura guardados correctamente.",
+            "facturacion_id":
+                resultado_id,
+            "tipo":
+                "FACTURA",
+        }
+
+    # --------------------------------------------------------
+    # TIPO NO PERMITIDO
+    # --------------------------------------------------------
+
+    return {
+        "ok": False,
+        "mensaje":
+            "Selecciona un tipo de comprobante válido.",
     }
