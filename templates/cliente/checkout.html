@@ -519,19 +519,143 @@ Finalizar compra | SULPAA
 
                     <!-- FACTURA -->
 
-                    <div
-                        id="checkout-factura-panel"
-                        hidden
-                    >
+                    <!-- =========================================
+                    FACTURA - VERIFICACIÓN DE RUC
+                    Implementación rama: serna
 
-                        <p>
-                            La consulta por RUC será habilitada
-                            en el siguiente paso.
-                        </p>
+                    El RUC se consulta mediante el backend
+                    de SULPAA. Las credenciales de APIsPERU
+                    nunca son expuestas al navegador.
+                    ========================================= -->
+
+                <div
+                    id="checkout-factura-panel"
+                    hidden
+                >
+
+                    <div class="checkout-form-group">
+
+                        <label for="checkout-ruc">
+                            RUC
+                        </label>
+
+                        <div class="checkout-document-row">
+
+                            <input
+                                type="text"
+                                id="checkout-ruc"
+                                inputmode="numeric"
+                                maxlength="11"
+                                autocomplete="off"
+                                placeholder="11 dígitos"
+                            >
+
+                            <button
+                                type="button"
+                                id="checkout-verify-ruc"
+                                class="checkout-secondary-button"
+                            >
+                                Verificar RUC
+                            </button>
+
+                        </div>
 
                     </div>
 
-                </section>
+
+                    <!--
+                        Mensajes de validación o errores
+                        devueltos por el backend.
+                    -->
+
+                    <div
+                        id="checkout-ruc-message"
+                        role="status"
+                        aria-live="polite"
+                    ></div>
+
+
+                    <!--
+                        Los datos empresariales permanecen ocultos
+                        hasta que APIsPERU confirme el RUC.
+                    -->
+
+                    <div
+                        id="checkout-ruc-result"
+                        hidden
+                    >
+
+                        <div class="checkout-fields">
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Razón social
+                                </span>
+
+                                <strong
+                                    id="checkout-ruc-business-name"
+                                ></strong>
+
+                            </div>
+
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Dirección fiscal
+                                </span>
+
+                                <strong
+                                    id="checkout-ruc-address"
+                                ></strong>
+
+                            </div>
+
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Estado
+                                </span>
+
+                                <strong
+                                    id="checkout-ruc-status"
+                                ></strong>
+
+                            </div>
+
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Condición
+                                </span>
+
+                                <strong
+                                    id="checkout-ruc-condition"
+                                ></strong>
+
+                            </div>
+
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Ubicación fiscal
+                                </span>
+
+                                <strong
+                                    id="checkout-ruc-location"
+                                ></strong>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
 
 
 

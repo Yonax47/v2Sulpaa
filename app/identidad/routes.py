@@ -43,6 +43,7 @@ from app.identidad.services import (
     listar_distritos,
     registrar_direccion_usuario,
     validar_dni_con_perfil,
+    validar_ruc_facturacion,
 )
 
 
@@ -471,6 +472,40 @@ def verificar_dni_facturacion():
 
     if not resultado["ok"]:
 
+        return jsonify(
+            resultado
+        ), 400
+
+    return jsonify(
+        resultado
+    ), 200
+
+# ============================================================
+# VERIFICACIÓN DE RUC
+# ============================================================
+
+@identidad_bp.route(
+    "/api/facturacion/verificar-ruc",
+    methods=["POST"],
+)
+@login_required
+def verificar_ruc_facturacion():
+    """
+    Verifica un RUC mediante APIsPERU.
+
+    La consulta se realiza únicamente desde el backend.
+    El token de APIsPERU nunca se expone al navegador.
+    """
+
+    datos = request.get_json(
+        silent=True
+    ) or {}
+
+    resultado = validar_ruc_facturacion(
+        ruc=datos.get("ruc"),
+    )
+
+    if not resultado["ok"]:
         return jsonify(
             resultado
         ), 400

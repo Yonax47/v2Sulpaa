@@ -16,6 +16,7 @@ import unicodedata
 
 from app.identidad.apisperu import (
     consultar_dni,
+    consultar_ruc,
 )
 
 from app.identidad.repositories import (
@@ -940,5 +941,141 @@ def validar_dni_con_perfil(
 
             "nombre_completo":
                 nombre_completo,
+        },
+    }
+
+# ============================================================
+# VALIDACIÓN DE RUC CON APISPERU
+# ============================================================
+
+def validar_ruc_facturacion(ruc):
+    """
+    Consulta y valida un RUC mediante APIsPERU.
+
+    A diferencia del DNI, el RUC no se compara con
+    los nombres personales del perfil, ya que una
+    cuenta SULPAA puede solicitar factura para una
+    empresa con una razón social diferente.
+
+    Los datos obtenidos serán utilizados posteriormente
+    para registrar los datos de facturación.
+    """
+
+    ruc = (ruc or "").strip()
+
+    # --------------------------------------------------------
+    # 1. VALIDAR FORMATO
+    # --------------------------------------------------------
+
+    if (
+        not ruc.isdigit()
+        or len(ruc) != 11
+    ):
+        return {
+            "ok": False,
+            "mensaje": (
+                "El RUC debe contener "
+                "exactamente 11 dígitos."
+            ),
+        }
+
+    # --------------------------------------------------------
+    # 2. CONSULTAR APISPERU
+    # --------------------------------------------------------
+
+    resultado_api = consultar_ruc(
+        ruc
+    )
+
+    if not resultado_api.get("ok"):
+        return resultado_api
+
+    # --------------------------------------------------------
+    # 3. OBTENER DATOS DE LA EMPRESA
+    # --------------------------------------------------------
+
+    razon_social = (
+        resultado_api.get("razon_social")
+        or ""
+    ).strip()
+
+    direccion = (
+        resultado_api.get("direccion")
+        or ""
+    ).strip()
+
+    estado = (
+        resultado_api.get("estado")
+        or ""
+    ).strip()
+
+    condicion = (
+        resultado_api.get("condicion")
+        or ""
+    ).strip()
+
+    departamento = (
+        resultado_api.get("departamento")
+        or ""
+    ).strip()
+
+    provincia = (
+        resultado_api.get("provincia")
+        or ""
+    ).strip()
+
+    distrito = (
+        resultado_api.get("distrito")
+        or ""
+    ).strip()
+
+    # --------------------------------------------------------
+    # 4. VALIDAR INFORMACIÓN MÍNIMA
+    # --------------------------------------------------------
+
+    if not razon_social:
+        return {
+            "ok": False,
+            "mensaje": (
+                "No fue posible obtener la razón social "
+                "correspondiente al RUC."
+            ),
+        }
+
+    # --------------------------------------------------------
+    # 5. RUC VERIFICADO
+    # --------------------------------------------------------
+
+    return {
+        "ok": True,
+
+        "mensaje": (
+            "RUC verificado correctamente."
+        ),
+
+        "empresa": {
+            "ruc":
+                ruc,
+
+            "razon_social":
+                razon_social,
+
+            "direccion":
+                direccion,
+
+            "estado":
+                estado,
+
+            "condicion":
+                condicion,
+
+            "departamento":
+                departamento,
+
+            "provincia":
+                provincia,
+
+            "distrito":
+                distrito,
         },
     }
