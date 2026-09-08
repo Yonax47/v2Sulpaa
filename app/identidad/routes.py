@@ -296,6 +296,9 @@ def login():
                 "success",
             )
 
+            if usuario["rol"] == "ADMIN":
+                return redirect(url_for("administracion.perfil"))
+
             return redirect(
                 url_for("inicio")
             )
@@ -478,3 +481,34 @@ def verificar_dni_facturacion():
     return jsonify(
         resultado
     ), 200
+
+def admin_required(funcion):
+    """
+    Protege una ruta para permitir acceso únicamente
+    a usuarios con rol ADMIN.
+
+    Debe usarse SIEMPRE junto a @login_required,
+    colocado justo debajo de este:
+
+    @app.route("/admin/perfil")
+    @login_required
+    @admin_required
+    def perfil():
+        ...
+    """
+
+    @wraps(funcion)
+    def funcion_protegida(*args, **kwargs):
+
+        if session.get("rol") != "ADMIN":
+
+            flash(
+                "No tienes permisos para acceder a esta sección.",
+                "danger",
+            )
+
+            return redirect(url_for("inicio"))
+
+        return funcion(*args, **kwargs)
+
+    return funcion_protegida

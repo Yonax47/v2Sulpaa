@@ -54,3 +54,26 @@ def login_required(funcion):
         return funcion(*args, **kwargs)
 
     return funcion_protegida
+
+
+def admin_required(funcion):
+    """
+    Protege una ruta para permitir acceso únicamente
+    a usuarios con rol ADMIN.
+    """
+
+    @wraps(funcion)
+    def funcion_protegida(*args, **kwargs):
+
+        if session.get("rol") != "ADMIN":
+
+            flash(
+                "No tienes permisos para acceder a esta sección.",
+                "danger",
+            )
+
+            return redirect(url_for("inicio"))
+
+        return funcion(*args, **kwargs)
+
+    return funcion_protegida

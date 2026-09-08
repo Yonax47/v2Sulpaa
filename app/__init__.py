@@ -49,6 +49,8 @@ load_dotenv()
 
 from app.identidad.routes import identidad_bp
 from app.comercio.routes import comercio_bp
+from app.administracion.routes import administracion_bp 
+
 
 
 # ============================================================
@@ -166,6 +168,10 @@ def create_app():
         comercio_bp
     )
 
+    app.register_blueprint(
+        administracion_bp
+    )
+    
 
     # ========================================================
     # RUTA PRINCIPAL DEL CLIENTE
@@ -210,3 +216,5 @@ def create_app():
     # ========================================================
 
     return app
+
+    

@@ -379,6 +379,7 @@ def autenticar_usuario(
         "usuario": {
             "id": usuario["id"],
             "correo": usuario["correo"],
+            "rol": usuario["rol"],
         },
     }
 # ============================================================

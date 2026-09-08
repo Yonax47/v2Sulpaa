@@ -11,15 +11,6 @@ from app.config.database import conexion_identidad
 
 
 def buscar_usuario_por_correo(correo: str):
-    """
-    Busca un usuario por correo electrónico.
-
-    Args:
-        correo: Correo del usuario.
-
-    Returns:
-        dict | None: Usuario encontrado o None.
-    """
     conexion = conexion_identidad()
 
     try:
@@ -30,6 +21,7 @@ def buscar_usuario_por_correo(correo: str):
                     correo,
                     password_hash,
                     estado,
+                    rol,
                     correo_verificado,
                     ultimo_acceso_en,
                     creado_en,
@@ -38,39 +30,7 @@ def buscar_usuario_por_correo(correo: str):
                 WHERE correo = %s
                 LIMIT 1
             """
-
             cursor.execute(sql, (correo,))
-            return cursor.fetchone()
-
-    finally:
-        conexion.close()
-
-
-def buscar_perfil_por_dni(dni: str):
-    """
-    Busca un perfil por DNI.
-
-    Se utiliza para evitar registros duplicados.
-    """
-    conexion = conexion_identidad()
-
-    try:
-        with conexion.cursor() as cursor:
-            sql = """
-                SELECT
-                    id,
-                    usuario_id,
-                    nombres,
-                    apellido_paterno,
-                    apellido_materno,
-                    dni,
-                    telefono
-                FROM perfiles
-                WHERE dni = %s
-                LIMIT 1
-            """
-
-            cursor.execute(sql, (dni,))
             return cursor.fetchone()
 
     finally:
@@ -558,6 +518,36 @@ def buscar_distrito_activo(
                 ),
             )
 
+            return cursor.fetchone()
+
+    finally:
+        conexion.close()
+
+def buscar_perfil_por_dni(dni: str):
+    """
+    Busca un perfil por DNI.
+
+    Se utiliza para evitar registros duplicados.
+    """
+    conexion = conexion_identidad()
+
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT
+                    id,
+                    usuario_id,
+                    nombres,
+                    apellido_paterno,
+                    apellido_materno,
+                    dni,
+                    telefono
+                FROM perfiles
+                WHERE dni = %s
+                LIMIT 1
+            """
+
+            cursor.execute(sql, (dni,))
             return cursor.fetchone()
 
     finally:
