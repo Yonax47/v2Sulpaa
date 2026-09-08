@@ -34,7 +34,6 @@ from app.identidad.services import (
 )
 
 
-
 # ============================================================
 # BLUEPRINT
 # ============================================================
@@ -55,6 +54,16 @@ comercio_bp = Blueprint(
 )
 @login_required
 def tienda():
+    """
+    Muestra la tienda principal.
+
+    Carga:
+    - catálogo;
+    - variantes;
+    - packs;
+    - packs personalizados;
+    - carrito actual del usuario.
+    """
 
     datos = obtener_datos_tienda()
 
@@ -91,6 +100,10 @@ def tienda():
 )
 @login_required
 def validar_variante():
+    """
+    Valida desde backend si una variante individual
+    puede agregarse al carrito según el stock disponible.
+    """
 
     datos = request.get_json(
         silent=True
@@ -146,6 +159,10 @@ def validar_variante():
 )
 @login_required
 def validar_pack():
+    """
+    Valida la cantidad solicitada de un pack fijo
+    utilizando la disponibilidad real de sus componentes.
+    """
 
     datos = request.get_json(
         silent=True
@@ -201,6 +218,22 @@ def validar_pack():
 )
 @login_required
 def obtener_carrito():
+    """
+    Devuelve el carrito actual del usuario autenticado.
+
+    El carrito se construye completamente desde backend.
+
+    Además de los productos y subtotal, services.py
+    puede incluir información física como:
+
+    - peso_total_gramos;
+    - peso_total_kg;
+    - peso_completo;
+    - variantes_sin_peso.
+
+    Esta información será utilizada posteriormente
+    para calcular las opciones de entrega.
+    """
 
     carrito = obtener_carrito_usuario(
         session["usuario_id"]
@@ -222,6 +255,12 @@ def obtener_carrito():
 )
 @login_required
 def agregar_carrito():
+    """
+    Agrega un artículo al carrito del usuario.
+
+    La validación comercial y de inventario
+    se realiza dentro de services.py.
+    """
 
     datos = request.get_json(
         silent=True
@@ -280,6 +319,12 @@ def agregar_carrito():
 )
 @login_required
 def actualizar_carrito():
+    """
+    Actualiza la cantidad de un detalle del carrito.
+
+    La nueva cantidad vuelve a pasar por las
+    validaciones comerciales y de inventario.
+    """
 
     datos = request.get_json(
         silent=True
@@ -332,6 +377,10 @@ def actualizar_carrito():
 )
 @login_required
 def eliminar_carrito():
+    """
+    Elimina un detalle perteneciente al carrito
+    activo del usuario autenticado.
+    """
 
     datos = request.get_json(
         silent=True
@@ -368,6 +417,7 @@ def eliminar_carrito():
         resultado
     ), 200
 
+
 # ============================================================
 # 8. CHECKOUT
 # ============================================================
@@ -381,8 +431,21 @@ def checkout():
     """
     Muestra el checkout del cliente.
 
-    Entrar a esta página NO crea el pedido
-    y NO reserva inventario.
+    IMPORTANTE:
+
+    Entrar a esta página:
+
+    - NO crea un pedido;
+    - NO reserva inventario;
+    - NO modifica existencias;
+    - NO confirma una compra.
+
+    El checkout únicamente reúne la información
+    necesaria para preparar el pedido.
+
+    El carrito recibido desde services.py incluye
+    también el peso calculado desde los datos
+    registrados en la base de datos.
     """
 
     usuario_id = session[
@@ -390,7 +453,13 @@ def checkout():
     ]
 
     # --------------------------------------------------------
-    # Carrito actual
+    # 1. Obtener carrito actual
+    # --------------------------------------------------------
+    #
+    # No utilizamos información enviada por JavaScript
+    # para reconstruir precios, cantidades o pesos.
+    #
+    # El backend vuelve a consultar el carrito.
     # --------------------------------------------------------
 
     carrito = obtener_carrito_usuario(
@@ -398,13 +467,22 @@ def checkout():
     )
 
     # --------------------------------------------------------
-    # Departamentos disponibles
+    # 2. Obtener departamentos disponibles
+    # --------------------------------------------------------
+    #
+    # Se cargan incluso antes de consultar los datos
+    # completos del checkout porque también pueden
+    # utilizarse para formularios de dirección.
     # --------------------------------------------------------
 
     departamentos = listar_departamentos()
 
     # --------------------------------------------------------
-    # Carrito vacío
+    # 3. Carrito vacío
+    # --------------------------------------------------------
+    #
+    # No tiene sentido preparar datos de checkout
+    # si el usuario no tiene productos.
     # --------------------------------------------------------
 
     if not carrito["items"]:
@@ -418,35 +496,54 @@ def checkout():
         )
 
     # --------------------------------------------------------
-    # Datos del cliente
+    # 4. Datos del cliente
+    # --------------------------------------------------------
+    #
+    # Aquí se obtienen los datos necesarios para
+    # identificación, dirección y facturación.
     # --------------------------------------------------------
 
     datos_checkout = obtener_checkout_usuario(
         usuario_id
     )
 
+    # --------------------------------------------------------
+    # 5. Información física del carrito
+    # --------------------------------------------------------
+    #
+    # services.py incorpora al carrito:
+    #
+    # peso_total_gramos
+    # peso_total_kg
+    # peso_completo
+    # variantes_sin_peso
+    #
+    # El cálculo se realiza en backend utilizando
+    # las variantes reales que componen el carrito.
+    #
+    # Esto es especialmente importante porque un
+    # artículo puede ser:
+    #
+    # - una variante individual;
+    # - un pack fijo;
+    # - un pack personalizado.
+    #
+    # El navegador NO debe decidir cuánto pesa
+    # un pedido.
+    # --------------------------------------------------------
+
+    # --------------------------------------------------------
+    # 6. Renderizar checkout
+    # --------------------------------------------------------
+
     return render_template(
         "cliente/checkout.html",
+
         carrito=carrito,
+
         checkout=datos_checkout,
+
         carrito_vacio=False,
+
         departamentos=departamentos,
-    )
-
-    # --------------------------------------------------------
-    # Datos del cliente
-    # --------------------------------------------------------
-
-    datos_checkout = obtener_checkout_usuario(
-        usuario_id
-    )
-
-    return render_template(
-        "cliente/checkout.html",
-
-        carrito=carrito,
-
-        checkout=datos_checkout,
-
-        carrito_vacio=False,
     )

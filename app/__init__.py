@@ -49,6 +49,7 @@ load_dotenv()
 
 from app.identidad.routes import identidad_bp
 from app.comercio.routes import comercio_bp
+from app.operaciones.routes import operaciones_bp
 
 
 # ============================================================
@@ -156,6 +157,24 @@ def create_app():
     # - Suscripciones
     # - Pedidos comerciales
     #
+    #
+    # OPERACIONES:
+    #
+    # /operaciones/api/entregas/opciones
+    # /operaciones/api/entregas/delivery/cotizar
+    # /operaciones/api/transportistas
+    #
+    # Operaciones administra:
+    #
+    # - Modalidades de entrega
+    # - Delivery local
+    # - Puntos de recojo
+    # - Transportistas
+    # - Servicios de transporte
+    # - Agencias
+    # - Tarifas de envío
+    # - Cotizaciones interprovinciales
+    #
     # ========================================================
 
     app.register_blueprint(
@@ -164,6 +183,10 @@ def create_app():
 
     app.register_blueprint(
         comercio_bp
+    )
+
+    app.register_blueprint(
+        operaciones_bp
     )
 
 

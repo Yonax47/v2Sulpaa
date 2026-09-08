@@ -1054,3 +1054,66 @@ def eliminar_detalle_carrito(
     finally:
 
         conexion.close()
+
+# ============================================================
+# 14. PESOS DE VARIANTES
+# ============================================================
+
+def obtener_pesos_variantes(variante_ids):
+    """
+    Obtiene el peso físico registrado de las variantes indicadas.
+
+    El peso se obtiene exclusivamente desde Comercio.
+    No se calcula ni se hardcodea en frontend.
+
+    Se utiliza principalmente para calcular el peso total
+    del carrito antes de cotizar una modalidad de entrega.
+    """
+
+    if not variante_ids:
+        return {}
+
+    # Evita repetir IDs innecesariamente en la consulta.
+    variante_ids = list(dict.fromkeys(variante_ids))
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            placeholders = ", ".join(
+                ["%s"] * len(variante_ids)
+            )
+
+            consulta = f"""
+                SELECT
+                    id AS variante_id,
+                    peso_gramos
+
+                FROM variantes
+
+                WHERE
+                    id IN ({placeholders})
+                    AND estado = 'ACTIVO'
+            """
+
+            cursor.execute(
+                consulta,
+                tuple(variante_ids),
+            )
+
+            filas = cursor.fetchall()
+
+            return {
+                fila["variante_id"]:
+                    float(fila["peso_gramos"])
+                    if fila["peso_gramos"] is not None
+                    else None
+
+                for fila in filas
+            }
+
+    finally:
+
+        conexion.close()

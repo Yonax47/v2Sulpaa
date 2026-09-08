@@ -26,6 +26,7 @@ from app.comercio.repositories import (
     guardar_item_carrito,
     actualizar_cantidad_detalle_carrito,
     eliminar_detalle_carrito,
+    obtener_pesos_variantes,
 )
 
 from app.inventario.services import (
@@ -558,7 +559,89 @@ def _obtener_consumo_carrito(usuario_id):
 
 
 # ============================================================
-# 6. VALIDAR VARIANTE INDIVIDUAL
+# 6. PESO TOTAL DEL CARRITO
+# ============================================================
+
+def _calcular_peso_carrito(usuario_id):
+    """
+    Calcula el peso físico total del contenido del carrito.
+
+    La función reutiliza el consumo real de variantes calculado por
+    _obtener_consumo_carrito(), por lo que contempla correctamente:
+
+    - productos individuales;
+    - packs fijos;
+    - packs personalizados.
+
+    El peso unitario de cada variante se obtiene desde la base de datos
+    mediante obtener_pesos_variantes(). Si una variante no tiene un peso
+    registrado, no se inventa ningún valor: se informa como incompleta.
+    """
+
+    consumo = _obtener_consumo_carrito(
+        usuario_id
+    )
+
+    if not consumo:
+        return {
+            "peso_total_gramos": 0,
+            "peso_total_kg": 0.0,
+            "peso_completo": True,
+            "variantes_sin_peso": [],
+        }
+
+    variantes_ids = list(
+        consumo.keys()
+    )
+
+    pesos = obtener_pesos_variantes(
+        variantes_ids
+    )
+
+    peso_total_gramos = 0.0
+    variantes_sin_peso = []
+
+    for variante_id, cantidad in consumo.items():
+
+        peso_unitario = pesos.get(
+            variante_id
+        )
+
+        # No se inventa un peso cuando falta información física.
+        # Esto evita cotizaciones de envío incorrectas.
+        if peso_unitario is None:
+
+            variantes_sin_peso.append(
+                variante_id
+            )
+
+            continue
+
+        peso_total_gramos += (
+            float(peso_unitario)
+            * int(cantidad)
+        )
+
+    return {
+        "peso_total_gramos":
+            int(round(peso_total_gramos)),
+
+        "peso_total_kg":
+            round(
+                peso_total_gramos / 1000,
+                3,
+            ),
+
+        "peso_completo":
+            len(variantes_sin_peso) == 0,
+
+        "variantes_sin_peso":
+            variantes_sin_peso,
+    }
+
+
+# ============================================================
+# 7. VALIDAR VARIANTE INDIVIDUAL
 # ============================================================
 
 def validar_cantidad_variante(
@@ -650,7 +733,7 @@ def validar_cantidad_variante(
 
 
 # ============================================================
-# 7. VALIDAR PACK FIJO
+# 8. VALIDAR PACK FIJO
 # ============================================================
 
 def validar_cantidad_pack(
@@ -772,7 +855,7 @@ def validar_cantidad_pack(
 
 
 # ============================================================
-# 8. VALIDAR PACK PERSONALIZADO
+# 9. VALIDAR PACK PERSONALIZADO
 # ============================================================
 
 def validar_pack_personalizado(
@@ -987,7 +1070,7 @@ def validar_pack_personalizado(
 
 
 # ============================================================
-# 9. AGREGAR AL CARRITO
+# 10. AGREGAR AL CARRITO
 # ============================================================
 
 def agregar_al_carrito(
@@ -1136,7 +1219,7 @@ def agregar_al_carrito(
 
 
 # ============================================================
-# 10. OBTENER CARRITO
+# 11. OBTENER CARRITO
 # ============================================================
 
 def obtener_carrito_usuario(usuario_id):
@@ -1151,6 +1234,10 @@ def obtener_carrito_usuario(usuario_id):
             "items": [],
             "cantidad_items": 0,
             "subtotal": 0.0,
+            "peso_total_gramos": 0,
+            "peso_total_kg": 0.0,
+            "peso_completo": True,
+            "variantes_sin_peso": [],
         }
 
     detalle_ids = [
@@ -1237,18 +1324,40 @@ def obtener_carrito_usuario(usuario_id):
                 ),
         })
 
+    # --------------------------------------------------------
+    # Peso físico total del carrito.
+    # --------------------------------------------------------
+    # Se calcula desde las variantes realmente contenidas en el carrito.
+    # Nunca se confía en un peso enviado desde el frontend.
+    peso = _calcular_peso_carrito(
+        usuario_id
+    )
+
     return {
         "items": items,
+
         "cantidad_items":
             cantidad_items,
 
         "subtotal":
             round(subtotal, 2),
+
+        "peso_total_gramos":
+            peso["peso_total_gramos"],
+
+        "peso_total_kg":
+            peso["peso_total_kg"],
+
+        "peso_completo":
+            peso["peso_completo"],
+
+        "variantes_sin_peso":
+            peso["variantes_sin_peso"],
     }
 
 
 # ============================================================
-# 11. DATOS COMPLETOS DE TIENDA
+# 12. DATOS COMPLETOS DE TIENDA
 # ============================================================
 
 def obtener_datos_tienda():
@@ -1268,7 +1377,7 @@ def obtener_datos_tienda():
     }
 
 # ============================================================
-# 12. BUSCAR DETALLE DEL CARRITO DEL USUARIO
+# 13. BUSCAR DETALLE DEL CARRITO DEL USUARIO
 # ============================================================
 
 def _obtener_detalle_carrito(
@@ -1296,7 +1405,7 @@ def _obtener_detalle_carrito(
 
 
 # ============================================================
-# 13. ACTUALIZAR CANTIDAD DEL CARRITO
+# 14. ACTUALIZAR CANTIDAD DEL CARRITO
 # ============================================================
 
 def actualizar_item_carrito(
@@ -1528,7 +1637,7 @@ def actualizar_item_carrito(
 
 
 # ============================================================
-# 14. ELIMINAR ITEM DEL CARRITO
+# 15. ELIMINAR ITEM DEL CARRITO
 # ============================================================
 
 def eliminar_item_carrito(

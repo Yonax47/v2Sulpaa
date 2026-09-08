@@ -10,9 +10,921 @@ Finalizar compra | SULPAA
 {% include "components/navbar.html" %}
 
 
+<!-- =========================================================
+     LEAFLET
+     Mapa utilizado para confirmar la ubicación del delivery.
+     ========================================================= -->
+
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+>
+
+<style>
+    /* =========================================================
+       CHECKOUT SULPAA V2
+       Estilos exclusivos de la pantalla de compra.
+       No modifica navbar ni otras páginas.
+       ========================================================= */
+
+    .checkout-page {
+        min-height: 100vh;
+        padding: 52px 0 90px;
+        background:
+            radial-gradient(
+                circle at top left,
+                rgba(21, 151, 91, 0.06),
+                transparent 28%
+            ),
+            linear-gradient(
+                180deg,
+                #f8fbf9 0%,
+                #f3f7f4 100%
+            );
+        color: #12372a;
+    }
+
+    .checkout-page > .container {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+    }
+
+
+    /* =========================================================
+       CABECERA
+       ========================================================= */
+
+    .checkout-header {
+        margin-bottom: 34px;
+    }
+
+    .checkout-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+
+        margin-bottom: 11px;
+
+        color: #087b49;
+
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+    }
+
+    .checkout-kicker::before {
+        content: "";
+        width: 22px;
+        height: 2px;
+        border-radius: 99px;
+        background: #14a364;
+    }
+
+    .checkout-header h1 {
+        margin: 0;
+
+        color: #103b2c;
+
+        font-size: clamp(31px, 4vw, 46px);
+        line-height: 1.08;
+        font-weight: 800;
+        letter-spacing: -1.2px;
+    }
+
+    .checkout-header p {
+        max-width: 680px;
+        margin: 15px 0 0;
+
+        color: #6b7d75;
+
+        font-size: 16px;
+        line-height: 1.65;
+    }
+
+
+    /* =========================================================
+       ESTRUCTURA PRINCIPAL
+       ========================================================= */
+
+    .checkout-layout {
+        display: grid;
+        grid-template-columns:
+            minmax(0, 1fr)
+            355px;
+
+        gap: 28px;
+        align-items: start;
+    }
+
+    .checkout-main {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        min-width: 0;
+    }
+
+
+    /* =========================================================
+       TARJETAS
+       ========================================================= */
+
+    .checkout-card,
+    .checkout-summary {
+        background: rgba(255, 255, 255, 0.96);
+
+        border: 1px solid rgba(18, 80, 54, 0.08);
+        border-radius: 22px;
+
+        box-shadow:
+            0 10px 35px rgba(29, 83, 57, 0.07);
+
+        transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
+    }
+
+    .checkout-card {
+        position: relative;
+        padding: 28px;
+    }
+
+    .checkout-card:hover {
+        border-color: rgba(11, 138, 82, 0.14);
+
+        box-shadow:
+            0 14px 40px rgba(29, 83, 57, 0.09);
+    }
+
+    .checkout-step {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        width: 42px;
+        height: 32px;
+
+        margin-bottom: 13px;
+
+        border-radius: 999px;
+
+        background:
+            linear-gradient(
+                135deg,
+                #e8f8ef,
+                #daf2e5
+            );
+
+        color: #087b49;
+
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .checkout-card h2 {
+        margin: 0 0 21px;
+
+        color: #12372a;
+
+        font-size: 23px;
+        line-height: 1.25;
+        font-weight: 800;
+    }
+
+    .checkout-card h3 {
+        margin: 0 0 8px;
+
+        color: #153d2f;
+
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .checkout-section-description {
+        margin: -10px 0 20px;
+
+        color: #73827b;
+
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+
+    /* =========================================================
+       DATOS DEL CLIENTE
+       ========================================================= */
+
+    .checkout-fields {
+        display: grid;
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+        gap: 13px;
+    }
+
+    .checkout-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        min-width: 0;
+
+        padding: 16px 17px;
+
+        background:
+            linear-gradient(
+                145deg,
+                #f9fbfa,
+                #f5f9f6
+            );
+
+        border: 1px solid #e6eee9;
+        border-radius: 14px;
+    }
+
+    .checkout-field span {
+        color: #7a8982;
+
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .checkout-field strong {
+        color: #173f30;
+
+        font-size: 14px;
+        line-height: 1.45;
+
+        overflow-wrap: anywhere;
+    }
+
+    .checkout-field small {
+        color: #75857d;
+        line-height: 1.45;
+    }
+
+
+    /* =========================================================
+       FORMULARIOS
+       ========================================================= */
+
+    .checkout-address-form {
+        display: grid;
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .checkout-form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        margin-top: 14px;
+    }
+
+    .checkout-form-group label {
+        color: #294a3c;
+
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .checkout-form-group label span {
+        color: #8d9993;
+        font-weight: 500;
+    }
+
+    .checkout-form-group input,
+    .checkout-form-group select {
+        width: 100%;
+        min-height: 48px;
+
+        box-sizing: border-box;
+
+        padding: 0 14px;
+
+        background: #ffffff;
+
+        border: 1px solid #d7e3dc;
+        border-radius: 12px;
+
+        color: #173d30;
+
+        font: inherit;
+        font-size: 14px;
+
+        outline: none;
+
+        transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease,
+            background 0.2s ease;
+    }
+
+    .checkout-form-group input:focus,
+    .checkout-form-group select:focus {
+        border-color: #16915b;
+
+        box-shadow:
+            0 0 0 4px rgba(22, 145, 91, 0.1);
+    }
+
+    .checkout-form-group select:disabled {
+        background: #f4f6f5;
+        color: #9aa59f;
+        cursor: not-allowed;
+    }
+
+
+    /* =========================================================
+       BOTONES
+       ========================================================= */
+
+    .checkout-primary-button,
+    .checkout-secondary-button,
+    .checkout-confirm-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        min-height: 46px;
+
+        box-sizing: border-box;
+
+        padding: 0 20px;
+
+        border-radius: 12px;
+
+        font: inherit;
+        font-size: 13px;
+        font-weight: 800;
+
+        cursor: pointer;
+
+        transition:
+            transform 0.18s ease,
+            background 0.18s ease,
+            box-shadow 0.18s ease,
+            border-color 0.18s ease;
+    }
+
+    .checkout-primary-button,
+    .checkout-confirm-button {
+        border: none;
+
+        background:
+            linear-gradient(
+                135deg,
+                #087b49 0%,
+                #13a367 100%
+            );
+
+        color: #ffffff;
+
+        box-shadow:
+            0 8px 20px rgba(8, 123, 73, 0.18);
+    }
+
+    .checkout-primary-button:hover:not(:disabled),
+    .checkout-confirm-button:hover:not(:disabled) {
+        transform: translateY(-1px);
+
+        box-shadow:
+            0 11px 25px rgba(8, 123, 73, 0.25);
+    }
+
+    .checkout-secondary-button {
+        border: 1px solid #cfe0d7;
+
+        background: #ffffff;
+
+        color: #087b49;
+    }
+
+    .checkout-secondary-button:hover {
+        border-color: #7db99c;
+        background: #f1f8f4;
+    }
+
+    .checkout-primary-button:disabled,
+    .checkout-confirm-button:disabled {
+        opacity: 0.48;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+
+    /* =========================================================
+       OPCIONES DE ENTREGA / COMPROBANTE
+       ========================================================= */
+
+    .checkout-document-options {
+        display: grid;
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+        gap: 12px;
+
+        margin-bottom: 18px;
+    }
+
+    #checkout-delivery-options {
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+
+        gap: 12px;
+    }
+
+    .checkout-document-options > label,
+    .checkout-delivery-option {
+        position: relative;
+
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+
+        min-width: 0;
+
+        padding: 17px;
+
+        background: #ffffff;
+
+        border: 1px solid #dbe7e1;
+        border-radius: 15px;
+
+        cursor: pointer;
+
+        transition:
+            transform 0.18s ease,
+            border-color 0.18s ease,
+            background 0.18s ease,
+            box-shadow 0.18s ease;
+    }
+
+    .checkout-document-options > label {
+        align-items: center;
+    }
+
+    .checkout-document-options > label:hover,
+    .checkout-delivery-option:hover {
+        transform: translateY(-1px);
+
+        border-color: #78b999;
+        background: #f8fcfa;
+    }
+
+    .checkout-document-options input[type="radio"],
+    .checkout-delivery-option input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 1px;
+
+        accent-color: #0b8b54;
+
+        flex-shrink: 0;
+    }
+
+    .checkout-delivery-option {
+        min-height: 104px;
+    }
+
+    .checkout-delivery-option:has(input:checked) {
+        border-color: #0b8b54;
+
+        background:
+            linear-gradient(
+                145deg,
+                #effaf4,
+                #ffffff
+            );
+
+        box-shadow:
+            0 0 0 3px rgba(11, 139, 84, 0.08);
+    }
+
+    .checkout-delivery-option-content {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        min-width: 0;
+    }
+
+    .checkout-delivery-option-content strong {
+        color: #153d2e;
+
+        font-size: 14px;
+        line-height: 1.3;
+    }
+
+    .checkout-delivery-option-content small {
+        color: #718078;
+
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+
+    /* =========================================================
+       PANELES DE ENTREGA
+       ========================================================= */
+
+    .checkout-delivery-panel {
+        margin-top: 19px;
+
+        padding: 21px;
+
+        background:
+            linear-gradient(
+                145deg,
+                #f8fbf9,
+                #f4f9f6
+            );
+
+        border: 1px solid #dce9e2;
+        border-radius: 17px;
+    }
+
+    .checkout-delivery-panel > p {
+        margin: 0 0 14px;
+
+        color: #708078;
+
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+
+    /* =========================================================
+       MAPA
+       ========================================================= */
+
+    #checkout-delivery-map {
+        position: relative;
+
+        width: 100% !important;
+        height: 390px !important;
+
+        margin-top: 16px !important;
+
+        border: 1px solid #d7e3dc;
+        border-radius: 16px !important;
+
+        box-shadow:
+            0 8px 24px rgba(34, 80, 57, 0.09);
+
+        overflow: hidden;
+    }
+
+    #checkout-delivery-map .leaflet-control-zoom {
+        border: none;
+        box-shadow:
+            0 4px 15px rgba(22, 58, 42, 0.15);
+    }
+
+    .checkout-document-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    #checkout-local-delivery-panel
+    .checkout-document-row {
+        margin-top: 16px !important;
+    }
+
+
+    /* =========================================================
+       MENSAJES
+       ========================================================= */
+
+    #checkout-map-message,
+    #checkout-delivery-message,
+    #checkout-carrier-message,
+    #checkout-address-message,
+    #checkout-dni-message,
+    #checkout-ruc-message {
+        min-height: 0;
+        margin-top: 12px;
+
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.5;
+    }
+
+    [data-type="success"] {
+        color: #087b49;
+    }
+
+    [data-type="error"] {
+        color: #b42318;
+    }
+
+    [data-type="info"] {
+        color: #49695c;
+    }
+
+    #checkout-route-result {
+        margin-top: 14px;
+    }
+
+
+    /* =========================================================
+       ALERTAS
+       ========================================================= */
+
+    .checkout-warning {
+        padding: 17px 19px;
+
+        background: #fffaf0;
+
+        border: 1px solid #efdba6;
+        border-radius: 14px;
+
+        color: #745d24;
+    }
+
+    .checkout-warning p {
+        margin: 6px 0 0;
+
+        line-height: 1.5;
+    }
+
+
+    /* =========================================================
+       RESUMEN DEL PEDIDO
+       ========================================================= */
+
+    .checkout-summary {
+        position: sticky;
+        top: 100px;
+
+        padding: 25px;
+    }
+
+    .checkout-summary .checkout-kicker {
+        margin-bottom: 7px;
+    }
+
+    .checkout-summary h2 {
+        margin: 0 0 20px;
+
+        color: #12372a;
+
+        font-size: 25px;
+        font-weight: 800;
+    }
+
+    .checkout-products {
+        display: flex;
+        flex-direction: column;
+
+        padding-bottom: 14px;
+
+        border-bottom: 1px solid #e6ece8;
+    }
+
+    .checkout-product {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+
+        padding: 12px 0;
+    }
+
+    .checkout-product > div {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .checkout-product strong {
+        color: #173d30;
+
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .checkout-product > strong {
+        white-space: nowrap;
+    }
+
+    .checkout-product span {
+        color: #7a8982;
+
+        font-size: 12px;
+    }
+
+    .checkout-total {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        gap: 20px;
+
+        padding: 14px 0;
+
+        border-bottom: 1px solid #edf1ef;
+    }
+
+    .checkout-total span {
+        color: #6c7b74;
+
+        font-size: 13px;
+    }
+
+    .checkout-total strong {
+        color: #163d2f;
+
+        font-size: 16px;
+    }
+
+    #checkout-summary-total-row {
+        margin-top: 5px;
+        padding: 17px 14px;
+
+        background:
+            linear-gradient(
+                135deg,
+                #eff9f3,
+                #e8f6ee
+            );
+
+        border: none;
+        border-radius: 13px;
+    }
+
+    #checkout-summary-total-row span {
+        color: #12452f;
+        font-weight: 800;
+    }
+
+    #checkout-summary-total {
+        color: #087b49;
+
+        font-size: 24px;
+        font-weight: 900;
+    }
+
+    .checkout-confirm-button {
+        width: 100%;
+        margin-top: 18px;
+    }
+
+    .checkout-security {
+        display: block;
+
+        margin-top: 12px;
+
+        color: #84918b;
+
+        font-size: 11px;
+        line-height: 1.55;
+        text-align: center;
+    }
+
+    .checkout-back {
+        display: block;
+
+        margin-top: 18px;
+
+        color: #087b49;
+
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .checkout-back:hover {
+        text-decoration: underline;
+    }
+
+
+    /* =========================================================
+       CARRITO VACÍO
+       ========================================================= */
+
+    .checkout-empty {
+        max-width: 620px;
+
+        margin: 55px auto;
+        padding: 46px;
+
+        background: #ffffff;
+
+        border: 1px solid #e5eee9;
+        border-radius: 22px;
+
+        box-shadow:
+            0 12px 35px rgba(18, 55, 42, 0.07);
+
+        text-align: center;
+    }
+
+
+    /* =========================================================
+       RESPONSIVE - TABLET
+       ========================================================= */
+
+    @media (max-width: 980px) {
+
+        .checkout-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .checkout-summary {
+            position: static;
+        }
+
+        #checkout-delivery-options {
+            grid-template-columns: 1fr;
+        }
+    }
+
+
+    /* =========================================================
+       RESPONSIVE - MÓVIL
+       ========================================================= */
+
+    @media (max-width: 650px) {
+
+        .checkout-page {
+            padding: 30px 0 55px;
+        }
+
+        .checkout-page > .container {
+            width: min(
+                100% - 24px,
+                1180px
+            );
+        }
+
+        .checkout-header {
+            margin-bottom: 25px;
+        }
+
+        .checkout-header h1 {
+            font-size: 30px;
+        }
+
+        .checkout-card,
+        .checkout-summary {
+            border-radius: 18px;
+        }
+
+        .checkout-card {
+            padding: 20px;
+        }
+
+        .checkout-summary {
+            padding: 20px;
+        }
+
+        .checkout-fields {
+            grid-template-columns: 1fr;
+        }
+
+        .checkout-document-options {
+            grid-template-columns: 1fr;
+        }
+
+        .checkout-document-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .checkout-document-row button {
+            width: 100%;
+        }
+
+        #checkout-delivery-map {
+            height: 315px !important;
+        }
+
+        .checkout-delivery-panel {
+            padding: 15px;
+        }
+
+        #checkout-summary-total {
+            font-size: 21px;
+        }
+    }
+</style>
+
+
+
 <main class="checkout-page">
 
     <div class="container">
+
+        <!-- =================================================
+             ENCABEZADO
+             ================================================= -->
 
         <header class="checkout-header">
 
@@ -25,14 +937,18 @@ Finalizar compra | SULPAA
             </h1>
 
             <p>
-                Revisa tus datos y los productos
-                antes de confirmar el pedido.
+                Revisa tus datos, selecciona la entrega
+                y confirma los productos de tu pedido.
             </p>
 
         </header>
 
 
         {% if carrito_vacio %}
+
+        <!-- =================================================
+             CARRITO VACÍO
+             ================================================= -->
 
         <section class="checkout-empty">
 
@@ -57,15 +973,20 @@ Finalizar compra | SULPAA
 
         {% else %}
 
+
         <div class="checkout-layout">
 
 
-            <!-- =============================================
-                 INFORMACIÓN DEL CLIENTE
-                 ============================================= -->
+            <!-- =================================================
+                 COLUMNA PRINCIPAL
+                 ================================================= -->
 
             <div class="checkout-main">
 
+
+                <!-- =============================================
+                     01. INFORMACIÓN DEL CLIENTE
+                     ============================================= -->
 
                 <section class="checkout-card">
 
@@ -81,6 +1002,7 @@ Finalizar compra | SULPAA
                     {% if checkout and checkout["ok"] %}
 
                     {% set cliente = checkout["cliente"] %}
+
 
                     <div class="checkout-fields">
 
@@ -139,12 +1061,21 @@ Finalizar compra | SULPAA
 
                     </div>
 
+
                     {% else %}
 
-                    <p>
-                        No pudimos cargar los datos
-                        de tu cuenta.
-                    </p>
+                    <div class="checkout-warning">
+
+                        <strong>
+                            No pudimos cargar tus datos.
+                        </strong>
+
+                        <p>
+                            Actualiza la página o verifica
+                            la información de tu cuenta.
+                        </p>
+
+                    </div>
 
                     {% endif %}
 
@@ -152,13 +1083,9 @@ Finalizar compra | SULPAA
 
 
 
-                <!-- =========================================
-                     DIRECCIÓN
-                     ========================================= -->
-
-                <!-- =========================================
-                    DIRECCIÓN DE ENTREGA
-                    ========================================= -->
+                <!-- =============================================
+                     02. DIRECCIÓN DE ENTREGA
+                     ============================================= -->
 
                 <section class="checkout-card">
 
@@ -177,227 +1104,257 @@ Finalizar compra | SULPAA
                         and checkout["direccion"]
                     ) %}
 
-                        {% set direccion = checkout["direccion"] %}
-
-                        <div class="checkout-fields">
-
-                            <div class="checkout-field">
-
-                                <span>
-                                    Dirección
-                                </span>
-
-                                <strong>
-                                    {{ direccion["direccion"] }}
-                                </strong>
-
-                            </div>
+                    {% set direccion = checkout["direccion"] %}
 
 
-                            {% if direccion["referencia"] %}
+                    <div class="checkout-fields">
 
-                            <div class="checkout-field">
+                        <div class="checkout-field">
 
-                                <span>
-                                    Referencia
-                                </span>
+                            <span>
+                                Dirección
+                            </span>
 
-                                <strong>
-                                    {{ direccion["referencia"] }}
-                                </strong>
-
-                            </div>
-
-                            {% endif %}
+                            <strong>
+                                {{ direccion["direccion"] }}
+                            </strong>
 
                         </div>
+
+
+                        {% if direccion["referencia"] %}
+
+                        <div class="checkout-field">
+
+                            <span>
+                                Referencia
+                            </span>
+
+                            <strong>
+                                {{ direccion["referencia"] }}
+                            </strong>
+
+                        </div>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <!--
+                        Guardamos los datos necesarios para que
+                        JavaScript pueda utilizarlos al trabajar
+                        con el mapa.
+
+                        Las coordenadas pueden estar vacías.
+                        Posteriormente podrán guardarse cuando
+                        el cliente confirme su ubicación.
+                    -->
+
+                    <div
+                        id="checkout-saved-address"
+                        data-address="{{ direccion['direccion'] }}"
+                        data-reference="{{ direccion['referencia'] or '' }}"
+                        data-latitude="{{ direccion['latitud'] or '' }}"
+                        data-longitude="{{ direccion['longitud'] or '' }}"
+                        hidden
+                    ></div>
 
 
                     {% else %}
 
-                        <div class="checkout-warning">
 
-                            <strong>
-                                Aún no tienes una dirección registrada.
-                            </strong>
+                    <div class="checkout-warning">
 
-                            <p>
-                                Registra tu dirección para continuar
-                                con el pedido.
-                            </p>
+                        <strong>
+                            Aún no tienes una dirección registrada.
+                        </strong>
+
+                        <p>
+                            Registra tu dirección para continuar
+                            con el pedido.
+                        </p>
+
+                    </div>
+
+
+                    <form
+                        id="checkout-address-form"
+                        class="checkout-address-form"
+                        autocomplete="on"
+                    >
+
+
+                        <!-- DEPARTAMENTO -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-department">
+                                Departamento
+                            </label>
+
+                            <select
+                                id="checkout-department"
+                                name="departamento_id"
+                                required
+                            >
+
+                                <option value="">
+                                    Selecciona un departamento
+                                </option>
+
+
+                                {% for departamento in departamentos %}
+
+                                <option
+                                    value="{{ departamento['id'] }}"
+                                >
+                                    {{ departamento["nombre"] }}
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
 
                         </div>
 
 
-                        <form
-                            id="checkout-address-form"
-                            class="checkout-address-form"
-                            autocomplete="on"
-                        >
+                        <!-- PROVINCIA -->
 
-                            <!-- DEPARTAMENTO -->
+                        <div class="checkout-form-group">
 
-                            <div class="checkout-form-group">
+                            <label for="checkout-province">
+                                Provincia
+                            </label>
 
-                                <label for="checkout-department">
-                                    Departamento
-                                </label>
-
-                                <select
-                                    id="checkout-department"
-                                    name="departamento_id"
-                                    required
-                                >
-
-                                    <option value="">
-                                        Selecciona un departamento
-                                    </option>
-
-                                    {% for departamento in departamentos %}
-
-                                    <option
-                                        value="{{ departamento['id'] }}"
-                                    >
-                                        {{ departamento["nombre"] }}
-                                    </option>
-
-                                    {% endfor %}
-
-                                </select>
-
-                            </div>
-
-
-                            <!-- PROVINCIA -->
-
-                            <div class="checkout-form-group">
-
-                                <label for="checkout-province">
-                                    Provincia
-                                </label>
-
-                                <select
-                                    id="checkout-province"
-                                    name="provincia_id"
-                                    required
-                                    disabled
-                                >
-
-                                    <option value="">
-                                        Primero selecciona un departamento
-                                    </option>
-
-                                </select>
-
-                            </div>
-
-
-                            <!-- DISTRITO -->
-
-                            <div class="checkout-form-group">
-
-                                <label for="checkout-district">
-                                    Distrito
-                                </label>
-
-                                <select
-                                    id="checkout-district"
-                                    name="distrito_id"
-                                    required
-                                    disabled
-                                >
-
-                                    <option value="">
-                                        Primero selecciona una provincia
-                                    </option>
-
-                                </select>
-
-                            </div>
-
-
-                            <!-- DIRECCIÓN -->
-
-                            <div class="checkout-form-group">
-
-                                <label for="checkout-address">
-                                    Dirección
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="checkout-address"
-                                    name="direccion"
-                                    maxlength="255"
-                                    autocomplete="street-address"
-                                    placeholder="Ej. Av. Los Andes 245"
-                                    required
-                                >
-
-                            </div>
-
-
-                            <!-- REFERENCIA -->
-
-                            <div class="checkout-form-group">
-
-                                <label for="checkout-reference">
-                                    Referencia
-                                    <span>
-                                        (opcional)
-                                    </span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="checkout-reference"
-                                    name="referencia"
-                                    maxlength="255"
-                                    placeholder="Ej. Frente al parque principal"
-                                >
-
-                            </div>
-
-
-                            <!-- ALIAS -->
-
-                            <div class="checkout-form-group">
-
-                                <label for="checkout-address-alias">
-                                    Nombre de la dirección
-                                    <span>
-                                        (opcional)
-                                    </span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="checkout-address-alias"
-                                    name="alias"
-                                    maxlength="50"
-                                    placeholder="Ej. Casa"
-                                    value="Casa"
-                                >
-
-                            </div>
-
-
-                            <div
-                                id="checkout-address-message"
-                                role="status"
-                                aria-live="polite"
-                            ></div>
-
-
-                            <button
-                                type="submit"
-                                id="checkout-save-address"
-                                class="checkout-primary-button"
+                            <select
+                                id="checkout-province"
+                                name="provincia_id"
+                                required
+                                disabled
                             >
-                                Guardar dirección
-                            </button>
 
-                        </form>
+                                <option value="">
+                                    Primero selecciona un departamento
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- DISTRITO -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-district">
+                                Distrito
+                            </label>
+
+                            <select
+                                id="checkout-district"
+                                name="distrito_id"
+                                required
+                                disabled
+                            >
+
+                                <option value="">
+                                    Primero selecciona una provincia
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- DIRECCIÓN -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-address">
+                                Dirección
+                            </label>
+
+                            <input
+                                type="text"
+                                id="checkout-address"
+                                name="direccion"
+                                maxlength="255"
+                                autocomplete="street-address"
+                                placeholder="Ej. Av. Los Andes 245"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- REFERENCIA -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-reference">
+
+                                Referencia
+
+                                <span>
+                                    (opcional)
+                                </span>
+
+                            </label>
+
+                            <input
+                                type="text"
+                                id="checkout-reference"
+                                name="referencia"
+                                maxlength="255"
+                                placeholder="Ej. Frente al parque principal"
+                            >
+
+                        </div>
+
+
+                        <!-- ALIAS -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-address-alias">
+
+                                Nombre de la dirección
+
+                                <span>
+                                    (opcional)
+                                </span>
+
+                            </label>
+
+                            <input
+                                type="text"
+                                id="checkout-address-alias"
+                                name="alias"
+                                maxlength="50"
+                                placeholder="Ej. Casa"
+                                value="Casa"
+                            >
+
+                        </div>
+
+
+                        <div
+                            id="checkout-address-message"
+                            role="status"
+                            aria-live="polite"
+                        ></div>
+
+
+                        <button
+                            type="submit"
+                            id="checkout-save-address"
+                            class="checkout-primary-button"
+                        >
+                            Guardar dirección
+                        </button>
+
+                    </form>
 
                     {% endif %}
 
@@ -405,24 +1362,375 @@ Finalizar compra | SULPAA
 
 
 
-               
-                <!-- =========================================
-                    COMPROBANTE
-                    ========================================= -->
+                <!-- =============================================
+                     03. TIPO DE ENTREGA
+                     ============================================= -->
 
-                <section class="checkout-card">
+                <section
+                    class="checkout-card"
+                    id="checkout-delivery-section"
+                >
 
                     <span class="checkout-step">
                         03
                     </span>
 
                     <h2>
+                        ¿Cómo quieres recibir tu pedido?
+                    </h2>
+
+
+                    <p class="checkout-section-description">
+                        Selecciona la modalidad disponible
+                        para tu compra.
+                    </p>
+
+
+                    <!--
+                        Las opciones reales se obtendrán desde:
+
+                        GET
+                        /operaciones/api/entregas/opciones
+                    -->
+
+                    <div
+                        id="checkout-delivery-options"
+                        class="checkout-document-options"
+                    >
+
+                        <p>
+                            Cargando opciones de entrega...
+                        </p>
+
+                    </div>
+
+
+                    <div
+                        id="checkout-delivery-message"
+                        role="status"
+                        aria-live="polite"
+                    ></div>
+
+
+
+                    <!-- =========================================
+                         RECOJO EN LOCAL
+                         ========================================= -->
+
+                    <div
+                        id="checkout-pickup-panel"
+                        class="checkout-delivery-panel"
+                        hidden
+                    >
+
+                        <h3>
+                            Punto de recojo
+                        </h3>
+
+
+                        <div
+                            id="checkout-pickup-locations"
+                            class="checkout-fields"
+                        ></div>
+
+
+                        <p class="checkout-security">
+                            El recojo en local no tiene
+                            costo de entrega.
+                        </p>
+
+                    </div>
+
+
+
+                    <!-- =========================================
+                         DELIVERY LOCAL
+                         ========================================= -->
+
+                    <div
+                        id="checkout-local-delivery-panel"
+                        class="checkout-delivery-panel"
+                        hidden
+                    >
+
+                        <h3>
+                            Ubicación para el delivery
+                        </h3>
+
+
+                        <p>
+                            Confirma en el mapa el punto exacto
+                            donde deseas recibir tu pedido.
+                        </p>
+
+
+                        <!--
+                            Dirección del local utilizada como
+                            origen para calcular la ruta.
+
+                            No se colocan coordenadas inventadas.
+                            El siguiente bloque de JavaScript
+                            resolverá la ubicación real.
+                        -->
+
+                        <div
+                            id="checkout-delivery-origin"
+                            data-address="Jr. Julio Sumar N.º 156, El Tambo, Huancayo, Junín, Perú"
+                            hidden
+                        ></div>
+
+
+                        <!-- MAPA -->
+
+                        <div
+                            id="checkout-delivery-map"
+                            style="
+                                width: 100%;
+                                height: 380px;
+                                margin-top: 16px;
+                                border-radius: 16px;
+                                overflow: hidden;
+                            "
+                            aria-label="Mapa para seleccionar ubicación de entrega"
+                        ></div>
+
+
+                        <!-- ACCIONES DEL MAPA -->
+
+                        <div
+                            class="checkout-document-row"
+                            style="margin-top: 16px;"
+                        >
+
+                            <button
+                                type="button"
+                                id="checkout-use-location"
+                                class="checkout-secondary-button"
+                            >
+                                Usar mi ubicación
+                            </button>
+
+
+                            <button
+                                type="button"
+                                id="checkout-confirm-location"
+                                class="checkout-primary-button"
+                                disabled
+                            >
+                                Confirmar ubicación
+                            </button>
+
+                        </div>
+
+
+                        <!-- RESULTADO -->
+
+                        <div
+                            id="checkout-map-message"
+                            role="status"
+                            aria-live="polite"
+                        ></div>
+
+
+                        <div
+                            id="checkout-route-result"
+                            class="checkout-fields"
+                            hidden
+                        >
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Distancia estimada
+                                </span>
+
+                                <strong id="checkout-route-distance">
+                                    --
+                                </strong>
+
+                            </div>
+
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Costo de delivery
+                                </span>
+
+                                <strong id="checkout-delivery-cost">
+                                    --
+                                </strong>
+
+                            </div>
+
+                        </div>
+
+
+                        <!--
+                            Estos valores no determinan por sí solos
+                            el precio final.
+
+                            El backend volverá a validar la
+                            cotización antes de crear el pedido.
+                        -->
+
+                        <input
+                            type="hidden"
+                            id="checkout-delivery-latitude"
+                        >
+
+                        <input
+                            type="hidden"
+                            id="checkout-delivery-longitude"
+                        >
+
+                        <input
+                            type="hidden"
+                            id="checkout-delivery-distance"
+                        >
+
+                        <input
+                            type="hidden"
+                            id="checkout-delivery-quote"
+                        >
+
+                    </div>
+
+
+
+                    <!-- =========================================
+                         TRANSPORTISTA
+                         ========================================= -->
+
+                    <div
+                        id="checkout-carrier-panel"
+                        class="checkout-delivery-panel"
+                        hidden
+                    >
+
+                        <h3>
+                            Envío interprovincial
+                        </h3>
+
+
+                        <!-- TRANSPORTISTA -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-carrier">
+                                Empresa de transporte
+                            </label>
+
+                            <select
+                                id="checkout-carrier"
+                                disabled
+                            >
+
+                                <option value="">
+                                    Selecciona un transportista
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- SERVICIO -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-carrier-service">
+                                Servicio
+                            </label>
+
+                            <select
+                                id="checkout-carrier-service"
+                                disabled
+                            >
+
+                                <option value="">
+                                    Primero selecciona un transportista
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <!-- AGENCIA -->
+
+                        <div class="checkout-form-group">
+
+                            <label for="checkout-carrier-agency">
+                                Agencia de destino
+                            </label>
+
+                            <select
+                                id="checkout-carrier-agency"
+                                disabled
+                            >
+
+                                <option value="">
+                                    Selecciona una agencia
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <div
+                            id="checkout-carrier-message"
+                            role="status"
+                            aria-live="polite"
+                        ></div>
+
+
+                        <div
+                            id="checkout-carrier-result"
+                            class="checkout-fields"
+                            hidden
+                        >
+
+                            <div class="checkout-field">
+
+                                <span>
+                                    Costo estimado del envío
+                                </span>
+
+                                <strong id="checkout-carrier-cost">
+                                    --
+                                </strong>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- =============================================
+                     04. COMPROBANTE
+                     ============================================= -->
+
+                <section class="checkout-card">
+
+                    <span class="checkout-step">
+                        04
+                    </span>
+
+                    <h2>
                         Comprobante
                     </h2>
+
 
                     <div class="checkout-document-options">
 
                         <label>
+
                             <input
                                 type="radio"
                                 name="tipo_comprobante"
@@ -430,23 +1738,32 @@ Finalizar compra | SULPAA
                                 id="checkout-boleta"
                                 checked
                             >
+
                             Boleta
+
                         </label>
 
+
                         <label>
+
                             <input
                                 type="radio"
                                 name="tipo_comprobante"
                                 value="FACTURA"
                                 id="checkout-factura"
                             >
+
                             Factura
+
                         </label>
 
                     </div>
 
 
-                    <!-- BOLETA -->
+
+                    <!-- =========================================
+                         BOLETA
+                         ========================================= -->
 
                     <div id="checkout-boleta-panel">
 
@@ -455,6 +1772,7 @@ Finalizar compra | SULPAA
                             <label for="checkout-dni">
                                 DNI
                             </label>
+
 
                             <div class="checkout-document-row">
 
@@ -476,6 +1794,7 @@ Finalizar compra | SULPAA
                                     }}"
                                     placeholder="8 dígitos"
                                 >
+
 
                                 <button
                                     type="button"
@@ -508,7 +1827,9 @@ Finalizar compra | SULPAA
                                     Titular verificado
                                 </span>
 
-                                <strong id="checkout-dni-name"></strong>
+                                <strong
+                                    id="checkout-dni-name"
+                                ></strong>
 
                             </div>
 
@@ -517,137 +1838,125 @@ Finalizar compra | SULPAA
                     </div>
 
 
-                    <!-- FACTURA -->
 
                     <!-- =========================================
-                    FACTURA - VERIFICACIÓN DE RUC
-                    Implementación rama: serna
-
-                    El RUC se consulta mediante el backend
-                    de SULPAA. Las credenciales de APIsPERU
-                    nunca son expuestas al navegador.
-                    ========================================= -->
-
-                <div
-                    id="checkout-factura-panel"
-                    hidden
-                >
-
-                    <div class="checkout-form-group">
-
-                        <label for="checkout-ruc">
-                            RUC
-                        </label>
-
-                        <div class="checkout-document-row">
-
-                            <input
-                                type="text"
-                                id="checkout-ruc"
-                                inputmode="numeric"
-                                maxlength="11"
-                                autocomplete="off"
-                                placeholder="11 dígitos"
-                            >
-
-                            <button
-                                type="button"
-                                id="checkout-verify-ruc"
-                                class="checkout-secondary-button"
-                            >
-                                Verificar RUC
-                            </button>
-
-                        </div>
-
-                    </div>
-
-
-                    <!--
-                        Mensajes de validación o errores
-                        devueltos por el backend.
-                    -->
+                         FACTURA
+                         ========================================= -->
 
                     <div
-                        id="checkout-ruc-message"
-                        role="status"
-                        aria-live="polite"
-                    ></div>
-
-
-                    <!--
-                        Los datos empresariales permanecen ocultos
-                        hasta que APIsPERU confirme el RUC.
-                    -->
-
-                    <div
-                        id="checkout-ruc-result"
+                        id="checkout-factura-panel"
                         hidden
                     >
 
-                        <div class="checkout-fields">
+                        <div class="checkout-form-group">
 
-                            <div class="checkout-field">
-
-                                <span>
-                                    Razón social
-                                </span>
-
-                                <strong
-                                    id="checkout-ruc-business-name"
-                                ></strong>
-
-                            </div>
+                            <label for="checkout-ruc">
+                                RUC
+                            </label>
 
 
-                            <div class="checkout-field">
+                            <div class="checkout-document-row">
 
-                                <span>
-                                    Dirección fiscal
-                                </span>
+                                <input
+                                    type="text"
+                                    id="checkout-ruc"
+                                    inputmode="numeric"
+                                    maxlength="11"
+                                    autocomplete="off"
+                                    placeholder="11 dígitos"
+                                >
 
-                                <strong
-                                    id="checkout-ruc-address"
-                                ></strong>
 
-                            </div>
-
-
-                            <div class="checkout-field">
-
-                                <span>
-                                    Estado
-                                </span>
-
-                                <strong
-                                    id="checkout-ruc-status"
-                                ></strong>
+                                <button
+                                    type="button"
+                                    id="checkout-verify-ruc"
+                                    class="checkout-secondary-button"
+                                >
+                                    Verificar RUC
+                                </button>
 
                             </div>
 
-
-                            <div class="checkout-field">
-
-                                <span>
-                                    Condición
-                                </span>
-
-                                <strong
-                                    id="checkout-ruc-condition"
-                                ></strong>
-
-                            </div>
+                        </div>
 
 
-                            <div class="checkout-field">
+                        <div
+                            id="checkout-ruc-message"
+                            role="status"
+                            aria-live="polite"
+                        ></div>
 
-                                <span>
-                                    Ubicación fiscal
-                                </span>
 
-                                <strong
-                                    id="checkout-ruc-location"
-                                ></strong>
+                        <div
+                            id="checkout-ruc-result"
+                            hidden
+                        >
+
+                            <div class="checkout-fields">
+
+                                <div class="checkout-field">
+
+                                    <span>
+                                        Razón social
+                                    </span>
+
+                                    <strong
+                                        id="checkout-ruc-business-name"
+                                    ></strong>
+
+                                </div>
+
+
+                                <div class="checkout-field">
+
+                                    <span>
+                                        Dirección fiscal
+                                    </span>
+
+                                    <strong
+                                        id="checkout-ruc-address"
+                                    ></strong>
+
+                                </div>
+
+
+                                <div class="checkout-field">
+
+                                    <span>
+                                        Estado
+                                    </span>
+
+                                    <strong
+                                        id="checkout-ruc-status"
+                                    ></strong>
+
+                                </div>
+
+
+                                <div class="checkout-field">
+
+                                    <span>
+                                        Condición
+                                    </span>
+
+                                    <strong
+                                        id="checkout-ruc-condition"
+                                    ></strong>
+
+                                </div>
+
+
+                                <div class="checkout-field">
+
+                                    <span>
+                                        Ubicación fiscal
+                                    </span>
+
+                                    <strong
+                                        id="checkout-ruc-location"
+                                    ></strong>
+
+                                </div>
 
                             </div>
 
@@ -655,7 +1964,11 @@ Finalizar compra | SULPAA
 
                     </div>
 
-                </div>
+                </section>
+
+
+            </div>
+            <!-- FIN checkout-main -->
 
 
 
@@ -668,6 +1981,7 @@ Finalizar compra | SULPAA
                 <span class="checkout-kicker">
                     TU PEDIDO
                 </span>
+
 
                 <h2>
                     Resumen
@@ -708,13 +2022,19 @@ Finalizar compra | SULPAA
                 </div>
 
 
+
+                <!-- SUBTOTAL -->
+
                 <div class="checkout-total">
 
                     <span>
                         Subtotal
                     </span>
 
-                    <strong>
+                    <strong
+                        id="checkout-summary-subtotal"
+                        data-subtotal="{{ carrito['subtotal'] }}"
+                    >
                         S/
                         {{ "%.2f"|format(
                             carrito["subtotal"]
@@ -724,8 +2044,52 @@ Finalizar compra | SULPAA
                 </div>
 
 
+
+                <!-- ENTREGA -->
+
+                <div
+                    class="checkout-total"
+                    id="checkout-summary-delivery-row"
+                    hidden
+                >
+
+                    <span>
+                        Entrega
+                    </span>
+
+                    <strong id="checkout-summary-delivery">
+                        S/ 0.00
+                    </strong>
+
+                </div>
+
+
+
+                <!-- TOTAL -->
+
+                <div
+                    class="checkout-total"
+                    id="checkout-summary-total-row"
+                >
+
+                    <span>
+                        Total
+                    </span>
+
+                    <strong id="checkout-summary-total">
+                        S/
+                        {{ "%.2f"|format(
+                            carrito["subtotal"]
+                        ) }}
+                    </strong>
+
+                </div>
+
+
+
                 <button
                     type="button"
+                    id="checkout-confirm-order"
                     class="checkout-confirm-button"
                     disabled
                 >
@@ -733,12 +2097,12 @@ Finalizar compra | SULPAA
                 </button>
 
 
-                <small class="checkout-security">
-
-                    La confirmación se habilitará
-                    cuando terminemos de conectar
-                    pedido, entrega e inventario.
-
+                <small
+                    class="checkout-security"
+                    id="checkout-confirm-help"
+                >
+                    Selecciona la entrega y completa
+                    los datos necesarios para continuar.
                 </small>
 
 
@@ -751,6 +2115,7 @@ Finalizar compra | SULPAA
 
             </aside>
 
+
         </div>
 
         {% endif %}
@@ -759,14 +2124,33 @@ Finalizar compra | SULPAA
 
 </main>
 
+
+
+<!-- =========================================================
+     LEAFLET JS
+     ========================================================= -->
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+></script>
+
+
+
+<!-- =========================================================
+     SCRIPTS DEL CHECKOUT
+     ========================================================= -->
+
 <script
     src="{{ url_for('static', filename='js/modules/checkout.js') }}"
     defer
 ></script>
 
+
 <script
     src="{{ url_for('static', filename='js/modules/checkout-billing.js') }}"
     defer
 ></script>
+
 
 {% endblock %}
