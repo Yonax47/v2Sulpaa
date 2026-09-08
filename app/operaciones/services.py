@@ -42,6 +42,7 @@ from app.operaciones.repositories import (
     obtener_tarifario_activo_transportista,
     obtener_regla_tarifa_transportista,
     obtener_rango_tarifa_por_peso,
+    listar_metodos_pago_activos,
 )
 
 from app.comercio.services import (
@@ -1185,4 +1186,189 @@ def cotizar_envio_transportista(
 
         "costo_entrega":
             float(costo),
+    }
+
+# ============================================================
+# MÉTODOS DE PAGO DEL CHECKOUT
+# ============================================================
+
+def obtener_metodos_pago_checkout(
+    tipo_entrega,
+):
+    """
+    Devuelve los métodos de pago disponibles para
+    la modalidad de entrega seleccionada.
+
+    Reglas actuales:
+
+    RECOJO_LOCAL
+        - Efectivo -> PAGO_EN_LOCAL
+        - Yape -> ANTICIPADO
+        - Plin -> ANTICIPADO
+        - Transferencia -> ANTICIPADO
+
+    DELIVERY_LOCAL
+        - Efectivo -> CONTRA_ENTREGA
+        - Yape -> ANTICIPADO
+        - Plin -> ANTICIPADO
+        - Transferencia -> ANTICIPADO
+
+    TRANSPORTISTA
+        - No permite efectivo.
+        - Yape -> ANTICIPADO
+        - Plin -> ANTICIPADO
+        - Transferencia -> ANTICIPADO
+
+    IMPORTANTE:
+
+    El frontend no determina la modalidad de pago.
+    El backend la asigna según el método y el
+    tipo de entrega seleccionado.
+    """
+
+    tipos_entrega_validos = {
+        "RECOJO_LOCAL",
+        "DELIVERY_LOCAL",
+        "TRANSPORTISTA",
+    }
+
+    tipo_entrega = (
+        str(tipo_entrega or "")
+        .strip()
+        .upper()
+    )
+
+    if tipo_entrega not in tipos_entrega_validos:
+        return {
+            "ok": False,
+            "mensaje":
+                "Debe seleccionar una modalidad de entrega válida.",
+        }
+
+    metodos_bd = (
+        listar_metodos_pago_activos()
+    )
+
+    metodos = []
+
+    for metodo in metodos_bd:
+
+        codigo = (
+            str(
+                metodo.get(
+                    "codigo",
+                    ""
+                )
+            )
+            .strip()
+            .upper()
+        )
+
+        # ----------------------------------------------------
+        # EFECTIVO
+        # ----------------------------------------------------
+
+        if codigo == "EFECTIVO":
+
+            if tipo_entrega == "TRANSPORTISTA":
+                continue
+
+            if tipo_entrega == "RECOJO_LOCAL":
+                modalidad = (
+                    "PAGO_EN_LOCAL"
+                )
+
+                descripcion = (
+                    "Paga en efectivo cuando recojas "
+                    "tu pedido en el local."
+                )
+
+            else:
+                modalidad = (
+                    "CONTRA_ENTREGA"
+                )
+
+                descripcion = (
+                    "Paga en efectivo al momento "
+                    "de recibir tu pedido."
+                )
+
+        # ----------------------------------------------------
+        # PAGOS ANTICIPADOS
+        # ----------------------------------------------------
+
+        elif codigo in {
+            "YAPE",
+            "PLIN",
+            "TRANSFERENCIA",
+        }:
+
+            modalidad = "ANTICIPADO"
+
+            if codigo == "YAPE":
+                descripcion = (
+                    "Realiza el pago mediante Yape. "
+                    "La operación será verificada "
+                    "antes de confirmar el pago."
+                )
+
+            elif codigo == "PLIN":
+                descripcion = (
+                    "Realiza el pago mediante Plin. "
+                    "La operación será verificada "
+                    "antes de confirmar el pago."
+                )
+
+            else:
+                descripcion = (
+                    "Realiza una transferencia bancaria. "
+                    "La operación será verificada "
+                    "antes de confirmar el pago."
+                )
+
+        # ----------------------------------------------------
+        # MÉTODO TODAVÍA NO IMPLEMENTADO
+        # ----------------------------------------------------
+
+        else:
+            continue
+
+        metodos.append({
+            "id":
+                metodo["id"],
+
+            "codigo":
+                codigo,
+
+            "nombre":
+                metodo["nombre"],
+
+            "tipo_confirmacion":
+                metodo[
+                    "tipo_confirmacion"
+                ],
+
+            "modalidad":
+                modalidad,
+
+            "descripcion":
+                descripcion,
+        })
+
+    if not metodos:
+        return {
+            "ok": False,
+            "mensaje":
+                (
+                    "No existen métodos de pago "
+                    "disponibles para esta entrega."
+                ),
+        }
+
+    return {
+        "ok": True,
+        "tipo_entrega":
+            tipo_entrega,
+        "metodos_pago":
+            metodos,
     }

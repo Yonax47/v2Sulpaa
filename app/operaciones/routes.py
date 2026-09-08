@@ -40,6 +40,7 @@ from app.operaciones.services import (
     obtener_agencias_destino_checkout,
     cotizar_delivery_local,
     cotizar_envio_transportista,
+    obtener_metodos_pago_checkout,
 )
 
 
@@ -309,6 +310,53 @@ def api_cotizar_transportista():
         sucursal_destino_id=datos.get(
             "sucursal_destino_id"
         ),
+    )
+
+    return _respuesta(
+        resultado
+    )
+
+# ============================================================
+# 7. MÉTODOS DE PAGO
+# ============================================================
+
+@operaciones_bp.route(
+    "/api/metodos-pago",
+    methods=["GET"],
+)
+@login_required
+def api_metodos_pago():
+    """
+    Obtiene los métodos de pago permitidos para
+    la modalidad de entrega seleccionada.
+
+    Ejemplos:
+
+        /operaciones/api/metodos-pago
+            ?tipo_entrega=RECOJO_LOCAL
+
+        /operaciones/api/metodos-pago
+            ?tipo_entrega=DELIVERY_LOCAL
+
+        /operaciones/api/metodos-pago
+            ?tipo_entrega=TRANSPORTISTA
+
+    La modalidad de pago se determina en backend
+    y nunca se confía en una modalidad enviada
+    directamente desde JavaScript.
+    """
+
+    tipo_entrega = (
+        request.args.get(
+            "tipo_entrega",
+            "",
+        ).strip()
+    )
+
+    resultado = (
+        obtener_metodos_pago_checkout(
+            tipo_entrega
+        )
     )
 
     return _respuesta(

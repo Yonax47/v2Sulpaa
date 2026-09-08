@@ -505,3 +505,43 @@ def obtener_rango_tarifa_por_peso(
 
     finally:
         conexion.close()
+
+# ============================================================
+# MÉTODOS DE PAGO
+# ============================================================
+
+def listar_metodos_pago_activos():
+    """
+    Obtiene los métodos de pago actualmente habilitados.
+
+    La disponibilidad proviene siempre de
+    v2sulpaa_operaciones_db.metodos_pago.
+
+    El repositorio no decide qué método corresponde
+    a cada modalidad de entrega. Esa regla pertenece
+    a la capa de servicios.
+    """
+
+    conexion = conexion_operaciones()
+
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT
+                    id,
+                    codigo,
+                    nombre,
+                    tipo_confirmacion,
+                    estado,
+                    orden
+                FROM metodos_pago
+                WHERE estado = 'ACTIVO'
+                ORDER BY orden ASC, id ASC
+            """
+
+            cursor.execute(sql)
+
+            return cursor.fetchall()
+
+    finally:
+        conexion.close()
