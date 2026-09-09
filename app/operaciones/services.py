@@ -43,11 +43,11 @@ from app.operaciones.repositories import (
     obtener_regla_tarifa_transportista,
     obtener_rango_tarifa_por_peso,
     listar_metodos_pago_activos,
+    crear_pago_pedido,
+    cancelar_pago_pedido,
 )
 
-from app.comercio.services import (
-    obtener_carrito_usuario,
-)
+
 
 
 # ============================================================
@@ -154,10 +154,16 @@ def _obtener_datos_carrito_entrega(
                 "No se pudo identificar al usuario.",
         }
 
+    # Import local para evitar dependencia circular
+    # entre Comercio y Operaciones durante el arranque.
+    from app.comercio.services import (
+        obtener_carrito_usuario,
+    )
+
     carrito = obtener_carrito_usuario(
         usuario_id
     )
-
+    
     # --------------------------------------------------------
     # Carrito inexistente o vacío
     # --------------------------------------------------------
@@ -1372,3 +1378,124 @@ def obtener_metodos_pago_checkout(
         "metodos_pago":
             metodos,
     }
+
+# ============================================================
+# CREAR PAGO INICIAL DEL CHECKOUT
+# ============================================================
+
+def crear_pago_checkout(
+    pago_id,
+    pedido_id,
+    usuario_id,
+    tipo_entrega,
+    metodo_pago_id,
+    monto,
+    moneda="PEN",
+):
+    """
+    Crea el pago inicial de un pedido.
+
+    La modalidad nunca se acepta directamente desde frontend.
+    Se obtiene nuevamente utilizando las reglas de métodos de
+    pago del backend.
+    """
+
+    resultado_metodos = (
+        obtener_metodos_pago_checkout(
+            tipo_entrega
+        )
+    )
+
+    if not resultado_metodos.get("ok"):
+
+        return resultado_metodos
+
+    try:
+
+        metodo_pago_id = int(
+            metodo_pago_id
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El método de pago seleccionado no es válido.",
+        }
+
+    metodo = next(
+        (
+            item
+            for item
+            in resultado_metodos[
+                "metodos_pago"
+            ]
+            if int(
+                item["id"]
+            ) == metodo_pago_id
+        ),
+        None,
+    )
+
+    if not metodo:
+
+        return {
+            "ok": False,
+            "mensaje":
+                (
+                    "El método de pago no está permitido "
+                    "para la entrega seleccionada."
+                ),
+        }
+
+    try:
+
+        pago = crear_pago_pedido(
+            pago_id=pago_id,
+            pedido_id=pedido_id,
+            metodo_pago_id=metodo["id"],
+            modalidad=metodo["modalidad"],
+            monto=monto,
+            moneda=moneda,
+            usuario_id=usuario_id,
+        )
+
+    except ValueError as error:
+
+        return {
+            "ok": False,
+            "mensaje":
+                str(error),
+        }
+
+    return {
+        "ok": True,
+
+        "pago":
+            pago,
+    }
+
+
+# ============================================================
+# COMPENSAR PAGO DEL CHECKOUT
+# ============================================================
+
+def cancelar_pago_checkout(
+    pedido_id,
+    usuario_id=None,
+    observacion=None,
+):
+    """
+    Revierte el pago cuando una operación posterior del
+    checkout impide finalizar correctamente el pedido.
+    """
+
+    return cancelar_pago_pedido(
+        pedido_id=pedido_id,
+        usuario_id=usuario_id,
+        observacion=observacion,
+    )

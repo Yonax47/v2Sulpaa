@@ -1117,3 +1117,700 @@ def obtener_pesos_variantes(variante_ids):
     finally:
 
         conexion.close()
+
+# ============================================================
+# 15. CREAR PEDIDO DESDE SNAPSHOT DEL CHECKOUT
+# ============================================================
+
+def crear_pedido(
+    pedido_id,
+    numero_pedido,
+    usuario_id,
+    items,
+    costo_entrega,
+    moneda="PEN",
+):
+    """
+    Crea la cabecera, detalles y composiciones de un pedido.
+
+    IMPORTANTE:
+    - Los items recibidos deben haber sido reconstruidos y
+      validados previamente desde backend.
+    - No se confían precios, cantidades ni totales enviados
+      directamente desde JavaScript.
+    - Toda la escritura de Comercio ocurre en una única
+      transacción.
+    """
+
+    from decimal import (
+        Decimal,
+        ROUND_HALF_UP,
+    )
+
+    if not pedido_id:
+        raise ValueError(
+            "No se recibió el identificador del pedido."
+        )
+
+    if not numero_pedido:
+        raise ValueError(
+            "No se recibió el número del pedido."
+        )
+
+    if not usuario_id:
+        raise ValueError(
+            "No se pudo identificar al usuario."
+        )
+
+    if not items:
+        raise ValueError(
+            "El pedido no contiene productos."
+        )
+
+    def dinero(valor):
+        return Decimal(
+            str(valor or 0)
+        ).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    costo_entrega = dinero(
+        costo_entrega
+    )
+
+    if costo_entrega < 0:
+        raise ValueError(
+            "El costo de entrega no es válido."
+        )
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            # ----------------------------------------------------
+            # 1. Verificar que el número no exista
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                SELECT id
+
+                FROM pedidos
+
+                WHERE numero_pedido = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    numero_pedido,
+                ),
+            )
+
+            if cursor.fetchone():
+
+                raise ValueError(
+                    "El número de pedido ya existe."
+                )
+
+            # ----------------------------------------------------
+            # 2. Calcular subtotal exclusivamente
+            #    desde el snapshot validado por backend
+            # ----------------------------------------------------
+
+            subtotal = Decimal("0.00")
+
+            items_normalizados = []
+
+            for item in items:
+
+                articulo_venta_id = item.get(
+                    "articulo_venta_id"
+                )
+
+                nombre = str(
+                    item.get(
+                        "nombre",
+                        "",
+                    )
+                ).strip()
+
+                try:
+
+                    cantidad = int(
+                        item.get(
+                            "cantidad",
+                            0,
+                        )
+                    )
+
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+
+                    cantidad = 0
+
+                precio = dinero(
+                    item.get(
+                        "precio",
+                        0,
+                    )
+                )
+
+                if not articulo_venta_id:
+
+                    raise ValueError(
+                        "Uno de los artículos del pedido "
+                        "no es válido."
+                    )
+
+                if not nombre:
+
+                    raise ValueError(
+                        "Uno de los artículos no tiene "
+                        "un nombre válido."
+                    )
+
+                if cantidad <= 0:
+
+                    raise ValueError(
+                        "Uno de los artículos tiene "
+                        "una cantidad inválida."
+                    )
+
+                if precio < 0:
+
+                    raise ValueError(
+                        "Uno de los artículos tiene "
+                        "un precio inválido."
+                    )
+
+                subtotal_linea = dinero(
+                    precio
+                    * cantidad
+                )
+
+                subtotal += subtotal_linea
+
+                items_normalizados.append({
+                    **item,
+
+                    "nombre":
+                        nombre,
+
+                    "cantidad":
+                        cantidad,
+
+                    "precio":
+                        precio,
+
+                    "subtotal_linea":
+                        subtotal_linea,
+                })
+
+            subtotal = dinero(
+                subtotal
+            )
+
+            total = dinero(
+                subtotal
+                + costo_entrega
+            )
+
+            # ----------------------------------------------------
+            # 3. Crear cabecera
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                INSERT INTO pedidos (
+                    id,
+                    numero_pedido,
+                    usuario_id,
+                    origen,
+                    subtotal,
+                    descuento_total,
+                    costo_entrega,
+                    total,
+                    moneda,
+                    estado
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    'WEB',
+                    %s,
+                    0.00,
+                    %s,
+                    %s,
+                    %s,
+                    'CREADO'
+                )
+                """,
+                (
+                    pedido_id,
+                    numero_pedido,
+                    usuario_id,
+                    subtotal,
+                    costo_entrega,
+                    total,
+                    moneda,
+                ),
+            )
+
+            # ----------------------------------------------------
+            # 4. Crear detalles
+            # ----------------------------------------------------
+
+            detalles_creados = []
+
+            for item in items_normalizados:
+
+                pedido_detalle_id = str(
+                    uuid.uuid4()
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO pedido_detalles (
+                        id,
+                        pedido_id,
+                        articulo_venta_id,
+                        nombre_articulo,
+                        cantidad,
+                        precio_unitario,
+                        descuento_unitario,
+                        subtotal_linea
+                    )
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        0.00,
+                        %s
+                    )
+                    """,
+                    (
+                        pedido_detalle_id,
+                        pedido_id,
+                        item[
+                            "articulo_venta_id"
+                        ],
+                        item["nombre"],
+                        item["cantidad"],
+                        item["precio"],
+                        item[
+                            "subtotal_linea"
+                        ],
+                    ),
+                )
+
+                # ------------------------------------------------
+                # 5. Snapshot de composición
+                # ------------------------------------------------
+
+                composicion = item.get(
+                    "composicion",
+                    [],
+                )
+
+                for componente in composicion:
+
+                    variante_id = (
+                        componente.get(
+                            "variante_id"
+                        )
+                    )
+
+                    nombre_variante = str(
+                        componente.get(
+                            "nombre_variante",
+                            "",
+                        )
+                    ).strip()
+
+                    try:
+
+                        cantidad_componente = int(
+                            componente.get(
+                                "cantidad",
+                                0,
+                            )
+                        )
+
+                    except (
+                        TypeError,
+                        ValueError,
+                    ):
+
+                        cantidad_componente = 0
+
+                    if not variante_id:
+
+                        raise ValueError(
+                            "La composición de uno de los "
+                            "productos no es válida."
+                        )
+
+                    if not nombre_variante:
+
+                        raise ValueError(
+                            "Una variante del pedido "
+                            "no tiene nombre."
+                        )
+
+                    if cantidad_componente <= 0:
+
+                        raise ValueError(
+                            "La composición contiene una "
+                            "cantidad inválida."
+                        )
+
+                    cursor.execute(
+                        """
+                        INSERT INTO pedido_composiciones (
+                            id,
+                            pedido_detalle_id,
+                            variante_id,
+                            nombre_variante,
+                            cantidad
+                        )
+                        VALUES (
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s
+                        )
+                        """,
+                        (
+                            str(
+                                uuid.uuid4()
+                            ),
+                            pedido_detalle_id,
+                            variante_id,
+                            nombre_variante,
+                            cantidad_componente,
+                        ),
+                    )
+
+                detalles_creados.append({
+                    "pedido_detalle_id":
+                        pedido_detalle_id,
+
+                    "articulo_venta_id":
+                        item[
+                            "articulo_venta_id"
+                        ],
+                })
+
+            conexion.commit()
+
+            return {
+                "ok": True,
+                "mensaje":
+                    "Pedido creado correctamente.",
+
+                "pedido_id":
+                    pedido_id,
+
+                "numero_pedido":
+                    numero_pedido,
+
+                "subtotal":
+                    float(subtotal),
+
+                "costo_entrega":
+                    float(costo_entrega),
+
+                "total":
+                    float(total),
+
+                "moneda":
+                    moneda,
+
+                "estado":
+                    "CREADO",
+
+                "detalles":
+                    detalles_creados,
+            }
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 16. CAMBIAR ESTADO DEL PEDIDO
+# ============================================================
+
+def actualizar_estado_pedido(
+    pedido_id,
+    estado,
+):
+    """
+    Permite actualizar el estado comercial del pedido.
+
+    Se utilizará principalmente como mecanismo de compensación
+    cuando una operación posterior de Inventario u Operaciones
+    no pueda completarse.
+    """
+
+    if not pedido_id:
+        return False
+
+    estado = str(
+        estado or ""
+    ).strip().upper()
+
+    if not estado:
+        return False
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE pedidos
+
+                SET estado = %s
+
+                WHERE id = %s
+                """,
+                (
+                    estado,
+                    pedido_id,
+                ),
+            )
+
+            actualizado = (
+                cursor.rowcount > 0
+            )
+
+            conexion.commit()
+
+            return actualizado
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 17. CERRAR CARRITO DESPUÉS DE LA COMPRA
+# ============================================================
+
+def cerrar_carrito_usuario(
+    usuario_id,
+):
+    """
+    Cierra el carrito ACTIVO únicamente cuando todo el proceso
+    de confirmación del pedido terminó correctamente.
+
+    No eliminamos físicamente el carrito ni sus detalles:
+    conservamos el registro histórico.
+    """
+
+    if not usuario_id:
+        return False
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE carritos
+
+                SET estado = 'CONVERTIDO'
+
+                WHERE
+                    usuario_id = %s
+                    AND estado = 'ACTIVO'
+                """,
+                (
+                    usuario_id,
+                ),
+            )
+
+            actualizado = (
+                cursor.rowcount > 0
+            )
+
+            conexion.commit()
+
+            return actualizado
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+def reabrir_carrito_usuario(
+    usuario_id,
+):
+    """
+    Revierte el carrito CONVERTIDO a ACTIVO cuando
+    una confirmación de checkout falla después de
+    haber cerrado temporalmente el carrito.
+
+    Se utiliza únicamente como mecanismo de
+    compensación del proceso de compra.
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        cursor = conexion.cursor()
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM carritos
+            WHERE usuario_id = %s
+              AND estado = 'CONVERTIDO'
+            ORDER BY actualizado_en DESC
+            LIMIT 1
+            FOR UPDATE
+            """,
+            (
+                usuario_id,
+            ),
+        )
+
+        carrito = cursor.fetchone()
+
+        if not carrito:
+
+            conexion.rollback()
+
+            return {
+                "ok": False,
+                "mensaje":
+                    "No se encontró un carrito convertido.",
+            }
+
+        cursor.execute(
+            """
+            UPDATE carritos
+            SET estado = 'ACTIVO'
+            WHERE id = %s
+            """,
+            (
+                carrito["id"],
+            ),
+        )
+
+        conexion.commit()
+
+        return {
+            "ok": True,
+            "carrito_id":
+                carrito["id"],
+        }
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+# ============================================================
+# 18. DATOS BÁSICOS DE VARIANTES PARA SNAPSHOT DE PEDIDO
+# ============================================================
+
+def obtener_variantes_snapshot(
+    variante_ids,
+):
+    """
+    Obtiene los datos mínimos de las variantes que deben
+    conservarse como snapshot dentro de un pedido.
+
+    Se utiliza para no depender posteriormente de que el nombre
+    comercial de una variante cambie en el catálogo.
+    """
+
+    if not variante_ids:
+        return {}
+
+    variante_ids = list(
+        dict.fromkeys(
+            variante_ids
+        )
+    )
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            placeholders = ", ".join(
+                ["%s"] * len(variante_ids)
+            )
+
+            consulta = f"""
+                SELECT
+                    id AS variante_id,
+                    nombre_comercial
+
+                FROM variantes
+
+                WHERE id IN ({placeholders})
+            """
+
+            cursor.execute(
+                consulta,
+                tuple(variante_ids),
+            )
+
+            filas = cursor.fetchall()
+
+            return {
+                fila["variante_id"]: {
+                    "variante_id":
+                        fila["variante_id"],
+
+                    "nombre_variante":
+                        fila["nombre_comercial"],
+                }
+
+                for fila in filas
+            }
+
+    finally:
+
+        conexion.close()

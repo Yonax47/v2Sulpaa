@@ -545,3 +545,380 @@ def listar_metodos_pago_activos():
 
     finally:
         conexion.close()
+
+# ============================================================
+# PAGOS
+# ============================================================
+
+def crear_pago_pedido(
+    pago_id,
+    pedido_id,
+    metodo_pago_id,
+    modalidad,
+    monto,
+    moneda="PEN",
+    usuario_id=None,
+):
+    """
+    Crea el pago inicial de un pedido.
+
+    Todos los pagos nacen en estado PENDIENTE.
+
+    Yape, Plin y transferencia cambiarán posteriormente a
+    EN_REVISION cuando el cliente registre una operación
+    mediante el simulador de pago.
+
+    El pago y su primer historial se crean dentro de una sola
+    transacción de Operaciones.
+    """
+
+    if not pago_id:
+        raise ValueError(
+            "No se recibió el identificador del pago."
+        )
+
+    if not pedido_id:
+        raise ValueError(
+            "No se recibió el identificador del pedido."
+        )
+
+    if not metodo_pago_id:
+        raise ValueError(
+            "No se recibió el método de pago."
+        )
+
+    modalidades_validas = {
+        "ANTICIPADO",
+        "CONTRA_ENTREGA",
+        "PAGO_EN_LOCAL",
+    }
+
+    modalidad = str(
+        modalidad or ""
+    ).strip().upper()
+
+    if modalidad not in modalidades_validas:
+
+        raise ValueError(
+            "La modalidad de pago no es válida."
+        )
+
+    from decimal import (
+        Decimal,
+        ROUND_HALF_UP,
+    )
+
+    try:
+
+        monto = Decimal(
+            str(monto)
+        ).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    except Exception as error:
+
+        raise ValueError(
+            "El monto del pago no es válido."
+        ) from error
+
+    if monto <= 0:
+
+        raise ValueError(
+            "El monto del pago debe ser mayor que cero."
+        )
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            # ----------------------------------------------------
+            # 1. Verificar método de pago activo
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    codigo,
+                    nombre,
+                    tipo_confirmacion
+
+                FROM metodos_pago
+
+                WHERE
+                    id = %s
+                    AND estado = 'ACTIVO'
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    metodo_pago_id,
+                ),
+            )
+
+            metodo = cursor.fetchone()
+
+            if not metodo:
+
+                raise ValueError(
+                    "El método de pago ya no está disponible."
+                )
+
+            # ----------------------------------------------------
+            # 2. Evitar pago duplicado para el pedido
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                SELECT id
+
+                FROM pagos
+
+                WHERE pedido_id = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    pedido_id,
+                ),
+            )
+
+            if cursor.fetchone():
+
+                raise ValueError(
+                    "El pedido ya tiene un pago registrado."
+                )
+
+            # ----------------------------------------------------
+            # 3. Crear pago pendiente
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                INSERT INTO pagos (
+                    id,
+                    pedido_id,
+                    metodo_pago_id,
+                    modalidad,
+                    monto,
+                    moneda,
+                    estado,
+                    referencia_externa,
+                    registrado_por_usuario_id
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    'PENDIENTE',
+                    NULL,
+                    %s
+                )
+                """,
+                (
+                    pago_id,
+                    pedido_id,
+                    metodo_pago_id,
+                    modalidad,
+                    monto,
+                    moneda,
+                    usuario_id,
+                ),
+            )
+
+            # ----------------------------------------------------
+            # 4. Historial inicial
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                INSERT INTO pago_historial (
+                    pago_id,
+                    estado_anterior,
+                    estado_nuevo,
+                    usuario_responsable_id,
+                    observacion
+                )
+                VALUES (
+                    %s,
+                    NULL,
+                    'PENDIENTE',
+                    %s,
+                    %s
+                )
+                """,
+                (
+                    pago_id,
+                    usuario_id,
+                    "Pago creado desde checkout.",
+                ),
+            )
+
+            conexion.commit()
+
+            return {
+                "pago_id":
+                    pago_id,
+
+                "pedido_id":
+                    pedido_id,
+
+                "metodo_pago_id":
+                    metodo_pago_id,
+
+                "metodo_codigo":
+                    metodo["codigo"],
+
+                "metodo_nombre":
+                    metodo["nombre"],
+
+                "modalidad":
+                    modalidad,
+
+                "monto":
+                    float(monto),
+
+                "moneda":
+                    moneda,
+
+                "estado":
+                    "PENDIENTE",
+            }
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# CANCELAR PAGO POR COMPENSACIÓN
+# ============================================================
+
+def cancelar_pago_pedido(
+    pedido_id,
+    usuario_id=None,
+    observacion=None,
+):
+    """
+    Cancela un pago PENDIENTE o EN_REVISION cuando el checkout
+    completo necesita revertirse.
+
+    No modifica pagos ya PAGADOS.
+    """
+
+    if not pedido_id:
+        return False
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    estado
+
+                FROM pagos
+
+                WHERE pedido_id = %s
+
+                ORDER BY creado_en DESC
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    pedido_id,
+                ),
+            )
+
+            pago = cursor.fetchone()
+
+            if not pago:
+
+                conexion.rollback()
+                return False
+
+            estado_actual = str(
+                pago["estado"]
+            ).upper()
+
+            if estado_actual not in {
+                "PENDIENTE",
+                "EN_REVISION",
+            }:
+
+                conexion.rollback()
+                return False
+
+            cursor.execute(
+                """
+                UPDATE pagos
+
+                SET estado = 'CANCELADO'
+
+                WHERE id = %s
+                """,
+                (
+                    pago["id"],
+                ),
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO pago_historial (
+                    pago_id,
+                    estado_anterior,
+                    estado_nuevo,
+                    usuario_responsable_id,
+                    observacion
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    'CANCELADO',
+                    %s,
+                    %s
+                )
+                """,
+                (
+                    pago["id"],
+                    estado_actual,
+                    usuario_id,
+                    observacion
+                    or "Pago cancelado por compensación del checkout.",
+                ),
+            )
+
+            conexion.commit()
+
+            return True
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()

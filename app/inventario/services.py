@@ -60,6 +60,8 @@ def obtener_disponibilidad_variantes(variantes_ids):
 
 from app.inventario.repositories import (
     crear_reserva_inventario,
+    liberar_reserva_pedido,
+     confirmar_reserva_pedido,
 )
 
 
@@ -81,4 +83,40 @@ def reservar_stock_pedido(
         referencia_id=pedido_id,
         consumos=consumos,
         minutos_expiracion=30,
+    )
+
+# ============================================================
+# LIBERAR RESERVA PARA PEDIDO
+# ============================================================
+
+def liberar_stock_pedido(
+    pedido_id,
+):
+    """
+    Revierte la reserva física de inventario de un pedido.
+
+    Se utiliza únicamente como compensación cuando el proceso
+    completo del checkout no consigue finalizar.
+    """
+
+    return liberar_reserva_pedido(
+        pedido_id
+    )
+
+# ============================================================
+# CONFIRMAR STOCK DE PEDIDO COMO VENTA
+# ============================================================
+
+def confirmar_stock_pedido(
+    pedido_id,
+    usuario_id=None,
+):
+    """
+    Convierte la reserva de inventario del pedido
+    en una salida física definitiva por venta.
+    """
+
+    return confirmar_reserva_pedido(
+        pedido_id=pedido_id,
+        usuario_id=usuario_id,
     )

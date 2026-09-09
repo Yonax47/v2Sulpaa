@@ -26,6 +26,7 @@ from app.comercio.services import (
     obtener_carrito_usuario,
     actualizar_item_carrito,
     eliminar_item_carrito,
+    confirmar_checkout_con_entrega,
 )
 
 from app.identidad.services import (
@@ -547,3 +548,64 @@ def checkout():
 
         departamentos=departamentos,
     )
+
+# ============================================================
+# 9. CONFIRMAR CHECKOUT
+# ============================================================
+
+@comercio_bp.route(
+    "/api/checkout/confirmar",
+    methods=["POST"],
+)
+@login_required
+def api_confirmar_checkout():
+    """
+    Confirma definitivamente el pedido del usuario autenticado.
+
+    El backend:
+    - vuelve a leer el carrito;
+    - recalcula precios;
+    - recalcula entrega;
+    - valida método de pago;
+    - reserva inventario;
+    - crea pedido;
+    - crea pago;
+    - confirma inventario;
+    - cierra el carrito.
+    """
+
+    datos = request.get_json(
+        silent=True
+    )
+
+    if not isinstance(
+        datos,
+        dict,
+    ):
+
+        return jsonify({
+            "ok": False,
+            "mensaje":
+                "No se recibieron datos válidos.",
+        }), 400
+
+    resultado = (
+        confirmar_checkout_con_entrega(
+            usuario_id=session[
+                "usuario_id"
+            ],
+            datos=datos,
+        )
+    )
+
+    if resultado.get(
+        "ok"
+    ):
+
+        return jsonify(
+            resultado
+        ), 200
+
+    return jsonify(
+        resultado
+    ), 400

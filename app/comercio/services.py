@@ -12,6 +12,22 @@ Aquí vive la lógica comercial:
 """
 
 from collections import defaultdict
+import uuid
+from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+
+from app.inventario.services import (
+    reservar_stock_pedido,
+    liberar_stock_pedido,
+    confirmar_stock_pedido,
+)
+
+from app.operaciones.services import (
+    crear_pago_checkout,
+    cancelar_pago_checkout,
+    cotizar_delivery_local,
+    cotizar_envio_transportista,
+)
 
 from app.comercio.repositories import (
     obtener_variantes_comerciales_tienda,
@@ -27,6 +43,11 @@ from app.comercio.repositories import (
     actualizar_cantidad_detalle_carrito,
     eliminar_detalle_carrito,
     obtener_pesos_variantes,
+    crear_pedido,
+    actualizar_estado_pedido,
+    cerrar_carrito_usuario,
+    obtener_variantes_snapshot,
+    reabrir_carrito_usuario,
 )
 
 from app.inventario.services import (
@@ -1684,3 +1705,1051 @@ def eliminar_item_carrito(
                 usuario_id
             ),
     }
+
+# ============================================================
+# 16. CONSUMO REAL PARA CONFIRMAR PEDIDO
+# ============================================================
+
+def obtener_consumos_carrito_pedido(
+    usuario_id,
+):
+    """
+    Expone de forma controlada el consumo físico de variantes
+    requerido para convertir el carrito en un pedido.
+
+    Se reutiliza exactamente la misma lógica que ya contempla:
+
+    - variantes individuales;
+    - packs fijos;
+    - packs personalizados.
+    """
+
+    consumo = _obtener_consumo_carrito(
+        usuario_id
+    )
+
+    return {
+        variante_id:
+            int(cantidad)
+
+        for variante_id, cantidad
+        in consumo.items()
+
+        if int(cantidad) > 0
+    }
+
+# ============================================================
+# 17. PREPARAR SNAPSHOT COMPLETO DEL PEDIDO
+# ============================================================
+
+def preparar_snapshot_pedido(
+    usuario_id,
+):
+    """
+    Reconstruye desde backend toda la información comercial
+    que debe almacenarse definitivamente en el pedido.
+
+    Incluye:
+    - artículo;
+    - nombre;
+    - cantidad;
+    - precio vigente;
+    - composición física de variantes.
+
+    La composición se reconstruye también para packs fijos.
+    No se acepta ninguna composición enviada desde JavaScript.
+    """
+
+    detalles = obtener_detalles_carrito_usuario(
+        usuario_id
+    )
+
+    if not detalles:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El carrito está vacío.",
+        }
+
+    detalle_ids = [
+        detalle["carrito_detalle_id"]
+        for detalle in detalles
+    ]
+
+    composiciones_carrito = (
+        obtener_composiciones_carrito(
+            detalle_ids
+        )
+    )
+
+    composicion_personalizada = (
+        defaultdict(list)
+    )
+
+    for componente in composiciones_carrito:
+
+        composicion_personalizada[
+            componente[
+                "carrito_detalle_id"
+            ]
+        ].append(
+            componente
+        )
+
+    # --------------------------------------------------------
+    # Packs fijos utilizados actualmente en el carrito
+    # --------------------------------------------------------
+
+    pack_ids_fijos = list({
+        detalle["pack_id"]
+
+        for detalle in detalles
+
+        if (
+            detalle["tipo"] == "PACK"
+            and detalle["pack_id"]
+            and str(
+                detalle["pack_tipo"]
+            ).upper() == "FIJO"
+        )
+    })
+
+    componentes_fijos = (
+        obtener_componentes_packs(
+            pack_ids_fijos
+        )
+    )
+
+    componentes_por_pack = (
+        defaultdict(list)
+    )
+
+    for componente in componentes_fijos:
+
+        componentes_por_pack[
+            componente["pack_id"]
+        ].append(
+            componente
+        )
+
+    # --------------------------------------------------------
+    # Identificar todas las variantes utilizadas
+    # --------------------------------------------------------
+
+    variante_ids = set()
+
+    for detalle in detalles:
+
+        if (
+            detalle["tipo"] == "VARIANTE"
+            and detalle["variante_id"]
+        ):
+
+            variante_ids.add(
+                detalle["variante_id"]
+            )
+
+        elif (
+            detalle["tipo"] == "PACK"
+            and str(
+                detalle["pack_tipo"]
+            ).upper() == "FIJO"
+        ):
+
+            for componente in (
+                componentes_por_pack.get(
+                    detalle["pack_id"],
+                    [],
+                )
+            ):
+
+                variante_ids.add(
+                    componente[
+                        "variante_id"
+                    ]
+                )
+
+        elif detalle["tipo"] == "PACK":
+
+            for componente in (
+                composicion_personalizada.get(
+                    detalle[
+                        "carrito_detalle_id"
+                    ],
+                    [],
+                )
+            ):
+
+                variante_ids.add(
+                    componente[
+                        "variante_id"
+                    ]
+                )
+
+    variantes = obtener_variantes_snapshot(
+        list(variante_ids)
+    )
+
+    # --------------------------------------------------------
+    # Construir snapshot de cada línea
+    # --------------------------------------------------------
+
+    items = []
+
+    for detalle in detalles:
+
+        cantidad = int(
+            detalle["cantidad"]
+        )
+
+        precio = float(
+            detalle["precio"]
+            or 0
+        )
+
+        if precio < 0:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    (
+                        "Uno de los productos no tiene "
+                        "un precio válido."
+                    ),
+            }
+
+        if detalle["tipo"] == "VARIANTE":
+
+            nombre = str(
+                detalle[
+                    "nombre_comercial"
+                ]
+                or ""
+            ).strip()
+
+            variante_id = (
+                detalle["variante_id"]
+            )
+
+            variante = variantes.get(
+                variante_id
+            )
+
+            if not variante:
+
+                return {
+                    "ok": False,
+                    "mensaje":
+                        (
+                            "Una de las variantes del pedido "
+                            "ya no está disponible."
+                        ),
+                }
+
+            # Para una variante individual no necesitamos
+            # insertar pedido_composiciones, porque su identidad
+            # ya queda asociada mediante articulo_venta_id.
+            composicion = []
+
+        elif detalle["tipo"] == "PACK":
+
+            nombre = str(
+                detalle[
+                    "pack_nombre"
+                ]
+                or ""
+            ).strip()
+
+            composicion = []
+
+            tipo_pack = str(
+                detalle[
+                    "pack_tipo"
+                ]
+                or ""
+            ).upper()
+
+            # -----------------------------------------------
+            # Pack fijo
+            # -----------------------------------------------
+
+            if tipo_pack == "FIJO":
+
+                componentes = (
+                    componentes_por_pack.get(
+                        detalle["pack_id"],
+                        [],
+                    )
+                )
+
+                if not componentes:
+
+                    return {
+                        "ok": False,
+                        "mensaje":
+                            (
+                                "Uno de los packs fijos no "
+                                "tiene composición registrada."
+                            ),
+                    }
+
+                for componente in componentes:
+
+                    variante_id = (
+                        componente[
+                            "variante_id"
+                        ]
+                    )
+
+                    variante = variantes.get(
+                        variante_id
+                    )
+
+                    if not variante:
+
+                        return {
+                            "ok": False,
+                            "mensaje":
+                                (
+                                    "Una variante de un pack "
+                                    "ya no está disponible."
+                                ),
+                        }
+
+                    composicion.append({
+                        "variante_id":
+                            variante_id,
+
+                        "nombre_variante":
+                            variante[
+                                "nombre_variante"
+                            ],
+
+                        # Cantidad correspondiente a UNA
+                        # unidad comercial del pack.
+                        "cantidad":
+                            int(
+                                componente[
+                                    "cantidad"
+                                ]
+                            ),
+                    })
+
+            # -----------------------------------------------
+            # Pack personalizado
+            # -----------------------------------------------
+
+            else:
+
+                componentes = (
+                    composicion_personalizada.get(
+                        detalle[
+                            "carrito_detalle_id"
+                        ],
+                        [],
+                    )
+                )
+
+                if not componentes:
+
+                    return {
+                        "ok": False,
+                        "mensaje":
+                            (
+                                "Uno de los packs "
+                                "personalizados no tiene "
+                                "composición."
+                            ),
+                    }
+
+                for componente in componentes:
+
+                    variante_id = (
+                        componente[
+                            "variante_id"
+                        ]
+                    )
+
+                    variante = variantes.get(
+                        variante_id
+                    )
+
+                    if not variante:
+
+                        return {
+                            "ok": False,
+                            "mensaje":
+                                (
+                                    "Una variante del pack "
+                                    "personalizado ya no está "
+                                    "disponible."
+                                ),
+                        }
+
+                    composicion.append({
+                        "variante_id":
+                            variante_id,
+
+                        "nombre_variante":
+                            variante[
+                                "nombre_variante"
+                            ],
+
+                        # También representa la composición
+                        # de UNA unidad comercial del pack.
+                        "cantidad":
+                            int(
+                                componente[
+                                    "cantidad"
+                                ]
+                            ),
+                    })
+
+        else:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    (
+                        "El carrito contiene un tipo "
+                        "de artículo no válido."
+                    ),
+            }
+
+        if not nombre:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    (
+                        "Uno de los artículos no tiene "
+                        "un nombre válido."
+                    ),
+            }
+
+        items.append({
+            "articulo_venta_id":
+                detalle[
+                    "articulo_venta_id"
+                ],
+
+            "nombre":
+                nombre,
+
+            "cantidad":
+                cantidad,
+
+            "precio":
+                precio,
+
+            "moneda":
+                detalle[
+                    "moneda"
+                ],
+
+            "composicion":
+                composicion,
+        })
+
+    return {
+        "ok": True,
+
+        "items":
+            items,
+
+        "consumos":
+            obtener_consumos_carrito_pedido(
+                usuario_id
+            ),
+    }
+
+# ============================================================
+# 18. GENERAR NÚMERO DE PEDIDO
+# ============================================================
+
+def _generar_numero_pedido():
+    """
+    Genera un número comercial legible y suficientemente
+    pequeño para pedidos.numero_pedido VARCHAR(30).
+
+    Ejemplo:
+        PED-20260908-A1B2C3
+    """
+
+    fecha = datetime.now().strftime(
+        "%Y%m%d"
+    )
+
+    aleatorio = uuid.uuid4().hex[
+        :6
+    ].upper()
+
+    return (
+        f"PED-{fecha}-{aleatorio}"
+    )
+
+
+# ============================================================
+# 19. CONFIRMAR CHECKOUT
+# ============================================================
+
+def confirmar_checkout(
+    usuario_id,
+    tipo_entrega,
+    metodo_pago_id,
+    costo_entrega,
+):
+    """
+    Orquesta la confirmación definitiva del checkout.
+
+    Orden seguro:
+
+    1. Volver a preparar el carrito desde backend.
+    2. Reservar inventario.
+    3. Crear pedido.
+    4. Crear pago.
+    5. Cerrar carrito.
+    6. Confirmar salida física del inventario.
+
+    Si algo falla antes de confirmar el inventario,
+    se ejecutan compensaciones para evitar datos
+    inconsistentes entre módulos.
+    """
+
+    # --------------------------------------------------------
+    # 1. Validaciones básicas
+    # --------------------------------------------------------
+
+    if not usuario_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "No se pudo identificar al usuario.",
+        }
+
+    tipo_entrega = str(
+        tipo_entrega or ""
+    ).strip().upper()
+
+    tipos_validos = {
+        "RECOJO_LOCAL",
+        "DELIVERY_LOCAL",
+        "TRANSPORTISTA",
+    }
+
+    if tipo_entrega not in tipos_validos:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "La modalidad de entrega no es válida.",
+        }
+
+    if not metodo_pago_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Debe seleccionar un método de pago.",
+        }
+
+    try:
+
+        costo_entrega = Decimal(
+            str(
+                costo_entrega or 0
+            )
+        ).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    except Exception:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El costo de entrega no es válido.",
+        }
+
+    if costo_entrega < 0:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El costo de entrega no puede ser negativo.",
+        }
+
+    if tipo_entrega == "RECOJO_LOCAL":
+
+        costo_entrega = Decimal(
+            "0.00"
+        )
+
+    # --------------------------------------------------------
+    # 2. Snapshot seguro del carrito
+    # --------------------------------------------------------
+
+    snapshot = preparar_snapshot_pedido(
+        usuario_id
+    )
+
+    if not snapshot.get(
+        "ok"
+    ):
+
+        return snapshot
+
+    items = snapshot.get(
+        "items",
+        [],
+    )
+
+    consumos = snapshot.get(
+        "consumos",
+        [],
+    )
+
+    if not items:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El carrito está vacío.",
+        }
+
+    if not consumos:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "No se pudo determinar el consumo de inventario.",
+        }
+
+    # --------------------------------------------------------
+    # 3. Calcular subtotal nuevamente
+    # --------------------------------------------------------
+
+    subtotal = Decimal(
+        "0.00"
+    )
+
+    for item in items:
+
+        cantidad = Decimal(
+            str(
+                item.get(
+                    "cantidad",
+                    0,
+                )
+            )
+        )
+
+        precio = Decimal(
+            str(
+                item.get(
+                    "precio",
+                    0,
+                )
+            )
+        )
+
+        subtotal += (
+            cantidad
+            * precio
+        )
+
+    subtotal = subtotal.quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    total = (
+        subtotal
+        + costo_entrega
+    ).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    # --------------------------------------------------------
+    # 4. Identificadores
+    # --------------------------------------------------------
+
+    pedido_id = str(
+        uuid.uuid4()
+    )
+
+    pago_id = str(
+        uuid.uuid4()
+    )
+
+    numero_pedido = (
+        _generar_numero_pedido()
+    )
+
+    reserva_creada = False
+    pedido_creado = False
+    pago_creado = False
+    carrito_cerrado = False
+
+    try:
+
+        # ----------------------------------------------------
+        # 5. Reservar inventario
+        # ----------------------------------------------------
+
+        resultado_reserva = (
+            reservar_stock_pedido(
+                pedido_id=pedido_id,
+                consumos=consumos,
+            )
+        )
+
+        if not resultado_reserva.get(
+            "ok"
+        ):
+
+            return resultado_reserva
+
+        reserva_creada = True
+
+        # ----------------------------------------------------
+        # 6. Crear pedido en Comercio
+        # ----------------------------------------------------
+
+        resultado_pedido = crear_pedido(
+            pedido_id=pedido_id,
+            numero_pedido=numero_pedido,
+            usuario_id=usuario_id,
+            items=items,
+            costo_entrega=costo_entrega,
+            moneda="PEN",
+        )
+
+        if not resultado_pedido.get(
+            "ok"
+        ):
+
+            raise RuntimeError(
+                resultado_pedido.get(
+                    "mensaje",
+                    "No se pudo crear el pedido.",
+                )
+            )
+
+        pedido_creado = True
+
+        # ----------------------------------------------------
+        # 7. Crear pago
+        # ----------------------------------------------------
+
+        resultado_pago = (
+            crear_pago_checkout(
+                pago_id=pago_id,
+                pedido_id=pedido_id,
+                usuario_id=usuario_id,
+                tipo_entrega=tipo_entrega,
+                metodo_pago_id=metodo_pago_id,
+                monto=total,
+                moneda="PEN",
+            )
+        )
+
+        if not resultado_pago.get(
+            "ok"
+        ):
+
+            raise RuntimeError(
+                resultado_pago.get(
+                    "mensaje",
+                    "No se pudo crear el pago.",
+                )
+            )
+
+        pago_creado = True
+
+        # ----------------------------------------------------
+        # 8. Cerrar carrito
+        # ----------------------------------------------------
+
+        resultado_carrito = (
+            cerrar_carrito_usuario(
+                usuario_id
+            )
+        )
+
+        if (
+            isinstance(
+                resultado_carrito,
+                dict,
+            )
+            and not resultado_carrito.get(
+                "ok",
+                True,
+            )
+        ):
+
+            raise RuntimeError(
+                resultado_carrito.get(
+                    "mensaje",
+                    "No se pudo cerrar el carrito.",
+                )
+            )
+
+        carrito_cerrado = True
+
+        # ----------------------------------------------------
+        # 9. Confirmar salida del inventario
+        # ----------------------------------------------------
+
+        resultado_inventario = (
+            confirmar_stock_pedido(
+                pedido_id=pedido_id,
+                usuario_id=usuario_id,
+            )
+        )
+
+        if not resultado_inventario.get(
+            "ok"
+        ):
+
+            raise RuntimeError(
+                resultado_inventario.get(
+                    "mensaje",
+                    "No se pudo confirmar el inventario.",
+                )
+            )
+
+        # ----------------------------------------------------
+        # 10. Compra terminada correctamente
+        # ----------------------------------------------------
+
+        return {
+            "ok": True,
+            "mensaje":
+                "Pedido confirmado correctamente.",
+            "pedido_id":
+                pedido_id,
+            "numero_pedido":
+                numero_pedido,
+            "pago_id":
+                pago_id,
+            "subtotal":
+                float(
+                    subtotal
+                ),
+            "costo_entrega":
+                float(
+                    costo_entrega
+                ),
+            "total":
+                float(
+                    total
+                ),
+            "tipo_entrega":
+                tipo_entrega,
+        }
+
+    except Exception as error:
+
+        # ----------------------------------------------------
+        # COMPENSACIONES
+        # ----------------------------------------------------
+
+        if carrito_cerrado:
+
+            try:
+
+                reabrir_carrito_usuario(
+                    usuario_id
+                )
+
+            except Exception:
+
+                pass
+
+        if pago_creado:
+
+            try:
+
+                cancelar_pago_checkout(
+                    pedido_id=pedido_id,
+                    usuario_id=usuario_id,
+                    observacion=(
+                        "Pago cancelado automáticamente "
+                        "por error durante checkout."
+                    ),
+                )
+
+            except Exception:
+
+                pass
+
+        if pedido_creado:
+
+            try:
+
+                actualizar_estado_pedido(
+                    pedido_id,
+                    "CANCELADO",
+                )
+
+            except Exception:
+
+                pass
+
+        if reserva_creada:
+
+            try:
+
+                liberar_stock_pedido(
+                    pedido_id
+                )
+
+            except Exception:
+
+                pass
+
+        return {
+            "ok": False,
+            "mensaje":
+                str(error),
+        }
+
+# ============================================================
+# 20. CONFIRMAR CHECKOUT DESDE DATOS DE ENTREGA
+# ============================================================
+
+def confirmar_checkout_con_entrega(
+    usuario_id,
+    datos,
+):
+    """
+    Punto de entrada seguro para confirmar una compra.
+
+    El navegador informa únicamente las decisiones del usuario:
+    - modalidad de entrega;
+    - método de pago;
+    - distancia calculada por el mapa;
+    - transportista/servicio/destino seleccionados.
+
+    El costo final de entrega se vuelve a calcular en backend.
+    """
+
+    if not isinstance(datos, dict):
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Los datos del checkout no son válidos.",
+        }
+
+    tipo_entrega = str(
+        datos.get(
+            "tipo_entrega",
+            ""
+        )
+    ).strip().upper()
+
+    metodo_pago_id = datos.get(
+        "metodo_pago_id"
+    )
+
+    # --------------------------------------------------------
+    # 1. RECOJO EN LOCAL
+    # --------------------------------------------------------
+
+    if tipo_entrega == "RECOJO_LOCAL":
+
+        costo_entrega = 0
+
+    # --------------------------------------------------------
+    # 2. DELIVERY LOCAL
+    # --------------------------------------------------------
+
+    elif tipo_entrega == "DELIVERY_LOCAL":
+
+        resultado_cotizacion = (
+            cotizar_delivery_local(
+                usuario_id=usuario_id,
+                distancia_km=datos.get(
+                    "distancia_km"
+                ),
+            )
+        )
+
+        if not resultado_cotizacion.get(
+            "ok"
+        ):
+
+            return resultado_cotizacion
+
+        costo_entrega = (
+            resultado_cotizacion[
+                "costo_entrega"
+            ]
+        )
+
+    # --------------------------------------------------------
+    # 3. TRANSPORTISTA
+    # --------------------------------------------------------
+
+    elif tipo_entrega == "TRANSPORTISTA":
+
+        resultado_cotizacion = (
+            cotizar_envio_transportista(
+                usuario_id=usuario_id,
+
+                transportista_id=datos.get(
+                    "transportista_id"
+                ),
+
+                servicio_transportista_id=(
+                    datos.get(
+                        "servicio_transportista_id"
+                    )
+                ),
+
+                distrito_destino_id=datos.get(
+                    "distrito_destino_id"
+                ),
+
+                sucursal_destino_id=datos.get(
+                    "sucursal_destino_id"
+                ),
+            )
+        )
+
+        if not resultado_cotizacion.get(
+            "ok"
+        ):
+
+            return resultado_cotizacion
+
+        costo_entrega = (
+            resultado_cotizacion[
+                "costo_entrega"
+            ]
+        )
+
+    else:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Selecciona una modalidad de entrega válida.",
+        }
+
+    # --------------------------------------------------------
+    # 4. Ejecutar orquestador definitivo
+    # --------------------------------------------------------
+
+    return confirmar_checkout(
+        usuario_id=usuario_id,
+        tipo_entrega=tipo_entrega,
+        metodo_pago_id=metodo_pago_id,
+        costo_entrega=costo_entrega,
+    )
