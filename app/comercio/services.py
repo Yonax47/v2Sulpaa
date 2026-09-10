@@ -2631,13 +2631,33 @@ def confirmar_checkout_con_entrega(
     Punto de entrada seguro para confirmar una compra.
 
     El navegador informa únicamente las decisiones del usuario:
+
+    - tipo de comprobante;
+    - documento de facturación;
     - modalidad de entrega;
     - método de pago;
     - distancia calculada por el mapa;
     - transportista/servicio/destino seleccionados.
 
-    El costo final de entrega se vuelve a calcular en backend.
+    IMPORTANTE:
+
+    Antes de crear cualquier pedido se exige una
+    facturación válida.
+
+    BOLETA:
+        El DNI se verifica nuevamente desde backend
+        y debe corresponder al titular de la cuenta.
+
+    FACTURA:
+        El RUC se verifica nuevamente desde backend.
+
+    El costo final de entrega también se vuelve a
+    calcular en backend.
     """
+
+    # ========================================================
+    # 1. VALIDAR ESTRUCTURA DEL CHECKOUT
+    # ========================================================
 
     if not isinstance(datos, dict):
 
@@ -2646,6 +2666,119 @@ def confirmar_checkout_con_entrega(
             "mensaje":
                 "Los datos del checkout no son válidos.",
         }
+
+    if not usuario_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "No se pudo identificar al usuario.",
+        }
+
+    # ========================================================
+    # 2. FACTURACIÓN OBLIGATORIA
+    # ========================================================
+    #
+    # Nunca confiamos únicamente en que JavaScript haya
+    # verificado visualmente el DNI o RUC.
+    #
+    # El backend vuelve a ejecutar la validación oficial
+    # antes de permitir crear el pedido.
+    # ========================================================
+
+    tipo_comprobante = str(
+        datos.get(
+            "tipo_comprobante",
+            ""
+        )
+    ).strip().upper()
+
+    documento_facturacion = str(
+        datos.get(
+            "documento_facturacion",
+            ""
+        )
+    ).strip()
+
+    # --------------------------------------------------------
+    # Tipo de comprobante obligatorio
+    # --------------------------------------------------------
+
+    if tipo_comprobante not in {
+        "BOLETA",
+        "FACTURA",
+    }:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Debes seleccionar Boleta o Factura antes de realizar la compra.",
+        }
+
+    # --------------------------------------------------------
+    # Documento obligatorio
+    # --------------------------------------------------------
+
+    if not documento_facturacion:
+
+        if tipo_comprobante == "BOLETA":
+
+            mensaje_documento = (
+                "Debes ingresar y verificar tu DNI "
+                "para emitir la boleta."
+            )
+
+        else:
+
+            mensaje_documento = (
+                "Debes ingresar y verificar un RUC "
+                "para emitir la factura."
+            )
+
+        return {
+            "ok": False,
+            "mensaje":
+                mensaje_documento,
+        }
+
+    # --------------------------------------------------------
+    # Import local.
+    #
+    # Identidad es responsable de validar y guardar los
+    # datos fiscales del cliente.
+    #
+    # Se mantiene fuera de los imports globales para
+    # reducir acoplamiento entre módulos.
+    # --------------------------------------------------------
+
+    from app.identidad.services import (
+        registrar_facturacion_checkout,
+    )
+
+    resultado_facturacion = (
+        registrar_facturacion_checkout(
+            usuario_id=usuario_id,
+            tipo=tipo_comprobante,
+            documento=documento_facturacion,
+        )
+    )
+
+    if not resultado_facturacion.get(
+        "ok"
+    ):
+
+        return {
+            "ok": False,
+            "mensaje":
+                resultado_facturacion.get(
+                    "mensaje",
+                    "No se pudieron verificar los datos de facturación.",
+                ),
+        }
+
+    # ========================================================
+    # 3. DATOS GENERALES DE ENTREGA Y PAGO
+    # ========================================================
 
     tipo_entrega = str(
         datos.get(
@@ -2658,23 +2791,32 @@ def confirmar_checkout_con_entrega(
         "metodo_pago_id"
     )
 
-    # --------------------------------------------------------
-    # 1. RECOJO EN LOCAL
-    # --------------------------------------------------------
+    if not metodo_pago_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Debes seleccionar un método de pago.",
+        }
+
+    # ========================================================
+    # 4. RECOJO EN LOCAL
+    # ========================================================
 
     if tipo_entrega == "RECOJO_LOCAL":
 
         costo_entrega = 0
 
-    # --------------------------------------------------------
-    # 2. DELIVERY LOCAL
-    # --------------------------------------------------------
+    # ========================================================
+    # 5. DELIVERY LOCAL
+    # ========================================================
 
     elif tipo_entrega == "DELIVERY_LOCAL":
 
         resultado_cotizacion = (
             cotizar_delivery_local(
                 usuario_id=usuario_id,
+
                 distancia_km=datos.get(
                     "distancia_km"
                 ),
@@ -2693,9 +2835,9 @@ def confirmar_checkout_con_entrega(
             ]
         )
 
-    # --------------------------------------------------------
-    # 3. TRANSPORTISTA
-    # --------------------------------------------------------
+    # ========================================================
+    # 6. TRANSPORTISTA
+    # ========================================================
 
     elif tipo_entrega == "TRANSPORTISTA":
 
@@ -2735,6 +2877,10 @@ def confirmar_checkout_con_entrega(
             ]
         )
 
+    # ========================================================
+    # 7. MODALIDAD DE ENTREGA INVÁLIDA
+    # ========================================================
+
     else:
 
         return {
@@ -2743,13 +2889,42 @@ def confirmar_checkout_con_entrega(
                 "Selecciona una modalidad de entrega válida.",
         }
 
-    # --------------------------------------------------------
-    # 4. Ejecutar orquestador definitivo
-    # --------------------------------------------------------
+    # ========================================================
+    # 8. EJECUTAR ORQUESTADOR DEFINITIVO
+    # ========================================================
 
-    return confirmar_checkout(
+    resultado_checkout = confirmar_checkout(
         usuario_id=usuario_id,
         tipo_entrega=tipo_entrega,
         metodo_pago_id=metodo_pago_id,
         costo_entrega=costo_entrega,
     )
+
+    if not resultado_checkout.get(
+        "ok"
+    ):
+
+        return resultado_checkout
+
+    # ========================================================
+    # 9. AGREGAR INFORMACIÓN DE FACTURACIÓN AL RESULTADO
+    # ========================================================
+    #
+    # Esto será útil posteriormente para:
+    #
+    # - generar el comprobante PDF;
+    # - enviar el correo;
+    # - mostrar el resumen de compra.
+    # ========================================================
+
+    resultado_checkout[
+        "tipo_comprobante"
+    ] = tipo_comprobante
+
+    resultado_checkout[
+        "facturacion_id"
+    ] = resultado_facturacion.get(
+        "facturacion_id"
+    )
+
+    return resultado_checkout

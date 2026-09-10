@@ -225,6 +225,34 @@ document.addEventListener("DOMContentLoaded", () => {
       "checkout-payment-confirmation-type",
     );
 
+    // ====================================================
+    // ELEMENTOS - FACTURACIÓN
+    // ====================================================
+
+    const boletaRadio = document.getElementById(
+    "checkout-boleta",
+    );
+
+    const facturaRadio = document.getElementById(
+    "checkout-factura",
+    );
+
+    const dniInput = document.getElementById(
+    "checkout-dni",
+    );
+
+    const rucInput = document.getElementById(
+    "checkout-ruc",
+    );
+
+    const dniResult = document.getElementById(
+    "checkout-dni-result",
+    );
+
+    const rucResult = document.getElementById(
+    "checkout-ruc-result",
+    );
+
   // ====================================================
   // ELEMENTOS - CONFIRMACIÓN DEL PEDIDO
   // ====================================================
@@ -1634,54 +1662,101 @@ document.addEventListener("DOMContentLoaded", () => {
   // ====================================================
 
   function updateConfirmOrderButton() {
-    if (!confirmOrderButton) {
-      return;
-    }
-
-    let ready = true;
-    let message =
-      "Revisa tu pedido y confirma la compra.";
-
-    if (!deliveryType) {
-      ready = false;
-      message =
-        "Selecciona una modalidad de entrega.";
-    } else if (!selectedPaymentMethod) {
-      ready = false;
-      message =
-        "Selecciona un método de pago.";
-    } else if (
-      deliveryType === "DELIVERY_LOCAL" &&
-      (
-        !distanceInput?.value ||
-        !quoteInput?.value
-      )
-    ) {
-      ready = false;
-      message =
-        "Confirma la ubicación y calcula el delivery.";
-    } else if (
-      deliveryType === "TRANSPORTISTA" &&
-      (
-        !carrierSelect?.value ||
-        !carrierServiceSelect?.value ||
-        !carrierAgencySelect?.value ||
-        !carrierResult ||
-        carrierResult.hidden
-      )
-    ) {
-      ready = false;
-      message =
-        "Selecciona transportista, servicio y agencia.";
-    }
-
-    confirmOrderButton.disabled =
-      !ready || checkoutProcessing;
-
-    if (confirmHelp) {
-      confirmHelp.textContent = message;
-    }
+  if (!confirmOrderButton) {
+    return;
   }
+
+  let ready = true;
+  let message =
+    "Revisa tu pedido y confirma la compra.";
+
+  // --------------------------------------------------
+  // FACTURACIÓN OBLIGATORIA
+  // --------------------------------------------------
+
+  const boletaSeleccionada =
+    Boolean(boletaRadio?.checked);
+
+  const facturaSeleccionada =
+    Boolean(facturaRadio?.checked);
+
+  const dniVerificado =
+    Boolean(
+      boletaSeleccionada &&
+      dniInput?.value.trim().length === 8 &&
+      dniResult &&
+      !dniResult.hidden
+    );
+
+  const rucVerificado =
+    Boolean(
+      facturaSeleccionada &&
+      rucInput?.value.trim().length === 11 &&
+      rucResult &&
+      !rucResult.hidden
+    );
+
+  if (
+    !boletaSeleccionada &&
+    !facturaSeleccionada
+  ) {
+    ready = false;
+    message =
+      "Selecciona Boleta o Factura.";
+  } else if (
+    boletaSeleccionada &&
+    !dniVerificado
+  ) {
+    ready = false;
+    message =
+      "Verifica tu DNI para continuar.";
+  } else if (
+    facturaSeleccionada &&
+    !rucVerificado
+  ) {
+    ready = false;
+    message =
+      "Verifica el RUC para continuar.";
+  } else if (!deliveryType) {
+    ready = false;
+    message =
+      "Selecciona una modalidad de entrega.";
+  } else if (!selectedPaymentMethod) {
+    ready = false;
+    message =
+      "Selecciona un método de pago.";
+  } else if (
+    deliveryType === "DELIVERY_LOCAL" &&
+    (
+      !distanceInput?.value ||
+      !quoteInput?.value
+    )
+  ) {
+    ready = false;
+    message =
+      "Confirma la ubicación y calcula el delivery.";
+  } else if (
+    deliveryType === "TRANSPORTISTA" &&
+    (
+      !carrierSelect?.value ||
+      !carrierServiceSelect?.value ||
+      !carrierAgencySelect?.value ||
+      !carrierResult ||
+      carrierResult.hidden
+    )
+  ) {
+    ready = false;
+    message =
+      "Selecciona transportista, servicio y agencia.";
+  }
+
+  confirmOrderButton.disabled =
+    !ready || checkoutProcessing;
+
+  if (confirmHelp) {
+    confirmHelp.textContent = message;
+  }
+}
 
   // ====================================================
   // MÉTODOS DE PAGO
@@ -1891,6 +1966,54 @@ document.addEventListener("DOMContentLoaded", () => {
   // ====================================================
 
   function buildCheckoutPayload() {
+    const boletaSeleccionada =
+  Boolean(boletaRadio?.checked);
+
+    const facturaSeleccionada =
+    Boolean(facturaRadio?.checked);
+
+    let tipoComprobante = "";
+    let documentoFacturacion = "";
+
+    if (boletaSeleccionada) {
+    tipoComprobante = "BOLETA";
+
+    documentoFacturacion =
+        dniInput?.value
+        .replace(/\D/g, "")
+        .slice(0, 8) || "";
+
+    if (
+        documentoFacturacion.length !== 8 ||
+        !dniResult ||
+        dniResult.hidden
+    ) {
+        throw new Error(
+        "Debes verificar tu DNI antes de confirmar la compra.",
+        );
+    }
+    } else if (facturaSeleccionada) {
+    tipoComprobante = "FACTURA";
+
+    documentoFacturacion =
+        rucInput?.value
+        .replace(/\D/g, "")
+        .slice(0, 11) || "";
+
+    if (
+        documentoFacturacion.length !== 11 ||
+        !rucResult ||
+        rucResult.hidden
+    ) {
+        throw new Error(
+        "Debes verificar el RUC antes de confirmar la compra.",
+        );
+    }
+    } else {
+    throw new Error(
+        "Debes seleccionar Boleta o Factura.",
+    );
+    }
     if (!deliveryType) {
       throw new Error(
         "Selecciona una modalidad de entrega.",
@@ -1904,10 +2027,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const payload = {
-      tipo_entrega: deliveryType,
-      metodo_pago_id:
-        selectedPaymentMethod.id,
-    };
+        tipo_comprobante:
+            tipoComprobante,
+
+        documento_facturacion:
+            documentoFacturacion,
+
+        tipo_entrega:
+            deliveryType,
+
+        metodo_pago_id:
+            selectedPaymentMethod.id,
+        };
 
     // --------------------------------------------------
     // RECOJO LOCAL
@@ -2152,6 +2283,28 @@ document.addEventListener("DOMContentLoaded", () => {
       confirmCheckoutOrder,
     );
   }
+
+
+  // ====================================================
+  // CAMBIOS EN FACTURACIÓN
+    // ====================================================
+    //
+    // checkout-billing.js informa a este módulo cuando:
+    //
+    // - se selecciona Boleta o Factura;
+    // - se verifica correctamente un DNI o RUC;
+    // - se modifica un documento previamente verificado.
+    //
+    // De esta forma el botón "Confirmar pedido" siempre
+    // refleja el estado real de la facturación.
+    // ====================================================
+
+  window.addEventListener(
+  "checkout:billing-updated",
+  () => {
+      updateConfirmOrderButton();
+  },
+  );
 
   // ====================================================
   // INICIALIZACIÓN
