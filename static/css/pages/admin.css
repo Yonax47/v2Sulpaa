@@ -1,0 +1,683 @@
+/*
+============================================================
+SULPAA V2 - PANEL ADMINISTRATIVO
+============================================================
+
+Este archivo contiene únicamente estilos propios
+del área administrativa.
+
+Depende de:
+
+- main.css
+- components.css
+
+No redefinir variables globales aquí.
+============================================================
+*/
+
+
+/* ==========================================================
+   1. LAYOUT ADMINISTRATIVO
+   ========================================================== */
+
+.admin-layout {
+
+    display: flex;
+
+    min-height:
+        calc(100vh - 76px);
+
+}
+
+
+/* ==========================================================
+   2. SIDEBAR
+   ========================================================== */
+
+.admin-sidebar {
+
+    width: 250px;
+
+    flex-shrink: 0;
+
+    background:
+        var(--color-surface);
+
+    border-right:
+        1px solid var(--color-border);
+
+}
+
+
+.admin-sidebar-inner {
+
+    position: sticky;
+
+    top: 76px;
+
+    max-height:
+        calc(100vh - 76px);
+
+    overflow-y: auto;
+
+    padding:
+        var(--space-5)
+        var(--space-3);
+
+}
+
+
+/* ==========================================================
+   3. SIDEBAR HEADER
+   ========================================================== */
+
+.admin-sidebar-header {
+
+    padding:
+        var(--space-3)
+        var(--space-3)
+        var(--space-5);
+
+    border-bottom:
+        1px solid var(--color-border);
+
+    margin-bottom:
+        var(--space-4);
+
+}
+
+
+.admin-sidebar-title {
+
+    display: block;
+
+    font-size: 1rem;
+
+    font-weight: 700;
+
+    color:
+        var(--sulpaa-green-900);
+
+}
+
+
+.admin-sidebar-role {
+
+    display: inline-block;
+
+    margin-top:
+        var(--space-2);
+
+    padding:
+        0.25rem
+        0.65rem;
+
+    border-radius:
+        var(--radius-pill);
+
+    background:
+        var(--color-surface-soft);
+
+    color:
+        var(--sulpaa-green-800);
+
+    font-size: 0.72rem;
+
+    font-weight: 700;
+
+    letter-spacing: 0.04em;
+
+}
+
+
+/* ==========================================================
+   4. SECCIONES
+   ========================================================== */
+
+.admin-menu-section {
+
+    margin-bottom:
+        var(--space-5);
+
+}
+
+
+.admin-menu-title {
+
+    display: block;
+
+    padding:
+        0
+        var(--space-3);
+
+    margin-bottom:
+        var(--space-2);
+
+    color:
+        var(--color-text-secondary);
+
+    font-size: 0.72rem;
+
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.08em;
+
+}
+
+
+/* ==========================================================
+   5. ITEMS
+   ========================================================== */
+
+.admin-menu-item {
+
+    display: flex;
+
+    align-items: center;
+
+    gap:
+        var(--space-3);
+
+    min-height: 44px;
+
+    padding:
+        0.65rem
+        0.75rem;
+
+    margin-bottom:
+        0.2rem;
+
+    border-radius:
+        var(--radius-sm);
+
+    color:
+        var(--color-text-secondary);
+
+    font-size: 0.92rem;
+
+    font-weight: 600;
+
+    transition:
+        background-color var(--transition-fast),
+        color var(--transition-fast),
+        transform var(--transition-fast);
+
+}
+
+
+.admin-menu-item:hover {
+
+    background:
+        var(--color-surface-soft);
+
+    color:
+        var(--sulpaa-green-900);
+
+    transform:
+        translateX(2px);
+
+}
+
+
+.admin-menu-item.active {
+
+    background:
+        var(--sulpaa-green-900);
+
+    color:
+        var(--color-text-inverse);
+
+}
+
+
+.admin-menu-icon {
+
+    width: 24px;
+
+    text-align: center;
+
+    font-size: 1rem;
+
+}
+
+
+/* ==========================================================
+   6. CONTENIDO
+   ========================================================== */
+
+.admin-content {
+
+    flex: 1;
+
+    min-width: 0;
+
+    padding:
+        var(--space-6);
+
+}
+
+
+.admin-content-inner {
+
+    width: min(
+        100%,
+        1200px
+    );
+
+    margin-inline: auto;
+
+}
+
+
+/* ==========================================================
+   7. CABECERA DE PÁGINA
+   ========================================================== */
+
+.admin-page-header {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    justify-content: space-between;
+
+    gap:
+        var(--space-4);
+
+    margin-bottom:
+        var(--space-6);
+
+}
+
+
+.admin-page-title {
+
+    margin: 0;
+
+    color:
+        var(--sulpaa-green-900);
+
+    font-size:
+        clamp(1.5rem, 3vw, 2rem);
+
+    line-height: 1.2;
+
+}
+
+
+.admin-page-description {
+
+    margin:
+        var(--space-2) 0 0;
+
+    color:
+        var(--color-text-secondary);
+
+}
+
+
+/* ==========================================================
+   8. DASHBOARD
+   ========================================================== */
+
+.admin-dashboard-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap:
+        var(--space-4);
+
+    margin-bottom:
+        var(--space-6);
+
+}
+
+
+.admin-stat-card {
+
+    padding:
+        var(--space-5);
+
+    background:
+        var(--color-surface);
+
+    border:
+        1px solid var(--color-border);
+
+    border-radius:
+        var(--radius-md);
+
+    box-shadow:
+        var(--shadow-sm);
+
+}
+
+
+.admin-stat-label {
+
+    color:
+        var(--color-text-secondary);
+
+    font-size: 0.82rem;
+
+    font-weight: 600;
+
+}
+
+
+.admin-stat-value {
+
+    display: block;
+
+    margin-top:
+        var(--space-2);
+
+    color:
+        var(--sulpaa-green-900);
+
+    font-size: 1.8rem;
+
+    font-weight: 800;
+
+}
+
+
+.admin-stat-description {
+
+    margin-top:
+        var(--space-2);
+
+    color:
+        var(--color-text-secondary);
+
+    font-size: 0.78rem;
+
+}
+
+
+/* ==========================================================
+   9. BLOQUES DEL DASHBOARD
+   ========================================================== */
+
+.admin-dashboard-columns {
+
+    display: grid;
+
+    grid-template-columns:
+        2fr 1fr;
+
+    gap:
+        var(--space-5);
+
+}
+
+
+.admin-panel {
+
+    padding:
+        var(--space-5);
+
+    background:
+        var(--color-surface);
+
+    border:
+        1px solid var(--color-border);
+
+    border-radius:
+        var(--radius-md);
+
+    box-shadow:
+        var(--shadow-sm);
+
+}
+
+
+.admin-panel-title {
+
+    margin: 0 0 var(--space-4);
+
+    color:
+        var(--sulpaa-green-900);
+
+    font-size: 1.05rem;
+
+}
+
+
+/* ==========================================================
+   10. TABLAS
+   ========================================================== */
+
+.admin-table-wrapper {
+
+    width: 100%;
+
+    overflow-x: auto;
+
+    background:
+        var(--color-surface);
+
+    border:
+        1px solid var(--color-border);
+
+    border-radius:
+        var(--radius-md);
+
+    box-shadow:
+        var(--shadow-sm);
+
+}
+
+
+.admin-table {
+
+    width: 100%;
+
+    border-collapse: collapse;
+
+    min-width: 700px;
+
+}
+
+
+.admin-table th {
+
+    padding:
+        0.85rem 1rem;
+
+    background:
+        var(--color-surface-soft);
+
+    color:
+        var(--color-text-secondary);
+
+    font-size: 0.76rem;
+
+    text-align: left;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.04em;
+
+}
+
+
+.admin-table td {
+
+    padding:
+        0.9rem 1rem;
+
+    border-top:
+        1px solid var(--color-border);
+
+    color:
+        var(--color-text);
+
+    font-size: 0.88rem;
+
+}
+
+
+.admin-table tbody tr:hover {
+
+    background:
+        var(--color-surface-soft);
+
+}
+
+
+/* ==========================================================
+   11. ESTADOS
+   ========================================================== */
+
+.admin-status {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    padding:
+        0.25rem
+        0.65rem;
+
+    border-radius:
+        var(--radius-pill);
+
+    font-size: 0.72rem;
+
+    font-weight: 700;
+
+}
+
+
+.admin-status-active {
+
+    background:
+        rgba(46, 139, 87, 0.12);
+
+    color:
+        var(--color-success);
+
+}
+
+
+.admin-status-inactive {
+
+    background:
+        rgba(200, 75, 75, 0.12);
+
+    color:
+        var(--color-danger);
+
+}
+
+
+/* ==========================================================
+   12. RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 1000px) {
+
+    .admin-sidebar {
+
+        width: 220px;
+
+    }
+
+
+    .admin-dashboard-grid {
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+    }
+
+
+    .admin-dashboard-columns {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
+
+
+@media (max-width: 760px) {
+
+    .admin-layout {
+
+        display: block;
+
+    }
+
+
+    .admin-sidebar {
+
+        width: 100%;
+
+        border-right: none;
+
+        border-bottom:
+            1px solid var(--color-border);
+
+    }
+
+
+    .admin-sidebar-inner {
+
+        position: static;
+
+        max-height: none;
+
+    }
+
+
+    .admin-menu-section {
+
+        margin-bottom:
+            var(--space-3);
+
+    }
+
+
+    .admin-menu-item {
+
+        display: inline-flex;
+
+        margin-right:
+            0.25rem;
+
+    }
+
+
+    .admin-content {
+
+        padding:
+            var(--space-4);
+
+    }
+
+
+    .admin-page-header {
+
+        flex-direction: column;
+
+    }
+
+}
+
+
+@media (max-width: 520px) {
+
+    .admin-dashboard-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
