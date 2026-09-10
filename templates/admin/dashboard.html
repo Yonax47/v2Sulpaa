@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    Dashboard | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin.css') }}"
+>
+
+{% endblock %}
+
+
+{% block content %}
+
+<div class="admin-layout">
+
+
+    <!-- =====================================================
+         SIDEBAR
+         ===================================================== -->
+
+    {% include 'components/admin_sidebar.html' %}
+
+
+    <!-- =====================================================
+         CONTENIDO
+         ===================================================== -->
+
+    <main class="admin-content">
+
+        <div class="admin-content-inner">
+
+
+            <!-- =================================================
+                 CABECERA
+                 ================================================= -->
+
+            <header class="admin-page-header">
+
+                <div>
+
+                    <h1 class="admin-page-title">
+                        Dashboard
+                    </h1>
+
+                    <p class="admin-page-description">
+
+                        Resumen general de la operación
+                        de SULPAA.
+
+                    </p>
+
+                </div>
+
+            </header>
+
+
+            <!-- =================================================
+                 ESTADÍSTICAS
+                 ================================================= -->
+
+            <section class="admin-dashboard-grid">
+
+
+                <article class="admin-stat-card">
+
+                    <span class="admin-stat-label">
+                        Ventas del periodo
+                    </span>
+
+                    <strong class="admin-stat-value">
+                        S/ 0.00
+                    </strong>
+
+                    <span class="admin-stat-description">
+                        Pendiente de conectar con ventas.
+                    </span>
+
+                </article>
+
+
+                <article class="admin-stat-card">
+
+                    <span class="admin-stat-label">
+                        Pedidos
+                    </span>
+
+                    <strong class="admin-stat-value">
+                        0
+                    </strong>
+
+                    <span class="admin-stat-description">
+                        Pedidos registrados.
+                    </span>
+
+                </article>
+
+
+                <article class="admin-stat-card">
+
+                    <span class="admin-stat-label">
+                        Stock disponible
+                    </span>
+
+                    <strong class="admin-stat-value">
+                        0
+                    </strong>
+
+                    <span class="admin-stat-description">
+                        Se conectará con Inventario.
+                    </span>
+
+                </article>
+
+
+                <article class="admin-stat-card">
+
+                    <span class="admin-stat-label">
+                        Usuarios
+                    </span>
+
+                    <strong class="admin-stat-value">
+                        0
+                    </strong>
+
+                    <span class="admin-stat-description">
+                        Clientes y empleados.
+                    </span>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================================
+                 PANELES
+                 ================================================= -->
+
+            <section class="admin-dashboard-columns">
+
+
+                <article class="admin-panel">
+
+                    <h2 class="admin-panel-title">
+                        Estado de pedidos
+                    </h2>
+
+                    <p>
+                        Aquí mostraremos posteriormente:
+                    </p>
+
+                    <ul>
+
+                        <li>
+                            Pedidos pendientes
+                        </li>
+
+                        <li>
+                            Pedidos en preparación
+                        </li>
+
+                        <li>
+                            Pedidos despachados
+                        </li>
+
+                        <li>
+                            Pedidos entregados
+                        </li>
+
+                    </ul>
+
+                </article>
+
+
+                <article class="admin-panel">
+
+                    <h2 class="admin-panel-title">
+                        Usuarios
+                    </h2>
+
+                    <p>
+                        Supervisión de clientes y empleados.
+                    </p>
+
+                    {% if tiene_permiso('identidad.ver') %}
+
+                        <a
+                            href="{{ url_for('admin.usuarios') }}"
+                            class="btn btn-primary"
+                        >
+                            Ver usuarios
+                        </a>
+
+                    {% endif %}
+
+                </article>
+
+
+            </section>
+
+        </div>
+
+    </main>
+
+</div>
+
+{% endblock %}

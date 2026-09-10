@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    Usuarios | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/admin.css') }}"
+>
+
+{% endblock %}
+
+
+{% block content %}
+
+<div class="admin-layout">
+
+
+    {% include 'components/admin_sidebar.html' %}
+
+
+    <main class="admin-content">
+
+        <div class="admin-content-inner">
+
+
+            <header class="admin-page-header">
+
+                <div>
+
+                    <h1 class="admin-page-title">
+                        Usuarios
+                    </h1>
+
+                    <p class="admin-page-description">
+
+                        Consulta de clientes y empleados
+                        registrados en SULPAA.
+
+                    </p>
+
+                </div>
+
+            </header>
+
+
+            <!-- =================================================
+                 FILTROS
+                 ================================================= -->
+
+            <section class="card">
+
+                <div class="form-group">
+
+                    <label
+                        for="tipo_usuario"
+                        class="form-label"
+                    >
+                        Tipo de usuario
+                    </label>
+
+                    <select
+                        id="tipo_usuario"
+                        class="form-control"
+                    >
+
+                        <option value="">
+                            Todos
+                        </option>
+
+                        <option value="CLIENTE">
+                            Clientes
+                        </option>
+
+                        <option value="EMPLEADO">
+                            Empleados
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </section>
+
+
+            <br>
+
+
+            <!-- =================================================
+                 TABLA
+                 ================================================= -->
+
+            <div class="admin-table-wrapper">
+
+                <table class="admin-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Nombre
+                            </th>
+
+                            <th>
+                                Correo
+                            </th>
+
+                            <th>
+                                Tipo
+                            </th>
+
+                            <th>
+                                Rol
+                            </th>
+
+                            <th>
+                                Estado
+                            </th>
+
+                            <th>
+                                Acción
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% if usuarios %}
+
+                            {% for usuario in usuarios %}
+
+                                <tr>
+
+                                    <td>
+                                        {{ usuario.nombre }}
+                                    </td>
+
+                                    <td>
+                                        {{ usuario.correo }}
+                                    </td>
+
+                                    <td>
+                                        {{ usuario.tipo_usuario }}
+                                    </td>
+
+                                    <td>
+                                        {{ usuario.rol or '-' }}
+                                    </td>
+
+                                    <td>
+
+                                        {% if usuario.estado == 'ACTIVO' %}
+
+                                            <span
+                                                class="admin-status admin-status-active"
+                                            >
+                                                ACTIVO
+                                            </span>
+
+                                        {% else %}
+
+                                            <span
+                                                class="admin-status admin-status-inactive"
+                                            >
+                                                {{ usuario.estado }}
+                                            </span>
+
+                                        {% endif %}
+
+                                    </td>
+
+                                    <td>
+
+                                        <a
+                                            href="#"
+                                            class="btn btn-secondary"
+                                        >
+                                            Ver
+                                        </a>
+
+                                    </td>
+
+                                </tr>
+
+                            {% endfor %}
+
+                        {% else %}
+
+                            <tr>
+
+                                <td
+                                    colspan="6"
+                                >
+
+                                    No hay usuarios para mostrar.
+
+                                </td>
+
+                            </tr>
+
+                        {% endif %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+{% endblock %}
