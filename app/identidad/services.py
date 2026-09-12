@@ -31,6 +31,7 @@ from app.identidad.repositories import (
     crear_direccion_usuario,
     buscar_distrito_activo,
     guardar_datos_facturacion,
+    listar_direcciones_usuario,
 )
 
 from app.shared.validators import (
@@ -417,6 +418,7 @@ def obtener_checkout_usuario(
 
         "facturacion":
             datos["facturacion"],
+        "direcciones": listar_direcciones_usuario(usuario_id),
     }
 
 # ============================================================
@@ -478,10 +480,20 @@ def registrar_direccion_usuario(
     direccion,
     referencia=None,
     alias=None,
+    latitud=None,
+    longitud=None,
 ):
     """
     Valida y registra una dirección del cliente.
     """
+
+    if any(v is not None and not isinstance(v, str)
+           for v in (distrito_id, direccion, referencia, alias)):
+        return {"ok": False, "mensaje": "Los datos de dirección no son válidos."}
+    try:
+        latitud, longitud = validar_coordenadas_direccion(latitud, longitud)
+    except ValueError as error:
+        return {"ok": False, "mensaje": str(error)}
 
     distrito_id = (
         distrito_id or ""
@@ -575,6 +587,8 @@ def registrar_direccion_usuario(
         direccion=direccion,
         referencia=referencia,
         es_principal=True,
+        latitud=latitud,
+        longitud=longitud,
     )
 
     return {
@@ -1197,3 +1211,19 @@ def registrar_facturacion_checkout(
         "mensaje":
             "Selecciona un tipo de comprobante válido.",
     }
+
+
+def validar_coordenadas_direccion(latitud, longitud, obligatorias=False):
+    """Mantiene compatibles las direcciones antiguas sin ubicación."""
+    from decimal import Decimal, InvalidOperation
+    if latitud in (None, "") and longitud in (None, "") and not obligatorias:
+        return None, None
+    try:
+        lat, lon = Decimal(str(latitud)), Decimal(str(longitud))
+        if not lat.is_finite() or not lon.is_finite():
+            raise ValueError
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError
+        return lat.quantize(Decimal("0.0000001")), lon.quantize(Decimal("0.0000001"))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("Selecciona una ubicación válida en el mapa.")

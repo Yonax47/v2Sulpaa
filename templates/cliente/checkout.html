@@ -945,10 +945,26 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
 
           <h2>Dirección de entrega</h2>
 
+          <div class="checkout-field" role="status" aria-live="polite">
+            <strong id="checkout-destination-summary">Selecciona una modalidad de entrega.</strong>
+          </div>
+          <div class="checkout-form-group" id="checkout-saved-selector-group" hidden>
+            <label for="checkout-saved-selector">Direcciones guardadas</label>
+            <select id="checkout-saved-selector">
+              <option value="">Otra dirección</option>
+              {% if checkout and checkout['ok'] %}
+              {% for item in checkout.get('direcciones', []) %}
+              <option value="{{ item['id'] }}">{{ item['alias'] or 'Dirección' }} — {{ item['direccion'] }}</option>
+              {% endfor %}
+              {% endif %}
+            </select>
+          </div>
+          <script id="checkout-saved-addresses" type="application/json">{{ (checkout.get('direcciones', []) if checkout and checkout['ok'] else [])|tojson }}</script>
+
           {% if ( checkout and checkout["ok"] and checkout["direccion"] ) %} {%
           set direccion = checkout["direccion"] %}
 
-          <div class="checkout-fields">
+          <div class="checkout-fields" hidden>
             <div class="checkout-field">
               <span> Dirección </span>
 
@@ -985,18 +1001,13 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
             hidden
           ></div>
 
-          {% else %}
-
-          <div class="checkout-warning">
-            <strong> Aún no tienes una dirección registrada. </strong>
-
-            <p>Registra tu dirección para continuar con el pedido.</p>
-          </div>
+          {% endif %}
 
           <form
             id="checkout-address-form"
             class="checkout-address-form"
             autocomplete="on"
+            hidden
           >
             <!-- DEPARTAMENTO -->
 
@@ -1110,11 +1121,10 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
               id="checkout-save-address"
               class="checkout-primary-button"
             >
-              Guardar dirección
+              Guardar como dirección frecuente
             </button>
           </form>
 
-          {% endif %}
         </section>
 
         <!-- =============================================
@@ -1311,6 +1321,7 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
               </select>
             </div>
 
+            <button type="button" id="checkout-quote-carrier" class="checkout-primary-button">Calcular envío</button>
             <div
               id="checkout-carrier-message"
               role="status"

@@ -28,6 +28,7 @@ v2sulpaa_operaciones_db
 from decimal import (
     Decimal,
     ROUND_HALF_UP,
+    InvalidOperation,
 )
 
 from app.operaciones.repositories import (
@@ -45,6 +46,8 @@ from app.operaciones.repositories import (
     listar_metodos_pago_activos,
     crear_pago_pedido,
     cancelar_pago_pedido,
+    guardar_entrega_checkout,
+    cancelar_entrega_checkout,
 )
 
 
@@ -106,13 +109,14 @@ def _numero_positivo(
     except (
         ValueError,
         TypeError,
+        InvalidOperation,
     ):
 
         raise ValueError(
             f"{nombre} no es válido."
         )
 
-    if numero <= 0:
+    if not numero.is_finite() or numero <= 0:
 
         raise ValueError(
             f"{nombre} debe ser mayor que cero."
@@ -378,6 +382,7 @@ def obtener_opciones_entrega_checkout():
     return {
         "ok": True,
         "opciones": opciones,
+        "origen_delivery": _origen_delivery(puntos_recojo),
     }
 
 
@@ -513,7 +518,9 @@ def cotizar_delivery_local(
     # --------------------------------------------------------
     # 5. Validar peso máximo
     # --------------------------------------------------------
-
+    peso_maximo = _decimal(tarifa.get("peso_maximo_kg"))
+    if peso_maximo > 0 and peso > peso_maximo:
+        return {"ok": False, "mensaje": "El pedido supera el peso máximo del delivery local."}
    
 
     # --------------------------------------------------------
@@ -544,6 +551,7 @@ def cotizar_delivery_local(
 
                 "tarifa_delivery_id":
                     tarifa["id"],
+                "tarifa_snapshot": tarifa,
 
                 "distancia_km":
                     float(distancia),
@@ -641,6 +649,7 @@ def cotizar_delivery_local(
 
         "tarifa_delivery_id":
             tarifa["id"],
+        "tarifa_snapshot": tarifa,
 
         "distancia_km":
             float(distancia),
@@ -1499,3 +1508,252 @@ def cancelar_pago_checkout(
         usuario_id=usuario_id,
         observacion=observacion,
     )
+
+
+# ============================================================
+# DESTINOS Y COTIZACIONES VERIFICABLES DEL CHECKOUT
+# ============================================================
+
+def _origen_delivery(puntos=None):
+    """Usa el local de BD; conserva el origen ya utilizado por el mapa.
+
+    El fallback solo corresponde a SULPAA-EL-TAMBO y permite trabajar
+    con el dump inicial, cuyas coordenadas todavía son NULL.
+    """
+    if puntos is None:
+        puntos = listar_puntos_recojo_activos()
+    punto = next((p for p in puntos if p['codigo'] == 'SULPAA-EL-TAMBO'), None)
+    if not punto:
+        return None
+    return {
+        'latitude': float(punto['latitud']) if punto.get('latitud') is not None else -12.049141052234061,
+        'longitude': float(punto['longitud']) if punto.get('longitud') is not None else -75.22147546622413,
+    }
+
+
+def _texto_destino(valor, nombre, minimo=0, maximo=255):
+    if valor is None:
+        valor = ''
+    if not isinstance(valor, str) or not minimo <= len(valor.strip()) <= maximo:
+        raise ValueError(f'{nombre} no es válido.')
+    return valor.strip()
+
+
+def _normalizar_ubicacion(texto):
+    import unicodedata
+    return unicodedata.normalize("NFKD", str(texto or "")).encode("ascii", "ignore").decode().upper()
+
+
+def _resolver_distrito_checkout(origen):
+    """Resuelve el distrito de un destino de entrega.
+
+    Si el formulario ya trajo un distrito válido, lo conserva.
+    Si viene vacío (destino marcado en el mapa), lo deduce de la
+    dirección geocodificada contra el catálogo oficial de ubigeo.
+    """
+    from app.identidad.repositories import buscar_distrito_activo, buscar_distritos_activos
+    try:
+        distrito = _texto_destino(origen.get('distrito_id'), 'El distrito', 6, 6)
+    except ValueError:
+        distrito = ''
+    if distrito.isascii() and distrito.isdigit() and buscar_distrito_activo(distrito):
+        return distrito
+    if origen.get('distrito_id'):
+        raise ValueError('Selecciona un distrito válido.')
+    texto = _normalizar_ubicacion(origen.get("direccion"))
+    if len(texto) < 5:
+        raise ValueError('Selecciona un distrito válido.')
+    mejor, mejor_puntaje = None, -1
+    for d in buscar_distritos_activos():
+        nombre = _normalizar_ubicacion(d["nombre"])
+        if not nombre or nombre not in texto:
+            continue
+        puntaje = 100
+        if _normalizar_ubicacion(d["provincia_nombre"]) in texto:
+            puntaje += 40
+        if _normalizar_ubicacion(d["departamento_nombre"]) in texto:
+            puntaje += 20
+        if puntaje > mejor_puntaje:
+            mejor, mejor_puntaje = d, puntaje
+    if mejor is None:
+        raise ValueError('Selecciona un distrito válido.')
+    return mejor['id']
+
+
+def _destino_checkout(usuario_id, datos, coordenadas=True):
+    from app.identidad.repositories import listar_direcciones_usuario, buscar_distrito_activo
+    from app.identidad.services import validar_coordenadas_direccion
+    direccion_id = datos.get('direccion_id')
+    origen = datos
+    if direccion_id:
+        guardada = next((d for d in listar_direcciones_usuario(usuario_id)
+                         if d['id'] == direccion_id), None)
+        if not guardada:
+            raise ValueError('La dirección no pertenece a tu cuenta o está inactiva.')
+        # Una dirección antigua puede completarse en el mapa sin perder su titularidad.
+        origen = {**datos, **guardada}
+        if guardada.get('latitud') is None or guardada.get('longitud') is None:
+            origen.update(latitud=datos.get('latitud'), longitud=datos.get('longitud'))
+    distrito = _resolver_distrito_checkout(origen)
+    lat, lon = validar_coordenadas_direccion(
+        origen.get('latitud'), origen.get('longitud'), obligatorias=coordenadas)
+    return {
+        'distrito_id': distrito,
+        'direccion': _texto_destino(origen.get('direccion'), 'La dirección', 5),
+        'referencia': _texto_destino(origen.get('referencia'), 'La referencia') or None,
+        'latitud': str(lat) if lat is not None else None,
+        'longitud': str(lon) if lon is not None else None,
+    }
+
+
+def _destino_checkout_opcional(usuario_id, datos):
+    """Devuelve el destino normalizado si el cliente ya lo completó.
+
+    La cotización de delivery NO requiere el destino: solo la distancia.
+    El destino se exige recién al guardar la entrega en la confirmación.
+    """
+    try:
+        return _destino_checkout(usuario_id, datos)
+    except ValueError:
+        return None
+
+
+def _preparar_entrega_checkout(usuario_id, datos):
+    """Normaliza la selección y vuelve a consultar todos los catálogos relevantes."""
+    from app.identidad.repositories import obtener_datos_checkout_usuario
+    tipo = datos.get('tipo_entrega')
+    if tipo == 'RECOJO_LOCAL':
+        punto = next((p for p in listar_puntos_recojo_activos()
+                      if p['id'] == datos.get('punto_recojo_id')), None)
+        if not punto:
+            raise ValueError('Selecciona un punto de recojo activo.')
+        return {'ok': True, 'tipo': tipo, 'costo_entrega': 0,
+                'punto_recojo': punto, 'direccion_entrega': punto['direccion']}
+
+    if tipo == 'DELIVERY_LOCAL':
+        # La cotización depende únicamente de la distancia calculada
+        # por el mapa. El destino completo solo se exige al guardar
+        # la entrega durante la confirmación del pedido.
+        resultado = cotizar_delivery_local(usuario_id, datos.get('distancia_km'))
+        if not resultado.get('ok'):
+            raise ValueError(resultado['mensaje'])
+        cliente = (obtener_datos_checkout_usuario(usuario_id) or {}).get('cliente') or {}
+        nombre = ' '.join(str(cliente.get(k) or '').strip()
+                          for k in ('nombres', 'apellido_paterno', 'apellido_materno')).strip()
+        resultado.update(nombre_receptor=_texto_destino(nombre, 'El nombre del receptor', 2, 150),
+                         telefono_receptor=_texto_destino(cliente.get('telefono'), 'El teléfono', 6, 20))
+        destino = _destino_checkout_opcional(usuario_id, datos)
+        if destino is not None:
+            resultado['destino'] = destino
+            resultado['direccion_entrega'] = destino['direccion']
+        return resultado
+
+    if tipo == 'TRANSPORTISTA':
+        servicio = obtener_servicio_transportista_activo(
+            datos.get('servicio_transportista_id'), datos.get('transportista_id'))
+        if not servicio:
+            raise ValueError('Selecciona un servicio activo del transportista.')
+        agencia = servicio['modalidad'].endswith('_AGENCIA')
+        destino = None if agencia else _destino_checkout(usuario_id, datos, coordenadas=False)
+        sucursal_id = datos.get('sucursal_destino_id') if agencia else None
+        if agencia and not sucursal_id:
+            raise ValueError('Selecciona la agencia de destino.')
+        distrito = datos.get('distrito_destino_id') if agencia else destino['distrito_id']
+        resultado = cotizar_envio_transportista(
+            usuario_id, datos.get('transportista_id'), datos.get('servicio_transportista_id'),
+            distrito, sucursal_id)
+        if not resultado.get('ok'):
+            raise ValueError(resultado['mensaje'])
+        resultado['distrito_destino_id'] = distrito
+        resultado['direccion_entrega'] = (resultado['sucursal_destino']['direccion'] if agencia
+                                         else destino['direccion'])
+        if destino:
+            resultado['destino'] = destino
+            # El esquema de envíos conserva el destino en un snapshot de 255 caracteres.
+            if destino['referencia']:
+                resultado['direccion_entrega'] = _texto_destino(
+                    destino['direccion'] + ' | Ref: ' + destino['referencia'], 'La dirección con referencia', 5)
+        return resultado
+    raise ValueError('Selecciona una modalidad de entrega válida.')
+
+
+def _huella_checkout(valor):
+    import hashlib
+    import json
+    return hashlib.sha256(json.dumps(valor, sort_keys=True, default=str,
+                                     separators=(',', ':')).encode()).hexdigest()
+
+
+def _huella_carrito_entrega(usuario_id):
+    from app.comercio.services import obtener_carrito_usuario
+    carrito = obtener_carrito_usuario(usuario_id)
+    if not carrito.get('items'):
+        raise ValueError('El carrito está vacío.')
+    return _huella_checkout(carrito)
+
+
+def _firma_cotizacion():
+    from flask import current_app
+    from itsdangerous import URLSafeTimedSerializer
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='checkout-entrega-v1')
+
+
+def _huella_entrega(entrega):
+    # La geometría no afecta a la tarifa. La distancia se compara a precisión de BD.
+    contenido = {k: v for k, v in entrega.items() if k not in ('geometria', 'cotizacion_token')}
+    if entrega.get('tipo') == 'DELIVERY_LOCAL':
+        # El destino puede completarse después de cotizar: se protegen
+        # únicamente los datos de costo. La dirección se valida al guardar.
+        contenido = {k: contenido[k] for k in (
+            'tipo', 'tarifa_delivery_id', 'distancia_km', 'peso_kg',
+            'subtotal_productos', 'costo_entrega', 'envio_gratis') if k in contenido}
+    if 'distancia_km' in contenido:
+        contenido['distancia_km'] = str(_dinero(contenido['distancia_km']))
+    return _huella_checkout(contenido)
+
+
+def cotizar_entrega_checkout(usuario_id, datos):
+    """Cotización de 15 minutos vinculada al usuario, carrito y destino."""
+    try:
+        huella = _huella_carrito_entrega(usuario_id)
+        entrega = _preparar_entrega_checkout(usuario_id, datos)
+        if huella != _huella_carrito_entrega(usuario_id):
+            raise ValueError('El carrito cambió. Vuelve a cotizar.')
+        entrega['cotizacion_token'] = _firma_cotizacion().dumps({
+            'usuario': usuario_id, 'carrito': huella, 'entrega': _huella_entrega(entrega)})
+        return entrega
+    except (ValueError, TypeError, InvalidOperation) as error:
+        return {'ok': False, 'mensaje': str(error)}
+
+
+def validar_entrega_confirmacion(usuario_id, datos):
+    from itsdangerous import BadSignature
+    try:
+        if datos.get('tipo_entrega') == 'RECOJO_LOCAL':
+            return _preparar_entrega_checkout(usuario_id, datos)
+        token = datos.get('cotizacion_token')
+        if not isinstance(token, str) or not token:
+            raise ValueError('Primero debes cotizar la entrega.')
+        firma = _firma_cotizacion().loads(token, max_age=900)
+        if firma.get('usuario') != usuario_id or firma.get('carrito') != _huella_carrito_entrega(usuario_id):
+            raise ValueError('La cotización no corresponde a tu carrito actual.')
+        entrega = _preparar_entrega_checkout(usuario_id, datos)
+        if firma.get('entrega') != _huella_entrega(entrega):
+            raise ValueError('El destino o la tarifa cambió. Vuelve a cotizar.')
+        if firma.get('carrito') != _huella_carrito_entrega(usuario_id):
+            raise ValueError('El carrito cambió. Vuelve a cotizar.')
+        if datos.get('tipo_entrega') == 'DELIVERY_LOCAL' and not entrega.get('destino'):
+            raise ValueError('Confirma tu dirección de entrega antes de continuar.')
+        return entrega
+    except BadSignature:
+        return {'ok': False, 'mensaje': 'La cotización venció o no es válida. Vuelve a cotizar.'}
+    except (ValueError, TypeError, InvalidOperation) as error:
+        return {'ok': False, 'mensaje': str(error)}
+
+
+def crear_entrega_pedido(pedido_id, usuario_id, entrega):
+    return guardar_entrega_checkout(pedido_id, usuario_id, entrega)
+
+
+def compensar_entrega_pedido(pedido_id, usuario_id):
+    return cancelar_entrega_checkout(pedido_id, usuario_id)

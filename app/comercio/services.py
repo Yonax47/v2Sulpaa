@@ -27,6 +27,9 @@ from app.operaciones.services import (
     cancelar_pago_checkout,
     cotizar_delivery_local,
     cotizar_envio_transportista,
+    validar_entrega_confirmacion,
+    crear_entrega_pedido,
+    compensar_entrega_pedido,
 )
 
 from app.comercio.repositories import (
@@ -2199,6 +2202,7 @@ def confirmar_checkout(
     tipo_entrega,
     metodo_pago_id,
     costo_entrega,
+    entrega=None,
 ):
     """
     Orquesta la confirmación definitiva del checkout.
@@ -2228,6 +2232,9 @@ def confirmar_checkout(
             "mensaje":
                 "No se pudo identificar al usuario.",
         }
+
+    if not entrega or not entrega.get('ok'):
+        return {'ok': False, 'mensaje': 'La entrega debe validarse antes de crear el pedido.'}
 
     tipo_entrega = str(
         tipo_entrega or ""
@@ -2394,6 +2401,7 @@ def confirmar_checkout(
     pedido_creado = False
     pago_creado = False
     carrito_cerrado = False
+    entrega_creada = False
 
     try:
 
@@ -2471,6 +2479,10 @@ def confirmar_checkout(
 
         pago_creado = True
 
+        # Persistir el destino antes de cerrar carrito y confirmar stock.
+        entrega_id = crear_entrega_pedido(pedido_id, usuario_id, entrega)
+        entrega_creada = True
+
         # ----------------------------------------------------
         # 8. Cerrar carrito
         # ----------------------------------------------------
@@ -2481,22 +2493,12 @@ def confirmar_checkout(
             )
         )
 
-        if (
-            isinstance(
-                resultado_carrito,
-                dict,
-            )
-            and not resultado_carrito.get(
-                "ok",
-                True,
-            )
+        if resultado_carrito is False or (
+            isinstance(resultado_carrito, dict) and not resultado_carrito.get('ok', False)
         ):
 
             raise RuntimeError(
-                resultado_carrito.get(
-                    "mensaje",
-                    "No se pudo cerrar el carrito.",
-                )
+                "No se pudo cerrar el carrito."
             )
 
         carrito_cerrado = True
@@ -2551,6 +2553,8 @@ def confirmar_checkout(
                 ),
             "tipo_entrega":
                 tipo_entrega,
+            "entrega_id": entrega_id,
+            "direccion_entrega": entrega['direccion_entrega'],
         }
 
     except Exception as error:
@@ -2558,6 +2562,13 @@ def confirmar_checkout(
         # ----------------------------------------------------
         # COMPENSACIONES
         # ----------------------------------------------------
+
+        if entrega_creada:
+            try:
+                compensar_entrega_pedido(pedido_id, usuario_id)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception('No se pudo cancelar la entrega del pedido %s', pedido_id)
 
         if carrito_cerrado:
 
@@ -2791,6 +2802,10 @@ def confirmar_checkout_con_entrega(
         "metodo_pago_id"
     )
 
+    entrega_validada = validar_entrega_confirmacion(usuario_id, datos)
+    if not entrega_validada.get('ok'):
+        return entrega_validada
+
     if not metodo_pago_id:
 
         return {
@@ -2805,7 +2820,7 @@ def confirmar_checkout_con_entrega(
 
     if tipo_entrega == "RECOJO_LOCAL":
 
-        costo_entrega = 0
+        costo_entrega = entrega_validada['costo_entrega']
 
     # ========================================================
     # 5. DELIVERY LOCAL
@@ -2813,15 +2828,7 @@ def confirmar_checkout_con_entrega(
 
     elif tipo_entrega == "DELIVERY_LOCAL":
 
-        resultado_cotizacion = (
-            cotizar_delivery_local(
-                usuario_id=usuario_id,
-
-                distancia_km=datos.get(
-                    "distancia_km"
-                ),
-            )
-        )
+        resultado_cotizacion = entrega_validada
 
         if not resultado_cotizacion.get(
             "ok"
@@ -2841,29 +2848,7 @@ def confirmar_checkout_con_entrega(
 
     elif tipo_entrega == "TRANSPORTISTA":
 
-        resultado_cotizacion = (
-            cotizar_envio_transportista(
-                usuario_id=usuario_id,
-
-                transportista_id=datos.get(
-                    "transportista_id"
-                ),
-
-                servicio_transportista_id=(
-                    datos.get(
-                        "servicio_transportista_id"
-                    )
-                ),
-
-                distrito_destino_id=datos.get(
-                    "distrito_destino_id"
-                ),
-
-                sucursal_destino_id=datos.get(
-                    "sucursal_destino_id"
-                ),
-            )
-        )
+        resultado_cotizacion = entrega_validada
 
         if not resultado_cotizacion.get(
             "ok"
@@ -2898,6 +2883,7 @@ def confirmar_checkout_con_entrega(
         tipo_entrega=tipo_entrega,
         metodo_pago_id=metodo_pago_id,
         costo_entrega=costo_entrega,
+        entrega=entrega_validada,
     )
 
     if not resultado_checkout.get(

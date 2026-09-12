@@ -41,6 +41,7 @@ from app.operaciones.services import (
     cotizar_delivery_local,
     cotizar_envio_transportista,
     obtener_metodos_pago_checkout,
+    cotizar_entrega_checkout,
 )
 
 
@@ -62,22 +63,12 @@ operaciones_bp = Blueprint(
 def _json_body():
     """
     Obtiene de forma segura el JSON enviado por el cliente.
-
-    Si el cuerpo no contiene un objeto JSON válido,
-    devuelve un diccionario vacío.
+    Acepta dicts y devuelve dict vacío para otros tipos.
     """
-
-    datos = request.get_json(
-        silent=True
-    )
-
-    if not isinstance(
-        datos,
-        dict,
-    ):
-        return {}
-
-    return datos
+    datos = request.get_json(silent=True)
+    if isinstance(datos, dict):
+        return datos
+    return {}
 
 
 def _respuesta(
@@ -137,29 +128,27 @@ def api_cotizar_delivery_local():
     """
     Cotiza un delivery local.
 
-    El navegador únicamente proporciona la distancia
-    determinada por el sistema de mapas.
+    El navegador envía la distancia calculada por el
+    sistema de mapas. Opcionalmente puede incluir el
+    destino (distrito, dirección y coordenadas) para
+    mostrarlo y firmarlo, pero la cotización del costo
+    NO lo exige.
 
     El backend obtiene por su cuenta:
 
     - peso real del carrito;
     - subtotal real del carrito;
-    - tarifa vigente.
+    - tarifa vigente;
+    - cobertura máxima.
 
-    Por seguridad NO se acepta peso ni subtotal
+    Por seguridad NO se acepta peso, subtotal ni costo
     enviados desde JavaScript.
     """
 
     datos = _json_body()
 
-    resultado = cotizar_delivery_local(
-        usuario_id=session[
-            "usuario_id"
-        ],
-        distancia_km=datos.get(
-            "distancia_km"
-        ),
-    )
+    datos['tipo_entrega'] = 'DELIVERY_LOCAL'
+    resultado = cotizar_entrega_checkout(session['usuario_id'], datos)
 
     return _respuesta(
         resultado
@@ -288,29 +277,8 @@ def api_cotizar_transportista():
 
     datos = _json_body()
 
-    resultado = cotizar_envio_transportista(
-        usuario_id=session[
-            "usuario_id"
-        ],
-
-        transportista_id=datos.get(
-            "transportista_id"
-        ),
-
-        servicio_transportista_id=(
-            datos.get(
-                "servicio_transportista_id"
-            )
-        ),
-
-        distrito_destino_id=datos.get(
-            "distrito_destino_id"
-        ),
-
-        sucursal_destino_id=datos.get(
-            "sucursal_destino_id"
-        ),
-    )
+    datos['tipo_entrega'] = 'TRANSPORTISTA'
+    resultado = cotizar_entrega_checkout(session['usuario_id'], datos)
 
     return _respuesta(
         resultado

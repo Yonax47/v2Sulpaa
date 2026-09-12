@@ -434,12 +434,17 @@ def guardar_direccion():
         silent=True
     ) or {}
 
+    if not isinstance(datos, dict):
+        return jsonify({"ok": False, "mensaje": "Dirección inválida."}), 400
+
     resultado = registrar_direccion_usuario(
         usuario_id=session["usuario_id"],
         distrito_id=datos.get("distrito_id"),
         direccion=datos.get("direccion"),
         referencia=datos.get("referencia"),
         alias=datos.get("alias"),
+        latitud=datos.get("latitud"),
+        longitud=datos.get("longitud"),
     )
 
     if not resultado["ok"]:

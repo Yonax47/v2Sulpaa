@@ -443,6 +443,42 @@ def obtener_distritos_por_provincia(
     finally:
         conexion.close()
 
+def buscar_distritos_activos():
+    """Devuelve todos los distritos activos con sus nombres
+    de provincia y departamento para resolver el distrito
+    de un destino geocodificado."""
+
+    conexion = conexion_identidad()
+
+    try:
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    di.id,
+                    di.provincia_id,
+                    di.nombre,
+                    p.departamento_id,
+                    p.nombre AS provincia_nombre,
+                    de.nombre AS departamento_nombre
+                FROM distritos di
+                JOIN provincias p ON p.id = di.provincia_id
+                JOIN departamentos de ON de.id = p.departamento_id
+                WHERE
+                    di.estado = 'ACTIVO'
+                    AND p.estado = 'ACTIVO'
+AND de.estado = 'ACTIVO'
+                ORDER BY di.nombre ASC
+                """
+            )
+
+            return cursor.fetchall()
+
+    finally:
+        conexion.close()
+
+
 # ============================================================
 # GUARDAR DIRECCIÓN DEL USUARIO
 # ============================================================
@@ -455,6 +491,8 @@ def crear_direccion_usuario(
     direccion,
     referencia,
     es_principal=True,
+    latitud=None,
+    longitud=None,
 ):
     """
     Registra una nueva dirección para el usuario.
@@ -492,10 +530,14 @@ def crear_direccion_usuario(
                     alias,
                     direccion,
                     referencia,
+                    latitud,
+                    longitud,
                     es_principal,
                     estado
                 )
                 VALUES (
+                    %s,
+                    %s,
                     %s,
                     %s,
                     %s,
@@ -513,6 +555,8 @@ def crear_direccion_usuario(
                     alias,
                     direccion,
                     referencia,
+                    latitud,
+                    longitud,
                     1 if es_principal else 0,
                 ),
             )
@@ -560,6 +604,28 @@ def buscar_distrito_activo(
 
             return cursor.fetchone()
 
+    finally:
+        conexion.close()
+
+
+def listar_direcciones_usuario(usuario_id):
+    """Solo direcciones activas del titular, con ubigeo para los selectores."""
+    conexion = conexion_identidad()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT d.*, di.nombre AS distrito_nombre,
+                       p.id AS provincia_id, p.departamento_id,
+                       p.nombre AS provincia_nombre, de.nombre AS departamento_nombre
+                FROM direcciones d
+                JOIN distritos di ON di.id = d.distrito_id
+                JOIN provincias p ON p.id = di.provincia_id
+                JOIN departamentos de ON de.id = p.departamento_id
+                WHERE d.usuario_id = %s AND d.estado = 'ACTIVA'
+                  AND di.estado = 'ACTIVO'
+                ORDER BY d.es_principal DESC, d.creado_en DESC
+            """, (usuario_id,))
+            return cursor.fetchall()
     finally:
         conexion.close()
 

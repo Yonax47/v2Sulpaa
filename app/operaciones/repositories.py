@@ -12,6 +12,128 @@ Reglas de arquitectura:
 """
 
 from app.config.database import conexion_operaciones
+import uuid
+
+
+def guardar_entrega_checkout(pedido_id, usuario_id, entrega):
+    """Cabecera, cotización, destino e historial: una transacción local.
+
+    Recibe exclusivamente datos normalizados por services. La cotización
+    firmada del checkout se materializa como ACEPTADA al crear la entrega.
+    """
+    conexion = conexion_operaciones()
+    entrega_id = str(uuid.uuid4())
+    cotizacion_id = str(uuid.uuid4())
+    tipo = entrega['tipo']
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO entregas
+                (id, pedido_id, tipo_entrega, costo_cobrado_cliente, estado)
+                VALUES (%s, %s, %s, %s, 'PENDIENTE')
+            """, (entrega_id, pedido_id,
+                  'TRANSPORTISTA_ASOCIADO' if tipo == 'TRANSPORTISTA' else tipo,
+                  entrega['costo_entrega']))
+            if tipo == 'RECOJO_LOCAL':
+                punto = entrega['punto_recojo']
+                cursor.execute("""
+                    INSERT INTO entregas_recojo
+                    (id, entrega_id, punto_recojo_id, nombre_punto_snapshot, direccion_snapshot)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (str(uuid.uuid4()), entrega_id, punto['id'], punto['nombre'], punto['direccion']))
+            elif tipo == 'DELIVERY_LOCAL':
+                tarifa = entrega['tarifa_snapshot']
+                destino = entrega['destino']
+                cursor.execute("""
+                    INSERT INTO cotizaciones_delivery
+                    (id, entrega_id, tarifa_delivery_id, distrito_destino_id,
+                     distancia_km, tarifa_base_aplicada, km_incluidos_aplicados,
+                     precio_km_aplicado, costo_estimado, estado, expira_en)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'ACEPTADA',
+                            DATE_ADD(NOW(), INTERVAL 15 MINUTE))
+                """, (cotizacion_id, entrega_id, entrega['tarifa_delivery_id'],
+                      destino['distrito_id'], entrega['distancia_km'],
+                      tarifa['tarifa_base'], tarifa['km_incluidos'],
+                      tarifa['precio_km_adicional'], entrega['costo_entrega']))
+                cursor.execute("""
+                    INSERT INTO entregas_delivery
+                    (id, entrega_id, cotizacion_delivery_id, distancia_km, costo_calculado)
+                    VALUES (%s,%s,%s,%s,%s)
+                """, (str(uuid.uuid4()), entrega_id, cotizacion_id,
+                      entrega['distancia_km'], entrega['costo_entrega']))
+                cursor.execute("""
+                    INSERT INTO delivery_destinos
+                    (id, entrega_id, distrito_id, nombre_receptor, telefono_receptor,
+                     direccion, referencia, latitud, longitud)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """, (str(uuid.uuid4()), entrega_id, destino['distrito_id'],
+                      entrega['nombre_receptor'], entrega['telefono_receptor'],
+                      destino['direccion'], destino['referencia'], destino['latitud'], destino['longitud']))
+            elif tipo == 'TRANSPORTISTA':
+                sucursal = entrega.get('sucursal_destino') or {}
+                cursor.execute("""
+                    INSERT INTO cotizaciones_transportista
+                    (id, pedido_id, transportista_id, servicio_transportista_id,
+                     tarifario_id, sucursal_destino_id, distrito_destino_id,
+                     peso_estimado_gramos, costo_estimado, estado, expira_en)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'ACEPTADA',
+                            DATE_ADD(NOW(), INTERVAL 15 MINUTE))
+                """, (cotizacion_id, pedido_id, entrega['transportista']['id'],
+                      entrega['servicio']['id'], entrega['tarifario_id'], sucursal.get('id'),
+                      entrega['distrito_destino_id'], entrega['peso_estimado_gramos'], entrega['costo_entrega']))
+                cursor.execute("""
+                    INSERT INTO envios_transportista
+                    (id, entrega_id, transportista_id, servicio_transportista_id,
+                     cotizacion_id, sucursal_destino_id, transportista_nombre_snapshot,
+                     servicio_nombre_snapshot, sucursal_destino_nombre_snapshot,
+                     direccion_destino_snapshot, peso_estimado_gramos,
+                     costo_estimado, costo_cobrado_cliente, url_seguimiento_snapshot)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """, (str(uuid.uuid4()), entrega_id, entrega['transportista']['id'],
+                      entrega['servicio']['id'], cotizacion_id, sucursal.get('id'),
+                      entrega['transportista']['nombre'], entrega['servicio']['nombre'],
+                      sucursal.get('nombre'), entrega['direccion_entrega'],
+                      entrega['peso_estimado_gramos'], entrega['costo_entrega'],
+                      entrega['costo_entrega'], entrega['transportista'].get('url_seguimiento')))
+            else:
+                raise ValueError('Modalidad de entrega inválida.')
+            cursor.execute("""
+                INSERT INTO entrega_historial
+                (entrega_id, estado_anterior, estado_nuevo, usuario_responsable_id, comentario)
+                VALUES (%s, NULL, 'PENDIENTE', %s, 'Entrega creada desde checkout.')
+            """, (entrega_id, usuario_id))
+        conexion.commit()
+        return entrega_id
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        conexion.close()
+
+
+def cancelar_entrega_checkout(pedido_id, usuario_id):
+    """Compensación idempotente: conserva snapshots e historial."""
+    conexion = conexion_operaciones()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute('SELECT id, estado FROM entregas WHERE pedido_id=%s FOR UPDATE', (pedido_id,))
+            entrega = cursor.fetchone()
+            if entrega and entrega['estado'] == 'PENDIENTE':
+                cursor.execute("UPDATE entregas SET estado='CANCELADO' WHERE id=%s", (entrega['id'],))
+                cursor.execute("UPDATE envios_transportista SET estado='CANCELADO' WHERE entrega_id=%s", (entrega['id'],))
+                cursor.execute("UPDATE cotizaciones_delivery SET estado='CANCELADA' WHERE entrega_id=%s", (entrega['id'],))
+                cursor.execute("UPDATE cotizaciones_transportista SET estado='CANCELADA' WHERE pedido_id=%s", (pedido_id,))
+                cursor.execute("""
+                    INSERT INTO entrega_historial
+                    (entrega_id, estado_anterior, estado_nuevo, usuario_responsable_id, comentario)
+                    VALUES (%s,'PENDIENTE','CANCELADO',%s,'Compensación por fallo del checkout.')
+                """, (entrega['id'], usuario_id))
+        conexion.commit()
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        conexion.close()
 
 
 # ============================================================

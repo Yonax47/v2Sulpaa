@@ -18,6 +18,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let pickupLocations = [];
   let carriers = [];
+  let selectedPickupId = null;
+  let deliveryQuote = null;
+  let carrierQuote = null;
+  let destinationVersion = 0;
+  let deliveryTimer = null;
+  const savedSelector = document.getElementById('checkout-saved-selector');
+  const savedSelectorGroup = document.getElementById('checkout-saved-selector-group');
+  const destinationSummary = document.getElementById('checkout-destination-summary');
+  const savedAddresses = JSON.parse(document.getElementById('checkout-saved-addresses')?.textContent || '[]');
+
+  function destinationPayload() {
+    return {
+      direccion_id: savedSelector?.value || null,
+      distrito_id: districtSelect?.value || '',
+      direccion: addressInput?.value.trim() || '',
+      referencia: referenceInput?.value.trim() || '',
+      latitud: latitudeInput?.value || null,
+      longitud: longitudeInput?.value || null,
+    };
+  }
+
+  function invalidateDestination() {
+    destinationVersion += 1;
+    deliveryQuote = null;
+    carrierQuote = null;
+    if (quoteInput) quoteInput.value = '';
+    if (distanceInput) distanceInput.value = '';
+    if (routeResult) routeResult.hidden = true;
+    if (carrierResult) carrierResult.hidden = true;
+    if (routeLayer && map) { map.removeLayer(routeLayer); routeLayer = null; }
+    clearTimeout(deliveryTimer);
+updateSummary(0);
+    updateConfirmOrderButton();
+  }
+
+  function scheduleDeliveryQuote() {
+    clearTimeout(deliveryTimer);
+    if (deliveryType === 'DELIVERY_LOCAL' && addressInput?.value.trim().length >= 5) {
+      deliveryTimer = setTimeout(() => confirmLocationButton?.click(), 500);
+    }
+  }
+
+  function refreshAddressMode() {
+    const service = carrierServiceSelect?.selectedOptions[0];
+    const needsAddress = deliveryType === 'DELIVERY_LOCAL' ||
+      (deliveryType === 'TRANSPORTISTA' && service?.dataset.modalidad?.endsWith('_DOMICILIO'));
+    if (form) form.hidden = !needsAddress;
+    if (savedSelectorGroup) savedSelectorGroup.hidden = !needsAddress;
+    if (carrierAgencySelect) carrierAgencySelect.closest('.checkout-form-group')?.toggleAttribute('hidden',
+      deliveryType === 'TRANSPORTISTA' && !!service?.dataset.modalidad?.endsWith('_DOMICILIO'));
+    if (destinationSummary && needsAddress) destinationSummary.textContent = addressInput?.value || 'Selecciona o indica el destino.';
+  }
 
   // ====================================================
   // ELEMENTOS - DIRECCIÓN
@@ -553,6 +605,8 @@ document.addEventListener("DOMContentLoaded", () => {
               direccion: address,
               referencia: reference,
               alias: alias,
+              latitud: latitudeInput?.value || null,
+              longitud: longitudeInput?.value || null,
             },
           );
 
@@ -591,6 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await getJSON(
         "/operaciones/api/entregas/opciones",
       );
+      originCoordinates = data.origen_delivery;
 
       deliveryOptions.innerHTML = "";
 
@@ -700,6 +755,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function selectDeliveryType(type) {
     deliveryType = type;
+    invalidateDestination();
+    refreshAddressMode();
 
     hideDeliveryPanels();
 
@@ -794,11 +851,28 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (!pickupLocations.some((p) => p.id === selectedPickupId)) {
+      selectedPickupId = (pickupLocations.find((p) => p.codigo === 'SULPAA-EL-TAMBO') || pickupLocations[0]).id;
+    }
     pickupLocations.forEach((location) => {
       const card =
         document.createElement("div");
 
       card.className = "checkout-field";
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'checkout_pickup_point';
+      radio.value = location.id;
+      radio.checked = location.id === selectedPickupId;
+      radio.setAttribute('aria-label', location.nombre);
+      const selectPoint = () => {
+        selectedPickupId = location.id;
+        destinationSummary.textContent = `${location.nombre} — ${location.direccion}`;
+        updateConfirmOrderButton();
+      };
+      radio.addEventListener('change', selectPoint);
+      card.appendChild(radio);
+      if (radio.checked) selectPoint();
 
       const label =
         document.createElement("span");
@@ -918,7 +992,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     prepareOrigin();
-    prepareSavedDestination();
+    if (!destinationCoordinates && savedAddresses.length && savedSelector) {
+      savedSelector.value = savedAddresses[0].id;
+      savedSelector.dispatchEvent(new Event('change'));
+    } else if (destinationCoordinates) {
+      setDestination(destinationCoordinates.latitude, destinationCoordinates.longitude, true);
+    }
   }
 
   // ====================================================
@@ -926,12 +1005,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // ====================================================
 
   async function prepareOrigin() {
-    originCoordinates = {
-      latitude:
-        -12.049141052234061,
-      longitude:
-        -75.22147546622413,
-    };
+    if (!originCoordinates) {
+      showMessage(mapMessage, 'No hay un origen activo para delivery.');
+      return;
+    }
 
     if (map) {
       L.marker([
@@ -1028,7 +1105,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function setDestination(
     latitude,
     longitude,
+    preserveAddress = false,
   ) {
+    invalidateDestination();
+    const version = destinationVersion;
+    if (!preserveAddress && savedSelector) savedSelector.value = '';
     destinationCoordinates = {
       latitude: Number(latitude),
       longitude: Number(longitude),
@@ -1112,6 +1193,31 @@ document.addEventListener("DOMContentLoaded", () => {
       "Ubicación seleccionada. Confírmala para calcular el delivery.",
       "success",
     );
+    if (preserveAddress) {
+      destinationSummary.textContent = addressInput.value;
+      scheduleDeliveryQuote();
+      return;
+    }
+    addressInput.value = '';
+    referenceInput.value = '';
+    destinationSummary.textContent = 'Buscando dirección del punto seleccionado…';
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`,
+      {headers: {Accept: 'application/json'}})
+      .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
+      .then((data) => {
+        if (version !== destinationVersion) return;
+        if (!data.display_name || data.error) throw new Error();
+        const a = data.address || {};
+        const concise = [a.road, a.house_number, a.suburb, a.city || a.town || a.village].filter(Boolean).join(', ');
+        addressInput.value = (concise.length >= 5 ? concise : data.display_name).slice(0, 255);
+        destinationSummary.textContent = addressInput.value;
+        showMessage(mapMessage, 'Dirección encontrada. Verifica el distrito y la referencia.', 'success');
+        scheduleDeliveryQuote();
+      }).catch(() => {
+        if (version !== destinationVersion) return;
+        destinationSummary.textContent = 'Completa la dirección del punto seleccionado.';
+        showMessage(mapMessage, 'No se pudo obtener la dirección. Escríbela y confirma el distrito para cotizar.');
+      });
   }
 
   // ====================================================
@@ -1190,6 +1296,13 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
+    const version = destinationVersion;
+
+    // --------------------------------------------------------
+    // Ruta por calles (mapa). La distancia se envía al backend;
+    // el backend valida cobertura y calcula el costo real.
+    // --------------------------------------------------------
+
     const origin =
       `${originCoordinates.longitude},` +
       `${originCoordinates.latitude}`;
@@ -1213,8 +1326,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    const data =
-      await response.json();
+    const data = await response.json();
 
     if (
       data.code !== "Ok" ||
@@ -1228,11 +1340,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const route = data.routes[0];
 
-    const distanceKm =
-      route.distance / 1000;
+    const distanceKm = Number(
+      (route.distance / 1000).toFixed(2),
+    );
 
     drawRoute(route.geometry);
 
+    const quote = await postJSON(
+      "/operaciones/api/entregas/delivery/cotizar",
+      {
+        ...destinationPayload(),
+        distancia_km: distanceKm,
+      },
+    );
+
+    if (version !== destinationVersion || deliveryType !== 'DELIVERY_LOCAL') {
+      throw new Error('El destino cambió. Confirma la nueva ubicación.');
+    }
+    deliveryQuote = quote;
+    if (quote.direccion_entrega) {
+      destinationSummary.textContent = quote.direccion_entrega;
+    }
     return distanceKm;
   }
 
@@ -1292,8 +1420,8 @@ document.addEventListener("DOMContentLoaded", () => {
           /*
            * SEGURIDAD:
            *
-           * JavaScript envía únicamente la
-           * distancia calculada.
+           * JavaScript envía el destino. La distancia por calles
+           * y la cotización provienen del backend.
            *
            * El backend vuelve a obtener:
            *
@@ -1303,14 +1431,7 @@ document.addEventListener("DOMContentLoaded", () => {
            * - tarifa vigente.
            */
 
-          const quote =
-            await postJSON(
-              "/operaciones/api/entregas/delivery/cotizar",
-              {
-                distancia_km:
-                  roundedDistance,
-              },
-            );
+          const quote = deliveryQuote;
 
           if (quoteInput) {
             quoteInput.value =
@@ -1467,6 +1588,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
               option.value = service.id;
+              option.dataset.modalidad = service.modalidad;
 
               option.textContent =
                 service.nombre;
@@ -1499,6 +1621,8 @@ document.addEventListener("DOMContentLoaded", () => {
       async () => {
         const carrierId =
           carrierSelect.value;
+        invalidateDestination();
+        refreshAddressMode();
 
         if (carrierResult) {
           carrierResult.hidden = true;
@@ -1539,6 +1663,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
               option.dataset.district =
                 agency.distrito_id;
+              option.dataset.address = agency.direccion;
 
               carrierAgencySelect.appendChild(
                 option,
@@ -1602,46 +1727,42 @@ document.addEventListener("DOMContentLoaded", () => {
         clearMessage(carrierMessage);
 
         try {
-          const quote =
-            await postJSON(
-              "/operaciones/api/entregas/transportista/cotizar",
-              {
-                transportista_id:
-                  carrierId,
+           const quote =
+             await postJSON(
+               "/operaciones/api/entregas/transportista/cotizar",
+               {
+                 ...destinationPayload(),
+                 tipo_entrega: "TRANSPORTISTA",
+                 transportista_id: carrierId,
+                 servicio_transportista_id: serviceId,
+                 distrito_destino_id: districtId,
+                 sucursal_destino_id: agencyId,
+               },
+             );
 
-                servicio_transportista_id:
-                  serviceId,
+           carrierQuote = quote;
+           const cost = Number(
+             quote.costo_entrega,
+           );
 
-                distrito_destino_id:
-                  districtId,
+           if (carrierCostElement) {
+             carrierCostElement.textContent =
+               `S/ ${cost.toFixed(2)}`;
+           }
 
-                sucursal_destino_id:
-                  agencyId,
-              },
-            );
+           if (carrierResult) {
+             carrierResult.hidden = false;
+           }
 
-          const cost = Number(
-            quote.costo_entrega,
-          );
+           updateSummary(cost);
+           updateConfirmOrderButton();
 
-          if (carrierCostElement) {
-            carrierCostElement.textContent =
-              `S/ ${cost.toFixed(2)}`;
-          }
-
-          if (carrierResult) {
-            carrierResult.hidden = false;
-          }
-
-          updateSummary(cost);
-          updateConfirmOrderButton();
-
-          showMessage(
-            carrierMessage,
-            "Envío calculado correctamente.",
-            "success",
-          );
-        } catch (error) {
+           showMessage(
+             carrierMessage,
+             "Envío calculado correctamente.",
+             "success",
+           );
+         } catch (error) {
           if (carrierResult) {
             carrierResult.hidden = true;
           }
@@ -2057,28 +2178,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (
       deliveryType === "DELIVERY_LOCAL"
     ) {
-      const distance = Number(
-        distanceInput?.value,
-      );
-
-      if (
-        !Number.isFinite(distance) ||
-        distance <= 0
-      ) {
+      if (!deliveryQuote) {
         throw new Error(
-          "Confirma la ubicación y calcula el delivery.",
+          "Primero debes cotizar el delivery con tu dirección.",
         );
       }
 
-      if (!quoteInput?.value) {
-        throw new Error(
-          "Primero debes calcular el costo del delivery.",
-        );
-      }
-
-      payload.distancia_km = distance;
-
-      return payload;
+      return {
+        ...payload,
+        ...destinationPayload(),
+        tipo_entrega: "DELIVERY_LOCAL",
+        distancia_km: deliveryQuote.distancia_km,
+        cotizacion_token: deliveryQuote.cotizacion_token,
+      };
     }
 
     // --------------------------------------------------
@@ -2138,19 +2250,22 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       }
 
-      payload.transportista_id =
-        carrierId;
+      if (!carrierQuote) {
+        throw new Error(
+          "Primero debes cotizar el envío.",
+        );
+      }
 
-      payload.servicio_transportista_id =
-        serviceId;
-
-      payload.distrito_destino_id =
-        districtId;
-
-      payload.sucursal_destino_id =
-        agencyId;
-
-      return payload;
+      return {
+        ...payload,
+        ...destinationPayload(),
+        tipo_entrega: "TRANSPORTISTA",
+        transportista_id: carrierId,
+        servicio_transportista_id: serviceId,
+        distrito_destino_id: districtId,
+        sucursal_destino_id: agencyId,
+        cotizacion_token: carrierQuote.cotizacion_token,
+      };
     }
 
     throw new Error(
@@ -2173,6 +2288,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const payload =
         buildCheckoutPayload();
+
+      console.log("CHECKOUT PAYLOAD:", payload);
 
       checkoutProcessing = true;
 
