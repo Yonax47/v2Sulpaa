@@ -1044,3 +1044,515 @@ def cancelar_pago_pedido(
     finally:
 
         conexion.close()
+
+
+# ============================================================
+# PAGO DE UN PEDIDO (LECTURA PARA SEGUIMIENTO)
+# ============================================================
+
+def obtener_pago_pedido(
+    pedido_id,
+):
+    """
+    Obtiene el pago más reciente de un pedido junto con
+    los datos legibles del método de pago.
+
+    Solo lectura para la pantalla de seguimiento:
+    no modifica ningún dato.
+    """
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id AS pago_id,
+                    p.metodo_pago_id,
+                    p.modalidad,
+                    p.monto,
+                    p.moneda,
+                    p.estado,
+                    p.referencia_externa,
+                    p.creado_en,
+                    m.codigo AS metodo_codigo,
+                    m.nombre AS metodo_nombre,
+                    m.tipo_confirmacion
+
+                FROM pagos p
+
+                INNER JOIN metodos_pago m
+                    ON m.id = p.metodo_pago_id
+
+                WHERE p.pedido_id = %s
+
+                ORDER BY p.creado_en DESC
+
+                LIMIT 1
+                """,
+                (
+                    pedido_id,
+                ),
+            )
+
+            pago = cursor.fetchone()
+
+            if not pago:
+
+                return None
+
+            return {
+                "pago_id":
+                    pago["pago_id"],
+
+                "metodo_pago_id":
+                    pago["metodo_pago_id"],
+
+                "modalidad":
+                    pago["modalidad"],
+
+                "monto":
+                    float(
+                        pago["monto"]
+                    ),
+
+                "moneda":
+                    pago["moneda"],
+
+                "estado":
+                    pago["estado"],
+
+                "referencia_externa":
+                    pago["referencia_externa"],
+
+                "creado_en":
+                    pago["creado_en"],
+
+                "metodo_codigo":
+                    pago["metodo_codigo"],
+
+                "metodo_nombre":
+                    pago["metodo_nombre"],
+
+                "tipo_confirmacion":
+                    pago["tipo_confirmacion"],
+            }
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# HISTORIAL DE PAGO (LECTURA PARA SEGUIMIENTO)
+# ============================================================
+
+def obtener_historial_pago(
+    pago_id,
+):
+    """
+    Obtiene el historial de eventos de un pago.
+
+    Solo lectura: no modifica ningún dato.
+    """
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    estado_anterior,
+                    estado_nuevo,
+                    usuario_responsable_id,
+                    observacion,
+                    creado_en
+
+                FROM pago_historial
+
+                WHERE pago_id = %s
+
+                ORDER BY creado_en ASC
+                """,
+                (
+                    pago_id,
+                ),
+            )
+
+            filas = cursor.fetchall()
+
+            return [
+                {
+                    "estado_anterior":
+                        fila["estado_anterior"],
+
+                    "estado_nuevo":
+                        fila["estado_nuevo"],
+
+                    "usuario_responsable_id":
+                        fila["usuario_responsable_id"],
+
+                    "observacion":
+                        fila["observacion"],
+
+                    "creado_en":
+                        fila["creado_en"],
+                }
+
+                for fila in filas
+            ]
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# ENTREGA DE UN PEDIDO (LECTURA PARA SEGUIMIENTO)
+# ============================================================
+
+def obtener_entrega_pedido(
+    pedido_id,
+):
+    """
+    Obtiene la entrega de un pedido con:
+
+    - cabecera de la entrega;
+    - detalles específicos de la modalidad (RECOJO_LOCAL,
+      DELIVERY_LOCAL, TRANSPORTISTA);
+    - historial de estados de la entrega.
+
+    Solo lectura: no modifica ningún dato.
+    """
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    tipo_entrega,
+                    costo_cobrado_cliente,
+                    estado,
+                    creado_en
+
+                FROM entregas
+
+                WHERE pedido_id = %s
+
+                LIMIT 1
+                """,
+                (
+                    pedido_id,
+                ),
+            )
+
+            entrega = cursor.fetchone()
+
+            if not entrega:
+
+                return None
+
+            entrega_id = entrega["id"]
+
+            tipo = str(
+                entrega["tipo_entrega"]
+            ).upper()
+
+            resultado = {
+                "id":
+                    entrega_id,
+
+                "tipo_entrega":
+                    entrega["tipo_entrega"],
+
+                "costo_cobrado_cliente":
+                    float(
+                        entrega["costo_cobrado_cliente"]
+                    ),
+
+                "estado":
+                    entrega["estado"],
+
+                "creado_en":
+                    entrega["creado_en"],
+
+                "recojo":
+                    None,
+
+                "delivery":
+                    None,
+
+                "transportista":
+                    None,
+            }
+
+            # ----------------------------------------------------
+            # RECOJO LOCAL
+            # ----------------------------------------------------
+
+            if tipo == "RECOJO_LOCAL":
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        punto_recojo_id,
+                        nombre_punto_snapshot,
+                        direccion_snapshot
+
+                    FROM entregas_recojo
+
+                    WHERE entrega_id = %s
+
+                    LIMIT 1
+                    """,
+                    (
+                        entrega_id,
+                    ),
+                )
+
+                recojo = cursor.fetchone()
+
+                if recojo:
+
+                    resultado["recojo"] = {
+                        "punto_recojo_id":
+                            recojo["punto_recojo_id"],
+
+                        "nombre_punto":
+                            recojo["nombre_punto_snapshot"],
+
+                        "direccion":
+                            recojo["direccion_snapshot"],
+                    }
+
+            # ----------------------------------------------------
+            # DELIVERY LOCAL
+            # ----------------------------------------------------
+
+            elif tipo == "DELIVERY_LOCAL":
+
+                cursor.execute(
+                    """
+                    SELECT
+                        d.distrito_id,
+                        d.nombre_receptor,
+                        d.telefono_receptor,
+                        d.direccion,
+                        d.referencia,
+                        d.latitud,
+                        d.longitud,
+                        c.distancia_km,
+                        c.costo_estimado,
+                        c.estado AS cotizacion_estado
+
+                    FROM delivery_destinos d
+
+                    LEFT JOIN cotizaciones_delivery c
+                        ON c.entrega_id = d.entrega_id
+
+                    WHERE d.entrega_id = %s
+
+                    LIMIT 1
+                    """,
+                    (
+                        entrega_id,
+                    ),
+                )
+
+                destino = cursor.fetchone()
+
+                if destino:
+
+                    resultado["delivery"] = {
+                        "distrito_id":
+                            destino["distrito_id"],
+
+                        "nombre_receptor":
+                            destino["nombre_receptor"],
+
+                        "telefono_receptor":
+                            destino["telefono_receptor"],
+
+                        "direccion":
+                            destino["direccion"],
+
+                        "referencia":
+                            destino["referencia"],
+
+                        "latitud":
+                            float(
+                                destino["latitud"]
+                            )
+                            if destino["latitud"] is not None
+                            else None,
+
+                        "longitud":
+                            float(
+                                destino["longitud"]
+                            )
+                            if destino["longitud"] is not None
+                            else None,
+
+                        "distancia_km":
+                            float(
+                                destino["distancia_km"]
+                            )
+                            if destino["distancia_km"] is not None
+                            else None,
+
+                        "costo_estimado":
+                            float(
+                                destino["costo_estimado"]
+                            )
+                            if destino["costo_estimado"] is not None
+                            else None,
+
+                        "cotizacion_estado":
+                            destino["cotizacion_estado"],
+                    }
+
+            # ----------------------------------------------------
+            # TRANSPORTISTA
+            # ----------------------------------------------------
+
+            elif tipo == "TRANSPORTISTA_ASOCIADO":
+
+                cursor.execute(
+                    """
+                    SELECT
+                        e.id,
+                        e.transportista_id,
+                        e.servicio_transportista_id,
+                        e.sucursal_destino_id,
+                        e.transportista_nombre_snapshot,
+                        e.servicio_nombre_snapshot,
+                        e.sucursal_destino_nombre_snapshot,
+                        e.direccion_destino_snapshot,
+                        e.peso_estimado_gramos,
+                        e.costo_estimado,
+                        e.costo_cobrado_cliente,
+                        e.url_seguimiento_snapshot,
+                        e.estado,
+                        c.distrito_destino_id
+
+                    FROM envios_transportista e
+
+                    LEFT JOIN cotizaciones_transportista c
+                        ON c.id = e.cotizacion_id
+
+                    WHERE e.entrega_id = %s
+
+                    LIMIT 1
+                    """,
+                    (
+                        entrega_id,
+                    ),
+                )
+
+                envio = cursor.fetchone()
+
+                if envio:
+
+                    resultado["transportista"] = {
+                        "envio_id":
+                            envio["id"],
+
+                        "transportista_id":
+                            envio["transportista_id"],
+
+                        "transportista_nombre":
+                            envio["transportista_nombre_snapshot"],
+
+                        "servicio_nombre":
+                            envio["servicio_nombre_snapshot"],
+
+                        "sucursal_destino":
+                            envio["sucursal_destino_nombre_snapshot"],
+
+                        "direccion_destino":
+                            envio["direccion_destino_snapshot"],
+
+                        "peso_estimado_gramos":
+                            envio["peso_estimado_gramos"],
+
+                        "costo_estimado":
+                            float(
+                                envio["costo_estimado"]
+                            )
+                            if envio["costo_estimado"] is not None
+                            else None,
+
+                        "url_seguimiento":
+                            envio["url_seguimiento_snapshot"],
+
+                        "estado":
+                            envio["estado"],
+
+                        "distrito_destino_id":
+                            envio["distrito_destino_id"],
+                    }
+
+            # ----------------------------------------------------
+            # HISTORIAL DE LA ENTREGA
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                SELECT
+                    estado_anterior,
+                    estado_nuevo,
+                    usuario_responsable_id,
+                    comentario,
+                    creado_en
+
+                FROM entrega_historial
+
+                WHERE entrega_id = %s
+
+                ORDER BY creado_en ASC
+                """,
+                (
+                    entrega_id,
+                ),
+            )
+
+            filas = cursor.fetchall()
+
+            resultado["historial"] = [
+                {
+                    "estado_anterior":
+                        fila["estado_anterior"],
+
+                    "estado_nuevo":
+                        fila["estado_nuevo"],
+
+                    "usuario_responsable_id":
+                        fila["usuario_responsable_id"],
+
+                    "comentario":
+                        fila["comentario"],
+
+                    "creado_en":
+                        fila["creado_en"],
+                }
+
+                for fila in filas
+            ]
+
+            return resultado
+
+    finally:
+
+        conexion.close()

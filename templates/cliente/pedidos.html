@@ -226,44 +226,12 @@ Mis pedidos | SULPAA
 
                                 <div class="order-status">
 
-                                    {% if pedido.estado == 'PENDIENTE' %}
+                                    {% if pedido.estado == 'CREADO' %}
 
                                         <span class="order-status-dot status-pending"></span>
 
                                         <span class="order-status-text status-pending-text">
-                                            Pendiente
-                                        </span>
-
-                                    {% elif pedido.estado == 'CONFIRMADO' %}
-
-                                        <span class="order-status-dot status-confirmed"></span>
-
-                                        <span class="order-status-text status-confirmed-text">
-                                            Confirmado
-                                        </span>
-
-                                    {% elif pedido.estado == 'EN_PREPARACION' %}
-
-                                        <span class="order-status-dot status-preparing"></span>
-
-                                        <span class="order-status-text status-preparing-text">
-                                            En preparación
-                                        </span>
-
-                                    {% elif pedido.estado == 'ENVIADO' %}
-
-                                        <span class="order-status-dot status-shipped"></span>
-
-                                        <span class="order-status-text status-shipped-text">
-                                            Enviado
-                                        </span>
-
-                                    {% elif pedido.estado == 'ENTREGADO' %}
-
-                                        <span class="order-status-dot status-delivered"></span>
-
-                                        <span class="order-status-text status-delivered-text">
-                                            Entregado
+                                            Registrado
                                         </span>
 
                                     {% elif pedido.estado == 'CANCELADO' %}

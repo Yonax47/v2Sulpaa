@@ -1814,3 +1814,341 @@ def obtener_variantes_snapshot(
     finally:
 
         conexion.close()
+
+
+# ============================================================
+# 19. LISTAR PEDIDOS DEL USUARIO
+# ============================================================
+#
+# Regla de seguridad:
+#
+# Estos repositorios SIEMPRE filtran por usuario_id.
+# Un pedido de otro usuario jamás debe ser devuelto.
+# ============================================================
+
+def obtener_pedidos_usuario(
+    usuario_id,
+):
+    """
+    Devuelve los pedidos del usuario autenticado,
+    del más reciente al más antiguo.
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    numero_pedido,
+                    usuario_id,
+                    origen,
+                    subtotal,
+                    descuento_total,
+                    costo_entrega,
+                    total,
+                    moneda,
+                    estado,
+                    creado_en
+
+                FROM pedidos
+
+                WHERE usuario_id = %s
+
+                ORDER BY
+                    creado_en DESC,
+                    numero_pedido DESC
+                """,
+                (
+                    usuario_id,
+                ),
+            )
+
+            filas = cursor.fetchall()
+
+            return [
+                {
+                    "id":
+                        fila["id"],
+
+                    "numero_pedido":
+                        fila["numero_pedido"],
+
+                    "estado":
+                        fila["estado"],
+
+                    "total":
+                        float(
+                            fila["total"]
+                        ),
+
+                    "moneda":
+                        fila["moneda"],
+
+                    "creado_en":
+                        fila["creado_en"],
+                }
+
+                for fila in filas
+            ]
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 20. OBTENER UN PEDIDO DEL USUARIO (VERIFICADO)
+# ============================================================
+
+def obtener_pedido_usuario(
+    usuario_id,
+    pedido_id,
+):
+    """
+    Obtiene la cabecera de un pedido únicamente si pertenece
+    al usuario autenticado.
+
+    IMPORTANTE:
+
+    El filtro por usuario_id se aplica SIEMPRE dentro del
+    mismo WHERE. Nunca se confía en un pedido_id enviado
+    desde el frontend sin verificar la propiedad.
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    numero_pedido,
+                    usuario_id,
+                    origen,
+                    subtotal,
+                    descuento_total,
+                    costo_entrega,
+                    total,
+                    moneda,
+                    estado,
+                    creado_en
+
+                FROM pedidos
+
+                WHERE
+                    id = %s
+                    AND usuario_id = %s
+
+                LIMIT 1
+                """,
+                (
+                    pedido_id,
+                    usuario_id,
+                ),
+            )
+
+            pedido = cursor.fetchone()
+
+            if not pedido:
+
+                return None
+
+            return {
+                "id":
+                    pedido["id"],
+
+                "numero_pedido":
+                    pedido["numero_pedido"],
+
+                "origen":
+                    pedido["origen"],
+
+                "subtotal":
+                    float(
+                        pedido["subtotal"]
+                    ),
+
+                "descuento_total":
+                    float(
+                        pedido["descuento_total"]
+                    ),
+
+                "costo_entrega":
+                    float(
+                        pedido["costo_entrega"]
+                    ),
+
+                "total":
+                    float(
+                        pedido["total"]
+                    ),
+
+                "moneda":
+                    pedido["moneda"],
+
+                "estado":
+                    pedido["estado"],
+
+                "creado_en":
+                    pedido["creado_en"],
+            }
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 21. DETALLES DE UN PEDIDO
+# ============================================================
+
+def obtener_detalles_pedido(
+    pedido_id,
+):
+    """
+    Obtiene las líneas de artículos de un pedido
+    (snapshot comercial de la compra).
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id AS pedido_detalle_id,
+                    articulo_venta_id,
+                    nombre_articulo,
+                    cantidad,
+                    precio_unitario,
+                    descuento_unitario,
+                    subtotal_linea
+
+                FROM pedido_detalles
+
+                WHERE pedido_id = %s
+                """,
+                (
+                    pedido_id,
+                ),
+            )
+
+            filas = cursor.fetchall()
+
+            return [
+                {
+                    "pedido_detalle_id":
+                        fila["pedido_detalle_id"],
+
+                    "nombre_articulo":
+                        fila["nombre_articulo"],
+
+                    "cantidad":
+                        int(
+                            fila["cantidad"]
+                        ),
+
+                    "precio_unitario":
+                        float(
+                            fila["precio_unitario"]
+                        ),
+
+                    "descuento_unitario":
+                        float(
+                            fila["descuento_unitario"]
+                        ),
+
+                    "subtotal_linea":
+                        float(
+                            fila["subtotal_linea"]
+                        ),
+                }
+
+                for fila in filas
+            ]
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 22. COMPOSICIONES DE UN PEDIDO
+# ============================================================
+
+def obtener_composiciones_pedido(
+    pedido_id,
+):
+    """
+    Obtiene las composiciones snapshot (variantes de packs)
+    de un pedido, agrupadas por línea de detalle.
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    c.pedido_detalle_id,
+                    c.variante_id,
+                    c.nombre_variante,
+                    c.cantidad
+
+                FROM pedido_composiciones c
+
+                INNER JOIN pedido_detalles d
+                    ON d.id = c.pedido_detalle_id
+
+                WHERE d.pedido_id = %s
+                """,
+                (
+                    pedido_id,
+                ),
+            )
+
+            filas = cursor.fetchall()
+
+            compuestas = {}
+
+            for fila in filas:
+
+                detalle_id = fila[
+                    "pedido_detalle_id"
+                ]
+
+                compuestas.setdefault(
+                    detalle_id,
+                    [],
+                ).append({
+                    "variante_id":
+                        fila["variante_id"],
+
+                    "nombre_variante":
+                        fila["nombre_variante"],
+
+                    "cantidad":
+                        int(
+                            fila["cantidad"]
+                        ),
+                })
+
+            return compuestas
+
+    finally:
+
+        conexion.close()

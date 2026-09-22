@@ -66,19 +66,11 @@ Si cambia la navegación, se modifica únicamente aquí.
 
 
             <!-- =================================================
-                 RUTAS PENDIENTES
-                 =================================================
-
-                 "Mis pedidos" todavía no tiene una ruta registrada
-                 en Flask.
-
-                 Temporalmente apunta a la tienda para evitar un
-                 BuildError. Cuando implementemos la ruta real de
-                 pedidos, cambiaremos este enlace.
+                 Mis pedidos
                  ================================================= -->
 
             <a
-                href="{{ url_for('comercio.tienda') }}"
+                href="{{ url_for('comercio.mis_pedidos') }}"
                 class="navbar-link"
             >
                 Mis pedidos
@@ -234,18 +226,10 @@ Si cambia la navegación, se modifica únicamente aquí.
             </a>
 
 
-            <!-- =================================================
-                 PEDIDOS - TEMPORAL
-                 =================================================
-
-                 La ruta comercio.mis_pedidos todavía no existe.
-
-                 Conservamos la opción visual y temporalmente
-                 apuntamos a la tienda hasta implementar el módulo.
-                 ================================================= -->
+            <!-- Mis pedidos -->
 
             <a
-                href="{{ url_for('comercio.tienda') }}"
+                href="{{ url_for('comercio.mis_pedidos') }}"
                 class="navbar-mobile-link"
             >
                 Mis pedidos

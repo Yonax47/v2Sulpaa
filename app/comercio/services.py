@@ -51,6 +51,16 @@ from app.comercio.repositories import (
     cerrar_carrito_usuario,
     obtener_variantes_snapshot,
     reabrir_carrito_usuario,
+    obtener_pedidos_usuario,
+    obtener_pedido_usuario,
+    obtener_detalles_pedido,
+    obtener_composiciones_pedido,
+)
+
+from app.operaciones.repositories import (
+    obtener_pago_pedido,
+    obtener_historial_pago,
+    obtener_entrega_pedido,
 )
 
 from app.inventario.services import (
@@ -2914,3 +2924,282 @@ def confirmar_checkout_con_entrega(
     )
 
     return resultado_checkout
+
+
+# ============================================================
+# 23. ETIQUETAS DE ESTADOS (SIN INVENTAR NUEVOS ESTADOS)
+# ============================================================
+#
+# Solo se etiquetan los estados que el sistema realmente
+# escribe hoy. Cualquier otro valor se muestra tal cual.
+# ============================================================
+
+_ETIQUETAS_ESTADO_PEDIDO = {
+    "CREADO": "Registrado",
+    "CANCELADO": "Cancelado",
+}
+
+_ETIQUETAS_ESTADO_PAGO = {
+    "PENDIENTE": "Pendiente",
+    "EN_REVISION": "En revisión",
+    "CANCELADO": "Cancelado",
+    "PAGADO": "Pagado",
+}
+
+_ETIQUETAS_ESTADO_ENTREGA = {
+    "PENDIENTE": "Pendiente",
+    "CANCELADO": "Cancelado",
+}
+
+_ETIQUETAS_MODALIDAD_PAGO = {
+    "ANTICIPADO": "Anticipado",
+    "CONTRA_ENTREGA": "Contra entrega",
+    "PAGO_EN_LOCAL": "Pago en local",
+}
+
+_ETIQUETAS_TIPO_ENTREGA = {
+    "RECOJO_LOCAL": "Punto de recojo",
+    "DELIVERY_LOCAL": "Delivery local",
+    "TRANSPORTISTA": "Transportista",
+    "TRANSPORTISTA_ASOCIADO": "Transportista",
+}
+
+
+def _etiqueta_estado(
+    estado,
+    etiquetas,
+):
+    """
+    Devuelve la etiqueta legible de un estado.
+
+    Si el estado no está en el mapa, se devuelve el valor
+    original en mayúsculas para nunca mentir al cliente.
+    """
+
+    valor = str(
+        estado or ""
+    ).strip()
+
+    if valor in etiquetas:
+
+        return etiquetas[valor]
+
+    return valor or "—"
+
+
+# ============================================================
+# 24. LISTAR PEDIDOS DEL USUARIO AUTENTICADO
+# ============================================================
+
+def listar_pedidos_usuario(
+    usuario_id,
+):
+    """
+    Devuelve los pedidos del usuario autenticado
+    para la pantalla "Mis pedidos".
+
+    Los datos llegan desde el repositorio, que SIEMPRE
+    filtra por usuario_id.
+    """
+
+    if not usuario_id:
+
+        return []
+
+    pedidos = obtener_pedidos_usuario(
+        usuario_id
+    )
+
+    for pedido in pedidos:
+
+        pedido["estado_label"] = _etiqueta_estado(
+            pedido["estado"],
+            _ETIQUETAS_ESTADO_PEDIDO,
+        )
+
+    return pedidos
+
+
+# ============================================================
+# 25. DETALLE Y SEGUIMIENTO DE UN PEDIDO
+# ============================================================
+
+def obtener_detalle_pedido_usuario(
+    usuario_id,
+    pedido_id,
+):
+    """
+    Compone el detalle profesional de un pedido del cliente.
+
+    VERIFICACIÓN DE PROPIEDAD:
+
+    La cabecera se consulta con pedido_id + usuario_id
+    dentro del mismo WHERE. Si el pedido no pertenece al
+    usuario autenticado, no se devuelve absolutamente nada
+    sobre él.
+    """
+
+    pedido = obtener_pedido_usuario(
+        pedido_id=pedido_id,
+        usuario_id=usuario_id,
+    )
+
+    if not pedido:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El pedido no existe o no pertenece a este usuario.",
+        }
+
+    # --------------------------------------------------------
+    # Líneas de artículos y sus composiciones snapshot
+    # --------------------------------------------------------
+
+    detalles = obtener_detalles_pedido(
+        pedido_id
+    )
+
+    composiciones = obtener_composiciones_pedido(
+        pedido_id
+    )
+
+    for detalle in detalles:
+
+        detalle["composicion"] = composiciones.get(
+            detalle["pedido_detalle_id"],
+            [],
+        )
+
+    pedido["detalles"] = detalles
+
+    # --------------------------------------------------------
+    # Pago y su historial
+    # --------------------------------------------------------
+
+    pago = obtener_pago_pedido(
+        pedido_id
+    )
+
+    pago_historial = (
+        obtener_historial_pago(
+            pago["pago_id"]
+        )
+        if pago
+        else []
+    )
+
+    pedido["pago"] = pago
+    pedido["pago_historial"] = pago_historial
+
+    if pago:
+
+        pago["estado_label"] = _etiqueta_estado(
+            pago["estado"],
+            _ETIQUETAS_ESTADO_PAGO,
+        )
+
+        pago["modalidad_label"] = _etiqueta_estado(
+            pago["modalidad"],
+            _ETIQUETAS_MODALIDAD_PAGO,
+        )
+
+    # --------------------------------------------------------
+    # Entrega y su historial
+    # --------------------------------------------------------
+
+    entrega = obtener_entrega_pedido(
+        pedido_id
+    )
+
+    pedido["entrega"] = entrega
+
+    if entrega:
+
+        entrega["estado_label"] = _etiqueta_estado(
+            entrega["estado"],
+            _ETIQUETAS_ESTADO_ENTREGA,
+        )
+
+        entrega["tipo_entrega_label"] = _etiqueta_estado(
+            entrega["tipo_entrega"],
+            _ETIQUETAS_TIPO_ENTREGA,
+        )
+
+        # ----------------------------------------------------
+        # Nombre legible del distrito destino (delivery)
+        # ----------------------------------------------------
+        #
+        # Import local para no aumentar el acoplamiento global
+        # con Identidad en módulos que no lo necesiten.
+        # ----------------------------------------------------
+
+        destino_delivery = entrega.get(
+            "delivery"
+        )
+
+        distrito_id = (
+            destino_delivery.get(
+                "distrito_id"
+            )
+            if destino_delivery
+            else None
+        )
+
+        if not distrito_id and entrega.get(
+            "transportista"
+        ):
+
+            distrito_id = entrega["transportista"].get(
+                "distrito_destino_id"
+            )
+
+        if distrito_id:
+
+            try:
+
+                from app.identidad.repositories import (
+                    buscar_distrito_activo,
+                )
+
+                distrito = buscar_distrito_activo(
+                    distrito_id
+                )
+
+                nombre_distrito = (
+                    distrito["nombre"]
+                    if distrito
+                    else None
+                )
+
+                if destino_delivery:
+
+                    destino_delivery["distrito_nombre"] = (
+                        nombre_distrito
+                    )
+
+                if entrega.get(
+                    "transportista"
+                ):
+
+                    entrega["transportista"][
+                        "distrito_destino_nombre"
+                    ] = nombre_distrito
+
+            except Exception:
+
+                pass
+
+    # --------------------------------------------------------
+    # Etiqueta del estado del pedido
+    # --------------------------------------------------------
+
+    pedido["estado_label"] = _etiqueta_estado(
+        pedido["estado"],
+        _ETIQUETAS_ESTADO_PEDIDO,
+    )
+
+    return {
+        "ok": True,
+        "pedido": pedido,
+    }

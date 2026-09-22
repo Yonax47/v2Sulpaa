@@ -12,6 +12,7 @@ from flask import (
     request,
     jsonify,
     session,
+    abort,
 )
 
 from app.shared.decorators import (
@@ -27,6 +28,8 @@ from app.comercio.services import (
     actualizar_item_carrito,
     eliminar_item_carrito,
     confirmar_checkout_con_entrega,
+    listar_pedidos_usuario,
+    obtener_detalle_pedido_usuario,
 )
 
 from app.identidad.services import (
@@ -609,3 +612,67 @@ def api_confirmar_checkout():
     return jsonify(
         resultado
     ), 400
+
+
+# ============================================================
+# 10. MIS PEDIDOS
+# ============================================================
+
+@comercio_bp.route(
+    "/pedidos",
+    methods=["GET"],
+)
+@login_required
+def mis_pedidos():
+    """
+    Muestra el historial de pedidos del usuario autenticado.
+
+    El repositorio filtra SIEMPRE por el usuario de la sesión:
+    nunca se devuelven pedidos de otros usuarios.
+    """
+
+    pedidos = listar_pedidos_usuario(
+        session["usuario_id"]
+    )
+
+    return render_template(
+        "cliente/pedidos.html",
+        pedidos=pedidos,
+    )
+
+
+# ============================================================
+# 11. DETALLE DE PEDIDO
+# ============================================================
+
+@comercio_bp.route(
+    "/pedidos/<pedido_id>",
+    methods=["GET"],
+)
+@login_required
+def detalle_pedido(pedido_id):
+    """
+    Muestra el detalle y seguimiento de un pedido del cliente.
+
+    La verificación de propiedad se realiza dentro del servicio:
+    el pedido se consulta con pedido_id + usuario_id en el
+    mismo WHERE. Si no pertenece al usuario, se responde 404.
+    """
+
+    resultado = obtener_detalle_pedido_usuario(
+        usuario_id=session[
+            "usuario_id"
+        ],
+        pedido_id=pedido_id,
+    )
+
+    if not resultado.get(
+        "ok"
+    ):
+
+        abort(404)
+
+    return render_template(
+        "cliente/detalle_pedido.html",
+        pedido=resultado["pedido"],
+    )
