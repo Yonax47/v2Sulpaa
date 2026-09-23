@@ -1,0 +1,66 @@
+<!-- Navegación compartida del panel. Los permisos reales siguen en backend;
+     esta representación solo evita ofrecer enlaces que terminarían en 403. -->
+<aside class="admin-sidebar" aria-label="Navegación administrativa">
+    <div class="admin-brand">
+        <img
+            src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+            alt="SULPAA"
+            class="admin-brand-logo"
+        >
+        <div>
+            <span class="admin-brand-area">Administración</span>
+            <span class="admin-brand-subtitle">Control general</span>
+        </div>
+    </div>
+
+    <nav class="admin-nav">
+        <span class="admin-nav-heading">Principal</span>
+        {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
+            <a
+                href="{{ url_for('admin.dashboard') }}"
+                class="admin-nav-link{% if admin_activo == 'dashboard' %} is-active{% endif %}"
+                {% if admin_activo == 'dashboard' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">▦</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('admin.dashboard') }}#indicadores" class="admin-nav-link">
+                <span class="admin-nav-icon" aria-hidden="true">↗</span>
+                <span>Indicadores KPI</span>
+            </a>
+        {% else %}
+            <span class="admin-nav-link is-disabled" aria-disabled="true">
+                <span class="admin-nav-icon" aria-hidden="true">▦</span>
+                <span>Dashboard</span>
+            </span>
+        {% endif %}
+
+        <span class="admin-nav-heading">Operación</span>
+        <a
+            href="{{ url_for('admin_pedidos.listado') }}"
+            class="admin-nav-link{% if admin_activo == 'pedidos' %} is-active{% endif %}"
+            {% if admin_activo == 'pedidos' %}aria-current="page"{% endif %}
+        >
+            <span class="admin-nav-icon" aria-hidden="true">□</span>
+            <span>Pedidos</span>
+        </a>
+        {% for modulo in ["Inventario", "Entregas", "Reportes"] %}
+            <span class="admin-nav-link is-disabled" aria-disabled="true">
+                <span class="admin-nav-icon" aria-hidden="true">•</span>
+                <span>{{ modulo }}</span>
+                <small>Próximamente</small>
+            </span>
+        {% endfor %}
+    </nav>
+
+    <div class="admin-sidebar-footer">
+        <span>Sesión activa</span>
+        <strong>{{ session.get("correo", "") }}</strong>
+        <div class="admin-session-actions">
+            <a href="{{ url_for('inicio') }}" class="admin-return-link">Volver al sitio</a>
+            <form method="POST" action="{{ url_for('identidad.logout') }}" class="admin-logout-form">
+                <button type="submit" class="admin-logout-button">Cerrar sesión</button>
+            </form>
+        </div>
+    </div>
+</aside>

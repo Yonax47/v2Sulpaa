@@ -32,6 +32,7 @@ from app.identidad.repositories import (
     buscar_distrito_activo,
     guardar_datos_facturacion,
     listar_direcciones_usuario,
+    listar_roles_usuario,
 )
 
 from app.shared.validators import (
@@ -384,6 +385,47 @@ def autenticar_usuario(
             "correo": usuario["correo"],
         },
     }
+# ============================================================
+# ROLES DEL USUARIO (para el panel administrativo)
+# ============================================================
+#
+# Tras autenticarse correctamente, el login consulta los
+# roles ACTIVOS del usuario y los guarda en session["roles"].
+#
+# Esta función es la capa de negocios de esa operación:
+# - Recibe el usuario_id autenticado.
+# - Delega EN SOLO LECTURA en listar_roles_usuario()
+#   (el repository que hace el INNER JOIN real sobre
+#   usuario_roles -> roles del dump de identidad).
+# - Devuelve los códigos de rol ACTIVOS (ej. ["GERENTE"]).
+#
+# IMPORTANTE:
+# - No inventa roles.
+# - No asigna GERENTE/ADMINISTRADOR automáticamente.
+# - No crea ni modifica tablas (es de solo lectura).
+# ============================================================
+
+def obtener_roles_usuario(
+    usuario_id: str,
+):
+    """
+    Devuelve los códigos de rol ACTIVOS de un usuario.
+
+    Es el puente entre la capa de rutas (que necesita poblar
+    session["roles"] tras el login) y la capa de datos.
+
+    Parece repetir el nombre de listar_roles_usuario() a
+    propósito: así mantenemos la convención del resto del
+    módulo (services.realizar_X -> repositories.buscar_X),
+    separando el "qué" (negocio) del "cómo" (SQL).
+
+    Returns:
+        list[str]: Códigos de rol ACTIVOS (ej. ["GERENTE"]).
+    """
+
+    return listar_roles_usuario(
+        usuario_id
+    )
 # ============================================================
 # DATOS PARA CHECKOUT
 # ============================================================

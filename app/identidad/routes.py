@@ -45,6 +45,7 @@ from app.identidad.services import (
     validar_dni_con_perfil,
     validar_ruc_facturacion,
     registrar_facturacion_checkout,
+    obtener_roles_usuario,
 )
 
 
@@ -273,6 +274,26 @@ def login():
 
 
             # ------------------------------------------------
+            # Roles administrativos (Etapa 1)
+            # ------------------------------------------------
+            #
+            # Tras autenticar, consultamos los roles ACTIVOS
+            # REALES del usuario (usuario_roles JOIN roles,
+            # dominio identidad) y los guardamos en sesión.
+            #
+            # El decorador @admin_required lee session["roles"]
+            # para permitir sólo GERENTE/ADMINISTRADOR.
+            #
+            # NO inventamos roles ni asignamos GERENTE de forma
+            # automática: esto sale de la BD en SOLO LECTURA.
+            # ------------------------------------------------
+
+            session["roles"] = obtener_roles_usuario(
+                usuario["id"]
+            )
+
+
+            # ------------------------------------------------
             # Duración de sesión
             # ------------------------------------------------
             #
@@ -297,6 +318,30 @@ def login():
                 "Bienvenido a SULPAA.",
                 "success",
             )
+
+            # ------------------------------------------------
+            # Destino posterior al inicio de sesión
+            # ------------------------------------------------
+            #
+            # Los roles administrativos ingresan directamente
+            # al panel protegido. Los demás usuarios conservan
+            # el flujo normal del cliente hacia Inicio.
+            #
+            # La decisión usa los códigos ACTIVOS recuperados de
+            # la BD; no asigna privilegios ni hardcodea una URL.
+            # ------------------------------------------------
+
+            roles_administrativos = {
+                "GERENTE",
+                "ADMINISTRADOR",
+            }
+
+            if roles_administrativos.intersection(
+                session["roles"]
+            ):
+                return redirect(
+                    url_for("admin.dashboard")
+                )
 
             return redirect(
                 url_for("inicio")

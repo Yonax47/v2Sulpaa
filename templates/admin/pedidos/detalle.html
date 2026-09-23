@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}{{ pedido.numero_pedido }} | Administración SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "pedidos" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label>
+            <strong>Detalle de pedido</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+        <div class="admin-content">
+            <a href="{{ url_for('admin_pedidos.listado') }}" class="admin-back-link">← Volver a pedidos</a>
+            <header class="admin-page-header admin-order-detail-header">
+                <div>
+                    <span class="admin-eyebrow">Pedido real</span>
+                    <h1>{{ pedido.numero_pedido }}</h1>
+                    <p>Registrado {{ pedido.creado_en.strftime('%d/%m/%Y a las %H:%M') if pedido.creado_en else "sin fecha disponible" }}.</p>
+                </div>
+                <span class="admin-state is-{{ pedido.estado|lower }} is-large">{{ pedido.estado_label }}</span>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% if pedido.acciones %}
+                <section class="admin-action-panel" aria-labelledby="acciones-titulo">
+                    <div>
+                        <span class="admin-section-kicker">Siguiente paso permitido</span>
+                        <h2 id="acciones-titulo">Acciones del pedido</h2>
+                        <p>La operación volverá a validar rol, pago, entrega y estado dentro de MySQL.</p>
+                    </div>
+                    {% for accion in pedido.acciones %}
+                        {% if accion.codigo == "CONFIRMAR" %}
+                            <form method="POST" action="{{ url_for('admin_pedidos.confirmar', pedido_id=pedido.id) }}" onsubmit="return confirm('¿Confirmar este pedido? La acción quedará registrada en el historial.');">
+                                <button type="submit" class="admin-button is-primary">{{ accion.etiqueta }}</button>
+                            </form>
+                        {% elif accion.codigo == "INICIAR_PREPARACION" %}
+                            <form method="POST" action="{{ url_for('admin_pedidos.preparar', pedido_id=pedido.id) }}" onsubmit="return confirm('¿Iniciar la preparación? El pedido y la entrega cambiarán de forma atómica.');">
+                                <button type="submit" class="admin-button is-primary">{{ accion.etiqueta }}</button>
+                            </form>
+                        {% endif %}
+                    {% endfor %}
+                </section>
+            {% endif %}
+
+            <div class="admin-detail-grid">
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Datos del pedido</span><h2>Resumen</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Número</dt><dd>{{ pedido.numero_pedido }}</dd></div>
+                        <div><dt>Origen</dt><dd>{{ pedido.origen }}</dd></div>
+                        <div><dt>Subtotal</dt><dd>S/ {{ "%.2f"|format(pedido.subtotal|float) }}</dd></div>
+                        <div><dt>Entrega</dt><dd>S/ {{ "%.2f"|format(pedido.costo_entrega|float) }}</dd></div>
+                        <div class="is-total"><dt>Total</dt><dd>S/ {{ "%.2f"|format(pedido.total|float) }}</dd></div>
+                    </dl>
+                </section>
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Cliente</span><h2>Contacto necesario</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Nombre</dt><dd>{{ pedido.cliente_nombre or "Sin perfil" }}</dd></div>
+                        <div><dt>Correo</dt><dd>{{ pedido.cliente_correo }}</dd></div>
+                        <div><dt>Teléfono</dt><dd>{{ pedido.cliente_telefono or "No registrado" }}</dd></div>
+                    </dl>
+                </section>
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Pago</span><h2>{{ pedido.pago_metodo_nombre or "Sin pago registrado" }}</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Modalidad</dt><dd>{{ (pedido.pago_modalidad or "No registrada")|replace('_', ' ')|title }}</dd></div>
+                        <div><dt>Estado</dt><dd><span class="admin-state is-{{ (pedido.pago_estado or 'sin-registro')|lower }}">{{ pedido.pago_estado_label }}</span></dd></div>
+                        <div><dt>Importe</dt><dd>{% if pedido.pago_monto is not none %}S/ {{ "%.2f"|format(pedido.pago_monto|float) }}{% else %}No registrado{% endif %}</dd></div>
+                        <div><dt>Referencia</dt><dd>{{ pedido.pago_referencia or "No disponible" }}</dd></div>
+                    </dl>
+                </section>
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Entrega</span><h2>{{ pedido.tipo_entrega_label }}</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Estado</dt><dd><span class="admin-state is-{{ (pedido.entrega_estado or 'sin-registro')|lower }}">{{ pedido.entrega_estado_label }}</span></dd></div>
+                        {% if pedido.entrega_detalle %}
+                            {% for clave, valor in pedido.entrega_detalle.items() %}
+                                {% if valor %}<div><dt>{{ clave|replace('_', ' ')|title }}</dt><dd>{{ valor }}</dd></div>{% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </dl>
+                </section>
+            </div>
+
+            <section class="admin-detail-card admin-detail-wide">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Snapshot comercial</span><h2>Productos</h2></div>
+                </div>
+                {% if pedido.productos %}
+                    <div class="admin-product-list">
+                        {% for producto in pedido.productos %}
+                            <article class="admin-product-row">
+                                <div>
+                                    <strong>{{ producto.nombre_articulo }}</strong>
+                                    <span>{{ producto.cantidad }} × S/ {{ "%.2f"|format(producto.precio_unitario|float) }}</span>
+                                    {% if producto.composicion %}
+                                        <small>{% for item in producto.composicion %}{{ item.cantidad }} × {{ item.nombre_variante }}{% if not loop.last %} · {% endif %}{% endfor %}</small>
+                                    {% endif %}
+                                </div>
+                                <strong>S/ {{ "%.2f"|format(producto.subtotal_linea|float) }}</strong>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}<p class="admin-muted">No existen líneas de producto registradas.</p>{% endif %}
+            </section>
+
+            <section class="admin-detail-card admin-detail-wide">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Evidencia comercial</span><h2>Historial del pedido</h2></div>
+                </div>
+                {% if pedido.historial %}
+                    <ol class="admin-history-list">
+                        {% for evento in pedido.historial %}
+                            <li>
+                                <span class="admin-history-dot" aria-hidden="true"></span>
+                                <div>
+                                    <strong>{% if evento.estado_anterior_label %}{{ evento.estado_anterior_label }} → {% endif %}{{ evento.estado_nuevo_label }}</strong>
+                                    <span>{{ evento.creado_en.strftime('%d/%m/%Y %H:%M') if evento.creado_en else "Sin fecha" }} · {{ evento.origen }}</span>
+                                    <p>{{ evento.comentario or "Sin comentario" }}</p>
+                                    <small>Actor: {{ evento.actor_nombre or evento.actor_correo or "Sistema / regularización" }}</small>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}<p class="admin-muted">Este pedido todavía no cuenta con evidencia histórica.</p>{% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

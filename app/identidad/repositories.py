@@ -46,6 +46,100 @@ def buscar_usuario_por_correo(correo: str):
         conexion.close()
 
 
+# ============================================================
+# ROLES DEL USUARIO
+# ============================================================
+#
+# Para el Panel Administrativo (Etapa 1) necesitamos saber
+# qué roles tiene asignado un usuario autenticado.
+#
+# Las tablas REALES (dump identidad) son:
+#
+#     usuario_roles
+#         - id
+#         - usuario_id      (FK -> usuarios.id)
+#         - rol_id          (FK -> roles.id)
+#         - estado          ('ACTIVO' / 'INACTIVO')
+#
+#     roles
+#         - id
+#         - codigo          ('GERENTE', 'ADMINISTRADOR',
+#                            'INVENTARIO',
+#                            'PEDIDOS_LOGISTICA',
+#                            'REPARTIDOR')
+#         - estado          ('ACTIVO' / 'INACTIVO')
+#
+# Hacemos INNER JOIN entre ambas tablas y devolvemos
+# SOLO los roles ACTIVOS del usuario.
+#
+# Esta es una consulta de SOLO LECTURA: no modifica
+# las tablas, solo las consulta para poblar session["roles"].
+# ============================================================
+
+
+def listar_roles_usuario(
+    usuario_id: str,
+):
+    """
+    Lista los códigos de rol ACTIVOS de un usuario.
+
+    Consulta las tablas reales `usuario_roles` y `roles`
+    (dominio identidad) haciendo INNER JOIN por rol_id.
+
+    Devuelve únicamente los roles en estado 'ACTIVO',
+    tanto a nivel del vínculo (usuario_roles.estado)
+    como a nivel del rol (roles.estado).
+
+    En la Etapa 1 se usa tras la autenticación para
+    poblar session["roles"]: así el decorador
+    admin_required sabe si el usuario es GERENTE
+    o ADMINISTRADOR (los únicos con acceso al panel).
+
+    Returns:
+        list[str]: Códigos de rol activos (ej. ["GERENTE"]).
+    """
+
+    conexion = conexion_identidad()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    r.codigo
+
+                FROM usuario_roles AS ur
+
+                INNER JOIN roles AS r
+                    ON r.id = ur.rol_id
+
+                WHERE
+                    ur.usuario_id = %s
+                    AND ur.estado = 'ACTIVO'
+                    AND r.estado = 'ACTIVO'
+
+                ORDER BY
+                    r.codigo ASC
+                """,
+                (
+                    usuario_id,
+                ),
+            )
+
+            filas = cursor.fetchall()
+
+            return [
+                fila["codigo"]
+                for fila in filas
+            ]
+
+    finally:
+
+        conexion.close()
+
+
 def buscar_perfil_por_dni(dni: str):
     """
     Busca un perfil por DNI.

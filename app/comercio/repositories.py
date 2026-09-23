@@ -1364,6 +1364,29 @@ def crear_pedido(
                 ),
             )
 
+            # El evento base comparte transacción con la cabecera. De este
+            # modo nunca puede existir un pedido nuevo CREADO sin su evidencia
+            # comercial inicial, ni un historial que apunte a una creación
+            # revertida por MySQL.
+            cursor.execute(
+                """
+                INSERT INTO pedido_historial (
+                    pedido_id,
+                    estado_anterior,
+                    estado_nuevo,
+                    cambiado_por_usuario_id,
+                    origen,
+                    comentario
+                )
+                VALUES (%s, NULL, 'CREADO', %s, 'CLIENTE', %s)
+                """,
+                (
+                    pedido_id,
+                    usuario_id,
+                    "Pedido recibido desde checkout.",
+                ),
+            )
+
             # ----------------------------------------------------
             # 4. Crear detalles
             # ----------------------------------------------------
@@ -1562,13 +1585,16 @@ def crear_pedido(
 def actualizar_estado_pedido(
     pedido_id,
     estado,
+    usuario_id=None,
+    comentario=None,
 ):
     """
-    Permite actualizar el estado comercial del pedido.
+    Permite compensar el estado comercial del pedido con trazabilidad.
 
     Se utilizará principalmente como mecanismo de compensación
-    cuando una operación posterior de Inventario u Operaciones
-    no pueda completarse.
+    cuando una operación posterior de Inventario u Operaciones no pueda
+    completarse. No expone la cancelación administrativa de fases futuras;
+    únicamente conserva la consistencia del checkout ya existente.
     """
 
     if not pedido_id:
@@ -1589,6 +1615,24 @@ def actualizar_estado_pedido(
 
             cursor.execute(
                 """
+                SELECT estado
+                FROM pedidos
+                WHERE id = %s
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (pedido_id,),
+            )
+            pedido = cursor.fetchone()
+
+            if not pedido or pedido["estado"] == estado:
+                conexion.rollback()
+                return False
+
+            estado_anterior = pedido["estado"]
+
+            cursor.execute(
+                """
                 UPDATE pedidos
 
                 SET estado = %s
@@ -1604,6 +1648,30 @@ def actualizar_estado_pedido(
             actualizado = (
                 cursor.rowcount > 0
             )
+
+            if actualizado:
+                cursor.execute(
+                    """
+                    INSERT INTO pedido_historial (
+                        pedido_id,
+                        estado_anterior,
+                        estado_nuevo,
+                        cambiado_por_usuario_id,
+                        origen,
+                        comentario
+                    )
+                    VALUES (%s, %s, %s, %s, 'SISTEMA', %s)
+                    """,
+                    (
+                        pedido_id,
+                        estado_anterior,
+                        estado,
+                        usuario_id,
+                        comentario or (
+                            "Estado actualizado por compensación del checkout."
+                        ),
+                    ),
+                )
 
             conexion.commit()
 
@@ -2151,4 +2219,37 @@ def obtener_composiciones_pedido(
 
     finally:
 
+        conexion.close()
+
+
+# ============================================================
+# 23. HISTORIAL COMERCIAL DEL PEDIDO
+# ============================================================
+
+def obtener_historial_pedido(pedido_id):
+    """Devuelve eventos comerciales reales en orden cronológico.
+
+    La vista cliente construye su timeline exclusivamente desde estas filas;
+    no infiere pasos intermedios a partir del estado actual del pedido.
+    """
+    conexion = conexion_comercio()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    estado_anterior,
+                    estado_nuevo,
+                    origen,
+                    comentario,
+                    creado_en
+                FROM pedido_historial
+                WHERE pedido_id = %s
+                ORDER BY creado_en ASC, id ASC
+                """,
+                (pedido_id,),
+            )
+            return cursor.fetchall()
+    finally:
         conexion.close()

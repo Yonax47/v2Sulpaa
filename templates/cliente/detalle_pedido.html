@@ -200,31 +200,10 @@
 
                 <div class="order-status">
 
-                    {% if pedido.estado == 'CREADO' %}
-
-                        <span class="order-status-dot status-pending"></span>
-
-                        <span class="order-status-text status-pending-text">
-                            Registrado
-                        </span>
-
-                    {% elif pedido.estado == 'CANCELADO' %}
-
-                        <span class="order-status-dot status-cancelled"></span>
-
-                        <span class="order-status-text status-cancelled-text">
-                            Cancelado
-                        </span>
-
-                    {% else %}
-
-                        <span class="order-status-dot status-default"></span>
-
-                        <span class="order-status-text">
-                            {{ pedido.estado }}
-                        </span>
-
-                    {% endif %}
+                    <span class="order-status-dot status-{{ pedido.estado_clase }}"></span>
+                    <span class="order-status-text status-{{ pedido.estado_clase }}-text">
+                        {{ pedido.estado_label }}
+                    </span>
 
                 </div>
 
@@ -831,7 +810,7 @@
          7. HISTORIAL DE ESTADOS
          ====================================================== -->
 
-    {% if (pedido.entrega and pedido.entrega.historial) or pedido.pago_historial %}
+    {% if pedido.historial or (pedido.entrega and pedido.entrega.historial) or pedido.pago_historial %}
 
     <section class="orders-list">
 
@@ -856,6 +835,30 @@
 
 
             <div class="order-detail-summary">
+
+                <!-- Este timeline no deriva pasos del estado actual. Cada
+                     elemento corresponde a una fila de pedido_historial. -->
+                {% if pedido.historial %}
+
+                <article class="order-detail-panel">
+                    <h3>Pedido</h3>
+                    <div class="order-timeline">
+                        {% for evento in pedido.historial %}
+                            <div class="order-timeline-step">
+                                <span class="order-status-dot status-{{ evento.estado_clase }} order-timeline-dot"></span>
+                                <div class="order-timeline-content">
+                                    <strong>{{ evento.etiqueta }}</strong>
+                                    <span>
+                                        {% if evento.creado_en %}{{ evento.creado_en.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                                        {% if evento.comentario %} · {{ evento.comentario }}{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                {% endif %}
 
                 {% if pedido.pago_historial %}
 

@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Panel administrativo | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/pages/admin.css') }}"
+    >
+{% endblock %}
+
+{% block content %}
+
+    <!-- ========================================================
+         PANEL ADMINISTRATIVO
+         ========================================================
+         La vista presenta únicamente datos calculados por la capa
+         Service. El template no inventa cifras ni decide si un KPI
+         cumple su meta; solo representa el estado recibido.
+         ======================================================== -->
+
+    <input
+        type="checkbox"
+        id="admin-menu-control"
+        class="admin-menu-control"
+        aria-hidden="true"
+    >
+
+    <div class="admin-layout">
+
+        <!-- ====================================================
+             SIDEBAR ADMINISTRATIVA
+             ====================================================
+             En escritorio permanece visible. En tablet y móvil
+             funciona como panel lateral mediante el control CSS.
+             Las secciones sin ruta real se muestran deshabilitadas.
+             ==================================================== -->
+
+        <aside class="admin-sidebar" aria-label="Navegación administrativa">
+
+            <div class="admin-brand">
+                <img
+                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                    alt="SULPAA"
+                    class="admin-brand-logo"
+                >
+                <div>
+                    <span class="admin-brand-area">Administración</span>
+                    <span class="admin-brand-subtitle">Control general</span>
+                </div>
+            </div>
+
+            <nav class="admin-nav">
+                <span class="admin-nav-heading">Principal</span>
+
+                <a
+                    href="{{ url_for('admin.dashboard') }}"
+                    class="admin-nav-link is-active"
+                    aria-current="page"
+                >
+                    <span class="admin-nav-icon" aria-hidden="true">▦</span>
+                    <span>Dashboard</span>
+                </a>
+
+                <a href="#indicadores" class="admin-nav-link">
+                    <span class="admin-nav-icon" aria-hidden="true">↗</span>
+                    <span>Indicadores KPI</span>
+                </a>
+
+                <span class="admin-nav-heading">Operación</span>
+
+                <a href="{{ url_for('admin_pedidos.listado') }}" class="admin-nav-link">
+                    <span class="admin-nav-icon" aria-hidden="true">□</span>
+                    <span>Pedidos</span>
+                </a>
+
+                {% for modulo in ["Inventario", "Entregas", "Reportes"] %}
+                    <span
+                        class="admin-nav-link is-disabled"
+                        aria-disabled="true"
+                    >
+                        <span class="admin-nav-icon" aria-hidden="true">•</span>
+                        <span>{{ modulo }}</span>
+                        <small>Próximamente</small>
+                    </span>
+                {% endfor %}
+            </nav>
+
+            <div class="admin-sidebar-footer">
+                <span>Sesión activa</span>
+                <strong>{{ session.get("correo", "") }}</strong>
+
+                <!-- ============================================
+                     ACCIONES DE SESIÓN ADMINISTRATIVA
+                     ============================================
+                     El cierre reutiliza el endpoint POST existente
+                     de Identidad. Esa ruta ejecuta session.clear(),
+                     por lo que no duplicamos lógica de seguridad.
+                     ============================================ -->
+                <div class="admin-session-actions">
+                    <a
+                        href="{{ url_for('inicio') }}"
+                        class="admin-return-link"
+                    >
+                        Volver al sitio
+                    </a>
+
+                    <form
+                        method="POST"
+                        action="{{ url_for('identidad.logout') }}"
+                        class="admin-logout-form"
+                    >
+                        <button type="submit" class="admin-logout-button">
+                            Cerrar sesión
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </aside>
+
+        <label
+            for="admin-menu-control"
+            class="admin-sidebar-backdrop"
+            aria-label="Cerrar menú administrativo"
+        ></label>
+
+        <main class="admin-main">
+
+            <!-- Barra móvil: mantiene el menú fuera del contenido
+                 hasta que el usuario lo solicita. -->
+            <div class="admin-mobile-bar">
+                <label
+                    for="admin-menu-control"
+                    class="admin-menu-button"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Abrir menú administrativo"
+                >
+                    <span aria-hidden="true">☰</span>
+                </label>
+                <strong>Panel administrativo</strong>
+                <span class="admin-mobile-spacer" aria-hidden="true"></span>
+            </div>
+
+            <div class="admin-content">
+
+                <header class="admin-page-header">
+                    <div>
+                        <span class="admin-eyebrow">SULPAA · Etapa 1</span>
+                        <h1>Panel administrativo</h1>
+                        <p>
+                            Resumen general de los indicadores funcionales
+                            con evidencia disponible en el sistema.
+                        </p>
+                    </div>
+
+                    <div class="admin-live-status">
+                        <span class="admin-live-dot" aria-hidden="true"></span>
+                        Datos actuales de BD
+                    </div>
+                </header>
+
+                <!-- ================================================
+                     RESUMEN DE INDICADORES FUNCIONALES
+                     ================================================
+                     Todos los totales provienen de resumen_dashboard().
+                     Se calculan exclusivamente sobre KPI-01 a KPI-10.
+                     ================================================ -->
+
+                <section class="admin-summary" aria-labelledby="resumen-titulo">
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Vista general</span>
+                            <h2 id="resumen-titulo">Resumen de indicadores</h2>
+                        </div>
+                        <span class="admin-section-note">KPI funcionales · RF-01 a RF-10</span>
+                    </div>
+
+                    <div class="admin-summary-grid">
+                        {% set tarjetas_resumen = [
+                            ("KPI funcionales", resumen.total, "neutral"),
+                            ("Instrumentados", resumen.instrumentados, "info"),
+                            ("Pendientes", resumen.pendientes, "warning"),
+                            ("Cumplen meta", resumen.cumplen, "success"),
+                            ("No cumplen", resumen.no_cumplen, "danger")
+                        ] %}
+
+                        {% for etiqueta, valor, tono in tarjetas_resumen %}
+                            <article class="admin-summary-card is-{{ tono }}">
+                                <span>{{ etiqueta }}</span>
+                                <strong>{{ valor }}</strong>
+                                <small>de {{ resumen.total }} indicadores</small>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <!-- ================================================
+                     KPI-01 A KPI-10
+                     ================================================
+                     KPI-01 y KPI-04 reciben valores reales. Los demás
+                     permanecen pendientes hasta contar con evidencia.
+                     ================================================ -->
+
+                <section
+                    id="indicadores"
+                    class="admin-indicators"
+                    aria-labelledby="indicadores-titulo"
+                >
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Seguimiento funcional</span>
+                            <h2 id="indicadores-titulo">Indicadores KPI</h2>
+                        </div>
+                        <span class="admin-section-note">
+                            Actualizados al consultar esta página
+                        </span>
+                    </div>
+
+                    <div class="admin-kpi-grid">
+                        {% for kpi in kpis %}
+                            <article class="admin-kpi-card is-{{ kpi.estado }}">
+                                <header class="admin-kpi-header">
+                                    <div>
+                                        <span class="admin-kpi-code">{{ kpi.codigo }}</span>
+                                        <span class="admin-kpi-rf">{{ kpi.clasificacion }}</span>
+                                    </div>
+
+                                    {% if kpi.estado == "cumple" %}
+                                        <span class="admin-badge is-success">Cumple</span>
+                                    {% elif kpi.estado == "no_cumple" %}
+                                        <span class="admin-badge is-danger">No cumple</span>
+                                    {% else %}
+                                        <span class="admin-badge is-pending">Pendiente</span>
+                                    {% endif %}
+                                </header>
+
+                                <h3>{{ kpi.nombre }}</h3>
+
+                                <div class="admin-kpi-value">
+                                    <span>Valor actual</span>
+                                    {% if kpi.valor is not none %}
+                                        <strong>{{ "%.2f"|format(kpi.valor) }} %</strong>
+                                    {% else %}
+                                        <strong class="is-pending-value">
+                                            Pendiente de instrumentación
+                                        </strong>
+                                    {% endif %}
+                                </div>
+
+                                <div class="admin-kpi-meta-row">
+                                    <span>Meta</span>
+                                    <strong>{{ kpi.meta }}</strong>
+                                </div>
+
+                                <footer class="admin-kpi-source">
+                                    <span>Fuente</span>
+                                    <p>{{ kpi.fuente }}</p>
+                                </footer>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <footer class="admin-data-note">
+                    <strong>Panel de solo lectura.</strong>
+                    KPI-04 se calcula con datos reales. KPI-01 y los demás
+                    indicadores permanecen pendientes hasta contar con una
+                    fuente inequívoca para su definición oficial.
+                </footer>
+
+            </div>
+
+        </main>
+
+    </div>
+
+{% endblock %}

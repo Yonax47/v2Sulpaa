@@ -55,7 +55,10 @@ from app.comercio.repositories import (
     obtener_pedido_usuario,
     obtener_detalles_pedido,
     obtener_composiciones_pedido,
+    obtener_historial_pedido,
 )
+
+from app.comercio.pedido_states import etiqueta_estado_pedido
 
 from app.operaciones.repositories import (
     obtener_pago_pedido,
@@ -2616,6 +2619,10 @@ def confirmar_checkout(
                 actualizar_estado_pedido(
                     pedido_id,
                     "CANCELADO",
+                    usuario_id=usuario_id,
+                    comentario=(
+                        "Pedido cancelado automáticamente por error durante checkout."
+                    ),
                 )
 
             except Exception:
@@ -2935,7 +2942,10 @@ def confirmar_checkout_con_entrega(
 # ============================================================
 
 _ETIQUETAS_ESTADO_PEDIDO = {
-    "CREADO": "Registrado",
+    "CREADO": "Pedido recibido",
+    "CONFIRMADO": "Pedido confirmado",
+    "EN_PREPARACION": "En preparación",
+    "COMPLETADO": "Completado",
     "CANCELADO": "Cancelado",
 }
 
@@ -2948,7 +2958,14 @@ _ETIQUETAS_ESTADO_PAGO = {
 
 _ETIQUETAS_ESTADO_ENTREGA = {
     "PENDIENTE": "Pendiente",
+    "EN_PREPARACION": "En preparación",
+    "LISTO": "Listo",
+    "PROGRAMADO": "Programado",
+    "EN_TRANSITO": "En tránsito",
+    "LISTO_PARA_RECOJO": "Listo para recojo",
+    "ENTREGADO": "Entregado",
     "CANCELADO": "Cancelado",
+    "INCIDENCIA": "Incidencia",
 }
 
 _ETIQUETAS_MODALIDAD_PAGO = {
@@ -2962,6 +2979,14 @@ _ETIQUETAS_TIPO_ENTREGA = {
     "DELIVERY_LOCAL": "Delivery local",
     "TRANSPORTISTA": "Transportista",
     "TRANSPORTISTA_ASOCIADO": "Transportista",
+}
+
+_CLASES_ESTADO_PEDIDO = {
+    "CREADO": "pending",
+    "CONFIRMADO": "confirmed",
+    "EN_PREPARACION": "preparing",
+    "COMPLETADO": "delivered",
+    "CANCELADO": "cancelled",
 }
 
 
@@ -3015,6 +3040,9 @@ def listar_pedidos_usuario(
         pedido["estado_label"] = _etiqueta_estado(
             pedido["estado"],
             _ETIQUETAS_ESTADO_PEDIDO,
+        )
+        pedido["estado_clase"] = _CLASES_ESTADO_PEDIDO.get(
+            pedido["estado"], "default"
         )
 
     return pedidos
@@ -3072,6 +3100,16 @@ def obtener_detalle_pedido_usuario(
         )
 
     pedido["detalles"] = detalles
+
+    # El timeline comercial se obtiene de pedido_historial. Cada etiqueta se
+    # proyecta para el cliente sin cambiar los códigos canónicos persistidos.
+    historial_pedido = obtener_historial_pedido(pedido_id)
+    for evento in historial_pedido:
+        evento["etiqueta"] = etiqueta_estado_pedido(evento["estado_nuevo"])
+        evento["estado_clase"] = _CLASES_ESTADO_PEDIDO.get(
+            evento["estado_nuevo"], "default"
+        )
+    pedido["historial"] = historial_pedido
 
     # --------------------------------------------------------
     # Pago y su historial
@@ -3197,6 +3235,9 @@ def obtener_detalle_pedido_usuario(
     pedido["estado_label"] = _etiqueta_estado(
         pedido["estado"],
         _ETIQUETAS_ESTADO_PEDIDO,
+    )
+    pedido["estado_clase"] = _CLASES_ESTADO_PEDIDO.get(
+        pedido["estado"], "default"
     )
 
     return {

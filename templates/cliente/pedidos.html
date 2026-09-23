@@ -226,31 +226,12 @@ Mis pedidos | SULPAA
 
                                 <div class="order-status">
 
-                                    {% if pedido.estado == 'CREADO' %}
-
-                                        <span class="order-status-dot status-pending"></span>
-
-                                        <span class="order-status-text status-pending-text">
-                                            Registrado
-                                        </span>
-
-                                    {% elif pedido.estado == 'CANCELADO' %}
-
-                                        <span class="order-status-dot status-cancelled"></span>
-
-                                        <span class="order-status-text status-cancelled-text">
-                                            Cancelado
-                                        </span>
-
-                                    {% else %}
-
-                                        <span class="order-status-dot status-default"></span>
-
-                                        <span class="order-status-text">
-                                            {{ pedido.estado }}
-                                        </span>
-
-                                    {% endif %}
+                                    <!-- La clase y etiqueta ya fueron proyectadas
+                                         por Service desde el estado canónico. -->
+                                    <span class="order-status-dot status-{{ pedido.estado_clase }}"></span>
+                                    <span class="order-status-text status-{{ pedido.estado_clase }}-text">
+                                        {{ pedido.estado_label }}
+                                    </span>
 
                                 </div>
 

@@ -50,6 +50,9 @@ load_dotenv()
 from app.identidad.routes import identidad_bp
 from app.comercio.routes import comercio_bp
 from app.operaciones.routes import operaciones_bp
+from app.admin.routes import admin_bp
+from app.admin.pedidos.routes import admin_pedidos_bp
+from app.admin.pedidos.commands import registrar_comandos_pedidos
 
 
 # ============================================================
@@ -188,6 +191,32 @@ def create_app():
     app.register_blueprint(
         operaciones_bp
     )
+
+
+    # ========================================================
+    # ADMINISTRACIÓN (Etapa 1)
+    # ========================================================
+    #
+    # /admin          -> redirige a /admin/dashboard.
+    # /admin/dashboard -> panel con los KPI instrumentados.
+    #
+    # NOTA: se registra SIN url_prefix porque las rutas del
+    # blueprint ya traen "/admin" en su propio path (patrón
+    # real del resto de dominios: comercio usa /tienda en su
+    # route, no en register_blueprint).
+    # ========================================================
+
+    app.register_blueprint(
+        admin_bp
+    )
+
+    app.register_blueprint(
+        admin_pedidos_bp
+    )
+
+    # El backfill queda disponible como comando Flask repetible y verificable;
+    # no se deja SQL manual aislado que pueda ejecutarse sin sus controles.
+    registrar_comandos_pedidos(app)
 
 
     # ========================================================

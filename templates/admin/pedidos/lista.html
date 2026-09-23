@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Pedidos administrativos | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "pedidos" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Pedidos</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Operación comercial</span>
+                    <h1>Pedidos</h1>
+                    <p>Consulta y procesa pedidos con información vigente de Comercio y Operaciones.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ pedidos|length }} resultados
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Los filtros viajan como parámetros; Service valida fechas y estado
+                 antes de que Repository componga la consulta parametrizada. -->
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de pedidos">
+                <label class="admin-filter-field admin-filter-search">
+                    <span>Buscar</span>
+                    <input type="search" name="q" value="{{ filtros.q }}" placeholder="Pedido, cliente o correo">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        {% for valor, etiqueta in [("CREADO", "Pedido recibido"), ("CONFIRMADO", "Confirmado"), ("EN_PREPARACION", "En preparación"), ("COMPLETADO", "Completado"), ("CANCELADO", "Cancelado")] %}
+                            <option value="{{ valor }}"{% if filtros.estado == valor %} selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Desde</span>
+                    <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Hasta</span>
+                    <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}">
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar filtros</button>
+                    <a href="{{ url_for('admin_pedidos.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if pedidos %}
+                <section class="admin-order-table-card" aria-labelledby="pedidos-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Datos actuales</span>
+                            <h2 id="pedidos-titulo">Listado de pedidos</h2>
+                        </div>
+                    </div>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th><th>Cliente</th><th>Fecha</th><th>Total</th>
+                                    <th>Pedido</th><th>Pago</th><th>Entrega</th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pedido in pedidos %}
+                                    <tr>
+                                        <td data-label="Pedido"><strong>{{ pedido.numero_pedido }}</strong></td>
+                                        <td data-label="Cliente">
+                                            <strong>{{ pedido.cliente_nombre or "Sin perfil" }}</strong>
+                                            <small>{{ pedido.cliente_correo }}</small>
+                                        </td>
+                                        <td data-label="Fecha">{{ pedido.creado_en.strftime('%d/%m/%Y %H:%M') if pedido.creado_en else "—" }}</td>
+                                        <td data-label="Total"><strong>S/ {{ "%.2f"|format(pedido.total|float) }}</strong></td>
+                                        <td data-label="Estado pedido"><span class="admin-state is-{{ pedido.estado|lower }}">{{ pedido.estado_label }}</span></td>
+                                        <td data-label="Pago">
+                                            <span class="admin-state is-{{ (pedido.pago_estado or 'sin-registro')|lower }}">{{ pedido.pago_estado_label }}</span>
+                                            <small>{{ pedido.pago_metodo or "Sin método" }}</small>
+                                        </td>
+                                        <td data-label="Entrega">
+                                            <span class="admin-state is-{{ (pedido.entrega_estado or 'sin-registro')|lower }}">{{ pedido.entrega_estado_label }}</span>
+                                            <small>{{ pedido.tipo_entrega_label }}</small>
+                                        </td>
+                                        <td class="admin-order-action">
+                                            <a href="{{ url_for('admin_pedidos.detalle', pedido_id=pedido.id) }}" class="admin-table-link">Ver detalle</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% else %}
+                <section class="admin-empty-state">
+                    <span aria-hidden="true">□</span>
+                    <h2>No se encontraron pedidos</h2>
+                    <p>Ajusta los filtros o espera el registro de una compra real.</p>
+                </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

@@ -76,6 +76,38 @@ Si cambia la navegación, se modifica únicamente aquí.
                 Mis pedidos
             </a>
 
+
+            <!-- =================================================
+                 PANEL ADMINISTRATIVO (Etapa 1)
+                 =================================================
+                 Enlace visible SOLO para usuarios cuyo
+                 session["roles"] contenga GERENTE o
+                 ADMINISTRADOR o PEDIDOS_LOGISTICA.
+
+                 IMPORTANTE sobre la seguridad:
+                 - El condicional Jinja solo oculta el ENLACE visual.
+                 - La protección REAL está en el backend:
+                   la ruta /admin/dashboard exige
+                   @login_required + @admin_required, que
+                   devuelve 403 si un cliente normal intenta
+                   entrar aunque CACHEE esta URL.
+                 ================================================= -->
+
+            {% if
+                "GERENTE" in (session.get("roles") or [])
+                or "ADMINISTRADOR" in (session.get("roles") or [])
+                or "PEDIDOS_LOGISTICA" in (session.get("roles") or [])
+            %}
+
+                <a
+                    href="{{ url_for('admin.dashboard') if ('GERENTE' in (session.get('roles') or []) or 'ADMINISTRADOR' in (session.get('roles') or [])) else url_for('admin_pedidos.listado') }}"
+                    class="navbar-link"
+                >
+                    Panel administrativo
+                </a>
+
+            {% endif %}
+
             <a
                 href="#"
                 class="navbar-link"
@@ -234,6 +266,35 @@ Si cambia la navegación, se modifica únicamente aquí.
             >
                 Mis pedidos
             </a>
+
+
+            <!-- =================================================
+                 PANEL ADMINISTRATIVO - MÓVIL
+                 =================================================
+                 Mismo condicional que el escritorio: visible
+                 SOLO si session["roles"] contiene GERENTE o
+                 ADMINISTRADOR o PEDIDOS_LOGISTICA.
+
+                 La seguridad REAL no depende de este enlace:
+                 @login_required + @admin_required en el backend
+                 responden 403 si un cliente normal intenta
+                 entrar aunque NO vea este enlace.
+                 ================================================= -->
+
+            {% if
+                "GERENTE" in (session.get("roles") or [])
+                or "ADMINISTRADOR" in (session.get("roles") or [])
+                or "PEDIDOS_LOGISTICA" in (session.get("roles") or [])
+            %}
+
+                <a
+                    href="{{ url_for('admin.dashboard') if ('GERENTE' in (session.get('roles') or []) or 'ADMINISTRADOR' in (session.get('roles') or [])) else url_for('admin_pedidos.listado') }}"
+                    class="navbar-mobile-link"
+                >
+                    Panel administrativo
+                </a>
+
+            {% endif %}
 
 
             <!-- Suscripciones -->
