@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Contenido | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "contenido" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Contenido</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Experiencia "Aprende"</span>
+                    <h1>Contenido educativo</h1>
+                    <p>Administra las secciones, sabores y procesos que el cliente explora en la experiencia Aprende.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ contenidos|length }} contenidos
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="admin-action-panel" style="border-left-color: var(--sulpaa-green-700)">
+                <div>
+                    <h2>Crear nuevo contenido</h2>
+                    <p>Un borrador queda oculto al público; publícalo cuando esté listo.</p>
+                </div>
+                <form method="GET" action="{{ url_for('admin_contenido.nuevo') }}">
+                    <button type="submit" class="admin-button is-primary">+ Nuevo contenido</button>
+                </form>
+            </div>
+
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de contenido">
+                <label class="admin-filter-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        <option value="BORRADOR"{% if estado == "BORRADOR" %} selected{% endif %}>Borradores</option>
+                        <option value="PUBLICADO"{% if estado == "PUBLICADO" %} selected{% endif %}>Publicados</option>
+                    </select>
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar filtros</button>
+                    <a href="{{ url_for('admin_contenido.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if contenidos %}
+                <section class="admin-order-table-card" aria-labelledby="contenido-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Administrable</span>
+                            <h2 id="contenido-titulo">Contenidos registrados</h2>
+                        </div>
+                    </div>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Título</th><th>Tipo</th><th>Estado</th>
+                                    <th>Fuentes</th><th>Variantes</th><th>Publicado</th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contenido in contenidos %}
+                                    <tr>
+                                        <td data-label="Título">
+                                            <strong>{{ contenido.titulo }}</strong>
+                                            <small>{{ contenido.slug }}</small>
+                                        </td>
+                                        <td data-label="Tipo"><span>{{ contenido.tipo_label }}</span></td>
+                                        <td data-label="Estado">
+                                            {% if contenido.estado == "PUBLICADO" %}
+                                                <span class="admin-state is-completado">Publicado</span>
+                                            {% else %}
+                                                <span class="admin-state is-creado">Borrador</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Fuentes"><span>{{ contenido.total_fuentes }}</span></td>
+                                        <td data-label="Variantes"><span>{{ contenido.total_variantes }}</span></td>
+                                        <td data-label="Publicado">
+                                            <span>{{ contenido.publicado_en or "—" }}</span>
+                                        </td>
+                                        <td data-label="">
+                                            <a href="{{ url_for('admin_contenido.detalle', contenido_id=contenido.contenido_id) }}" class="admin-table-link">Editar</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% else %}
+                <div class="admin-empty-state">
+                    <span aria-hidden="true">◉</span>
+                    <h2>Sin contenido</h2>
+                    <p>Crea el primer contenido educativo para la experiencia Aprende.</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

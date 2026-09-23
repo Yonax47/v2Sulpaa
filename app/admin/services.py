@@ -23,11 +23,15 @@ NO se inventan valores.
 """
 
 from app.admin.repositories import (
+    obtener_metrica_accesos_contenido,
+    obtener_metrica_consultas_producto,
+    obtener_metrica_favoritos,
     obtener_metrica_historial_pedidos,
     obtener_metrica_pedidos_procesados,
     obtener_metrica_consistencia_estados,
     obtener_metrica_programacion_entregas,
     obtener_metrica_satisfaccion,
+    obtener_metrica_verificaciones_fisicas,
 )
 
 
@@ -169,6 +173,122 @@ def resumen_dashboard():
             * 100
         )
 
+
+    # ========================================================
+    # KPI-02 — EXACTITUD DE INVENTARIO (Bloque 3)
+    # ========================================================
+    #
+    # Fórmula (condición de autorización Bloque 3):
+    #
+    #     verificaciones donde coincide = 1
+    #     --------------------------------- × 100
+    #     total de verificaciones físicas
+    #
+    # Base real: inventario.verificaciones_fisicas. Sin
+    # evidencia registrada aún, se conserva "Pendiente".
+    # ========================================================
+
+    metrica_verificaciones = obtener_metrica_verificaciones_fisicas()
+    kpi_02_valor = None
+    if (
+        metrica_verificaciones.get("disponible")
+        and (metrica_verificaciones["total_verificaciones"] or 0) > 0
+    ):
+        kpi_02_valor = (
+            (
+                metrica_verificaciones["verificaciones_ok"]
+                / metrica_verificaciones["total_verificaciones"]
+            )
+            * 100
+        )
+
+
+    # ========================================================
+    # KPI-03 — ACCESO A INFORMACIÓN DE PRODUCTO (Bloque 3)
+    # ========================================================
+    #
+    # Fórmula (condición de autorización Bloque 3):
+    #
+    #     consultas EXITO
+    #     ---------------- × 100
+    #     total de consultas
+    #
+    # Base real: comercio.consultas_producto (solo intentos
+    # funcionales del cliente, nunca assets ni navegación).
+    # ========================================================
+
+    metrica_consultas = obtener_metrica_consultas_producto()
+    kpi_03_valor = None
+    if (
+        metrica_consultas.get("disponible")
+        and (metrica_consultas["total_consultas"] or 0) > 0
+    ):
+        kpi_03_valor = (
+            (
+                metrica_consultas["consultas_exitosas"]
+                / metrica_consultas["total_consultas"]
+            )
+            * 100
+        )
+
+
+    # ========================================================
+    # KPI-06 — ARTÍCULOS FAVORITOS DEL CLIENTE (Bloque 3)
+    # ========================================================
+    #
+    # Fórmula (condición de autorización Bloque 3):
+    #
+    #      operaciones de favoritos EXITOSAS
+    #     --------------------------------- × 100
+    #     total de operaciones de favoritos
+    #
+    # Base real: comercio.favoritos_auditoria (append-only).
+    # Cada agregar/quitar real deja su resultado EXITO/FALLO.
+    # ========================================================
+
+    metrica_favoritos = obtener_metrica_favoritos()
+    kpi_06_valor = None
+    if (
+        metrica_favoritos.get("disponible")
+        and (metrica_favoritos["total_favoritos_ops"] or 0) > 0
+    ):
+        kpi_06_valor = (
+            (
+                metrica_favoritos["favoritos_exitosos"]
+                / metrica_favoritos["total_favoritos_ops"]
+            )
+            * 100
+        )
+
+
+    # ========================================================
+    # KPI-10 — DISPONIBILIDAD DEL CONTENIDO EDUCATIVO (Bloque 3)
+    # ========================================================
+    #
+    # Fórmula (condición de autorización Bloque 3):
+    #
+    #     accesos EXITO
+    #     -------------- × 100
+    #     total de accesos
+    #
+    # Base real: comercio.accesos_contenido (evidencia real de
+    # cada consulta a la experiencia "Aprende").
+    # ========================================================
+
+    metrica_accesos = obtener_metrica_accesos_contenido()
+    kpi_10_valor = None
+    if (
+        metrica_accesos.get("disponible")
+        and (metrica_accesos["total_accesos"] or 0) > 0
+    ):
+        kpi_10_valor = (
+            (
+                metrica_accesos["accesos_exitosos"]
+                / metrica_accesos["total_accesos"]
+            )
+            * 100
+        )
+
     kpis = [
             {
                 "codigo": "KPI-01",
@@ -184,18 +304,18 @@ def resumen_dashboard():
                 "nombre": "Exactitud de inventario",
                 "clasificacion": "RF-02",
                 "meta": "≥98%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "inventario (conteo f\u00edsico)",
+                "valor": kpi_02_valor,
+                "estado": "pendiente" if kpi_02_valor is None else "ok",
+                "fuente": "inventario.verificaciones_fisicas",
             },
             {
                 "codigo": "KPI-03",
                 "nombre": "Acceso a informaci\u00f3n de producto",
                 "clasificacion": "RF-03",
                 "meta": "≥95%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "comercio (cat\u00e1logo/b\u00fasqueda)",
+                "valor": kpi_03_valor,
+                "estado": "pendiente" if kpi_03_valor is None else "ok",
+                "fuente": "comercio.consultas_producto",
             },
             {
                 "codigo": "KPI-04",
@@ -220,9 +340,9 @@ def resumen_dashboard():
                 "nombre": "Art\u00edculos favoritos del cliente",
                 "clasificacion": "RF-06",
                 "meta": "≥95%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "comercio (favoritos/lista deseos)",
+                "valor": kpi_06_valor,
+                "estado": "pendiente" if kpi_06_valor is None else "ok",
+                "fuente": "comercio.favoritos_auditoria",
             },
             {
                 "codigo": "KPI-07",
@@ -256,9 +376,9 @@ def resumen_dashboard():
                 "nombre": "Contenido educativo",
                 "clasificacion": "RF-10",
                 "meta": "≥95%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "comercio (contenido/secciones)",
+                "valor": kpi_10_valor,
+                "estado": "pendiente" if kpi_10_valor is None else "ok",
+                "fuente": "comercio.accesos_contenido",
             },
             {
                 "codigo": "KPI-11",
@@ -347,9 +467,13 @@ def resumen_dashboard():
     kpis_funcionales = kpis[:10]
     metas_porcentuales = {
         "KPI-01": 95.0,
+        "KPI-02": 98.0,
+        "KPI-03": 95.0,
         "KPI-04": 98.0,
+        "KPI-06": 95.0,
         "KPI-07": 98.0,
         "KPI-08": 95.0,
+        "KPI-10": 95.0,
     }
 
     for kpi in kpis_funcionales:

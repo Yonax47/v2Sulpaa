@@ -25,6 +25,7 @@ def esquemas_sulpaa():
         "comercio": _nombre_esquema("DB_COMERCIO"),
         "operaciones": _nombre_esquema("DB_OPERACIONES"),
         "identidad": _nombre_esquema("DB_IDENTIDAD"),
+        "inventario": _nombre_esquema("DB_INVENTARIO"),
     }
 
 

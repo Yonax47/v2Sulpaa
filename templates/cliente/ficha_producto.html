@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+{{ producto.nombre_comercial }} | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/store.css') }}"
+>
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/store-ficha.css') }}"
+>
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="store-page ficha-page">
+
+
+    <nav class="ficha-breadcrumb container" aria-label="Ruta">
+        <a href="{{ url_for('comercio.tienda') }}">Tienda</a>
+        <span aria-hidden="true">/</span>
+        <span>{{ producto.nombre_comercial }}</span>
+    </nav>
+
+
+    <section class="ficha-hero container">
+
+        <div class="ficha-visual" aria-hidden="true">
+
+            <span class="ficha-orbit"></span>
+
+            <img
+                src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
+                alt=""
+                class="ficha-bottle"
+            >
+
+            <span class="ficha-float ficha-float-one">●</span>
+            <span class="ficha-float ficha-float-two">✦</span>
+
+        </div>
+
+
+        <div class="ficha-info">
+
+            <span class="store-kicker">SULPAA · {{ producto.sabor }}</span>
+
+            <h1>{{ producto.nombre_comercial }}</h1>
+
+            <p class="ficha-profile">
+                {{ producto.sabor }} · {{ producto.presentacion }}
+                {% if producto.peso_gramos %}
+                    · {{ producto.peso_gramos }} g
+                {% endif %}
+            </p>
+
+            <p class="ficha-description">
+                Kombucha SULPAA en su perfil de sabor
+                <strong>{{ producto.sabor }}</strong>, presentación
+                <strong>{{ producto.presentacion }}</strong>.
+                Disfrútala fría, directa de la botella.
+            </p>
+
+            <div class="ficha-price-row">
+
+                <strong class="ficha-price">
+                    {% if producto.precio is not none %}
+                        S/ {{ "%.2f"|format(producto.precio) }}
+                        <small>{{ producto.moneda }}</small>
+                    {% else %}
+                        —
+                    {% endif %}
+                </strong>
+
+                <span class="ficha-stock">
+                    {% if producto.disponible %}
+                        <i class="ficha-stock-ok" aria-hidden="true">●</i>
+                        {{ producto.stock_disponible }} disponibles
+                    {% else %}
+                        <i class="ficha-stock-no" aria-hidden="true">●</i>
+                        Agotado por ahora
+                    {% endif %}
+                </span>
+
+            </div>
+
+            <div class="ficha-actions">
+
+                {% if producto.articulo_venta_id %}
+                    <button
+                        type="button"
+                        class="store-btn store-btn-primary"
+                        onclick="agregarProducto('{{ producto.articulo_venta_id }}')"
+                    >
+                        Agregar al carrito
+                    </button>
+                {% endif %}
+
+                <button
+                    type="button"
+                    class="ficha-favorite-button"
+                    id="ficha-favorite"
+                    data-variante-id="{{ producto.variante_id }}"
+                    aria-label="Agregar a favoritos"
+                >
+                    <span aria-hidden="true">♡</span>
+                    <small>Guardar</small>
+                </button>
+
+            </div>
+
+            <a href="{{ url_for('aprende.portada') }}" class="ficha-learn-link">
+                Aprende más sobre la kombucha SULPAA →
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <section class="ficha-cards container">
+
+        <article class="ficha-card">
+            <span aria-hidden="true">✿</span>
+            <h3>Fermentación natural</h3>
+            <p>Cada botella conserva su carácter vivo y equilibrado.</p>
+        </article>
+
+        <article class="ficha-card">
+            <span aria-hidden="true">❄</span>
+            <h3>Mejor fría</h3>
+            <p>Disponla bien fría y agítala antes de destapar.</p>
+        </article>
+
+        <article class="ficha-card">
+            <span aria-hidden="true">↻</span>
+            <h3>Reciclable</h3>
+            <p>Botellas y empaques pensados para reutilizar.</p>
+        </article>
+
+    </section>
+
+
+</main>
+
+
+<script>
+    window.agregarProducto = async function (articuloVentaId) {
+
+        try {
+
+            const respuesta = await fetch(
+                "{{ url_for('comercio.agregar_carrito') }}",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "articulo_venta_id": articuloVentaId,
+                        "cantidad": 1,
+                    }),
+                }
+            );
+
+            const datos = await respuesta.json();
+
+            if (datos.ok) {
+
+                alert("Producto agregado al carrito.");
+                window.location.href = "{{ url_for('comercio.tienda') }}";
+
+            } else {
+
+                alert(datos.mensaje || "No se pudo agregar el producto.");
+
+            }
+
+        } catch (error) {
+
+            alert("Ocurrió un error de conexión. Inténtalo de nuevo.");
+
+        }
+
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+
+        const boton = document.getElementById("ficha-favorite");
+
+        if (!boton) return;
+
+        boton.addEventListener("click", async () => {
+
+            boton.disabled = true;
+
+            try {
+
+                const respuesta = await fetch(
+                    "{{ url_for('comercio.api_agregar_favorito') }}",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            "variante_id": boton.dataset.varianteId,
+                        }),
+                    }
+                );
+
+                const datos = await respuesta.json();
+
+                if (datos.ok) {
+
+                    boton.classList.add("is-active");
+                    boton.querySelector("span").textContent = "♥";
+
+                } else {
+
+                    alert(datos.mensaje || "No se pudo guardar.");
+
+                }
+
+            } catch (error) {
+
+                alert("Ocurrió un error de conexión. Inténtalo de nuevo.");
+
+            } finally {
+
+                boton.disabled = false;
+
+            }
+
+        });
+
+    });
+</script>
+
+{% endblock %}

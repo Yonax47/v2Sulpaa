@@ -30,6 +30,10 @@ from app.comercio.services import (
     confirmar_checkout_con_entrega,
     listar_pedidos_usuario,
     obtener_detalle_pedido_usuario,
+    listar_favoritos_del_usuario,
+    agregar_variante_a_favoritos,
+    quitar_variante_de_favoritos,
+    obtener_ficha_producto,
 )
 
 from app.identidad.services import (
@@ -675,4 +679,138 @@ def detalle_pedido(pedido_id):
     return render_template(
         "cliente/detalle_pedido.html",
         pedido=resultado["pedido"],
+    )
+
+
+# ============================================================
+# 12. MIS FAVORITOS
+# ============================================================
+
+@comercio_bp.route(
+    "/favoritos",
+    methods=["GET"],
+)
+@login_required
+def mis_favoritos():
+    """
+    Muestra los artículos favoritos del usuario autenticado.
+
+    La consulta filtra SIEMPRE en el backend por el usuario
+    de la sesión: nunca se muestran favoritos de otro usuario.
+    """
+
+    favoritos = listar_favoritos_del_usuario(
+        session["usuario_id"]
+    )
+
+    return render_template(
+        "cliente/favoritos.html",
+        favoritos=favoritos,
+    )
+
+
+# ============================================================
+# 13. API — AGREGAR FAVORITO
+# ============================================================
+
+@comercio_bp.route(
+    "/api/favoritos/agregar",
+    methods=["POST"],
+)
+@login_required
+def api_agregar_favorito():
+    """
+    Agrega una variante a favoritos (auditoría KPI-06).
+
+    Se recibe el variante_id (UUID) desde el frontend; el
+    backend valida que la variante exista y esté ACTIVA.
+    """
+
+    datos = request.get_json(silent=True) or {}
+
+    variante_id = datos.get("variante_id")
+
+    if not variante_id:
+
+        return jsonify({
+            "ok": False,
+            "mensaje":
+                "No se recibió la variante.",
+        }), 400
+
+    resultado = agregar_variante_a_favoritos(
+        usuario_id=session["usuario_id"],
+        variante_id=variante_id,
+    )
+
+    return jsonify(
+        resultado
+    ), (200 if resultado["ok"] else 400)
+
+
+# ============================================================
+# 14. API — QUITAR FAVORITO
+# ============================================================
+
+@comercio_bp.route(
+    "/api/favoritos/quitar",
+    methods=["POST"],
+)
+@login_required
+def api_quitar_favorito():
+    """
+    Quita una variante de favoritos (auditoría KPI-06).
+    """
+
+    datos = request.get_json(silent=True) or {}
+
+    variante_id = datos.get("variante_id")
+
+    if not variante_id:
+
+        return jsonify({
+            "ok": False,
+            "mensaje":
+                "No se recibió la variante.",
+        }), 400
+
+    resultado = quitar_variante_de_favoritos(
+        usuario_id=session["usuario_id"],
+        variante_id=variante_id,
+    )
+
+    return jsonify(
+        resultado
+    ), (200 if resultado["ok"] else 400)
+
+
+# ============================================================
+# 15. FICHA DE PRODUCTO (KPI-03)
+# ============================================================
+
+@comercio_bp.route(
+    "/producto/<sku>",
+    methods=["GET"],
+)
+@login_required
+def ficha_producto(sku):
+    """
+    Ficha pública de un producto por SKU.
+
+    Se registra el intento real en consultas_producto
+    (EXITO si existe, FALLO si no), base del KPI-03.
+    """
+
+    ficha = obtener_ficha_producto(
+        sku,
+        usuario_id=session.get("usuario_id"),
+    )
+
+    if not ficha:
+
+        abort(404)
+
+    return render_template(
+        "cliente/ficha_producto.html",
+        producto=ficha,
     )

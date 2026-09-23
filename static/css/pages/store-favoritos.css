@@ -1,0 +1,234 @@
+/* ============================================================
+   M I S   F A V O R I T O S   ·   SULPAA V2
+   ============================================================ */
+
+.fav-page {
+    background: #fdfaf5;
+    min-height: 70vh;
+}
+
+.container {
+    width: min(1180px, 92%);
+    margin-inline: auto;
+}
+
+/* ---------- HERO ---------- */
+
+.fav-hero {
+    padding: clamp(2.5rem, 6vw, 4rem) 0 1.6rem;
+    text-align: center;
+    background:
+        radial-gradient(circle at 78% 20%, rgba(255, 200, 92, .18), transparent 36%),
+        linear-gradient(165deg, #f7efe3 0%, #fdfaf5 60%);
+}
+
+.fav-hero h1 {
+    font-size: clamp(1.9rem, 4vw, 2.8rem);
+    color: #24402e;
+    margin: .9rem 0 .6rem;
+}
+
+.fav-hero p {
+    max-width: 560px;
+    margin-inline: auto;
+    color: #5e7367;
+    line-height: 1.7;
+}
+
+/* ---------- GRID ---------- */
+
+.fav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.4rem;
+    padding: 2.2rem 0 4rem;
+}
+
+.fav-card {
+    background: #fff;
+    border: 1px solid #ece7dc;
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform .22s ease, box-shadow .22s ease;
+}
+
+.fav-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, .09);
+}
+
+.fav-card.is-agotado {
+    opacity: .82;
+}
+
+.fav-card-visual {
+    position: relative;
+    height: 170px;
+    display: grid;
+    place-items: center;
+    background:
+        radial-gradient(circle at 50% 55%, #eaf4ec 0%, transparent 62%);
+    overflow: hidden;
+}
+
+.fav-orbit {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    border: 1px dashed rgba(63, 125, 85, .35);
+    animation: fav-girar 16s linear infinite;
+}
+
+@keyframes fav-girar {
+    to { transform: rotate(360deg); }
+}
+
+.fav-bottle {
+    position: relative;
+    width: 86px;
+    filter: drop-shadow(0 12px 14px rgba(63, 125, 85, .25));
+}
+
+.fav-card-body {
+    padding: 1.15rem 1.2rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    flex: 1;
+}
+
+.fav-sku {
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #9db0a3;
+}
+
+.fav-card-body h2 {
+    color: #24402e;
+    font-size: 1.18rem;
+    line-height: 1.25;
+}
+
+.fav-profile {
+    color: #78917f;
+    font-size: .88rem;
+}
+
+.fav-stock {
+    margin-top: .15rem;
+}
+
+.fav-stock-ok,
+.fav-stock-no {
+    font-size: .8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.fav-stock-ok {
+    color: #2f7d4d;
+}
+
+.fav-stock-ok i {
+    color: #2f7d4d;
+    font-size: .55rem;
+}
+
+.fav-stock-ok small {
+    color: #9db0a3;
+    font-weight: 500;
+}
+
+.fav-stock-no {
+    color: #a05757;
+}
+
+.fav-stock-no i {
+    color: #c06d6d;
+    font-size: .55rem;
+}
+
+.fav-footer {
+    margin-top: auto;
+    padding-top: .8rem;
+    border-top: 1px dashed #ece7dc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .8rem;
+    flex-wrap: wrap;
+}
+
+.fav-price {
+    font-size: 1.25rem;
+    color: #2d4034;
+}
+
+.fav-actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.fav-btn-buy {
+    padding: .6rem 1rem;
+    font-size: .85rem;
+}
+
+.fav-btn-remove {
+    padding: .6rem 1rem;
+    font-size: .85rem;
+    border-color: #e7cfcf;
+    color: #a05757;
+    background: #fff;
+}
+
+.fav-btn-remove:hover {
+    background: #fbeeee;
+}
+
+/* ---------- ESTADO VACÍO ---------- */
+
+.fav-empty {
+    text-align: center;
+    padding: 4rem 1rem 5rem;
+}
+
+.fav-empty > span {
+    display: grid;
+    place-items: center;
+    width: 84px;
+    height: 84px;
+    margin: 0 auto 1.2rem;
+    border-radius: 50%;
+    background: #f3e8e6;
+    color: #c98b91;
+    font-size: 2.2rem;
+}
+
+.fav-empty h2 {
+    color: #24402e;
+    margin-bottom: .5rem;
+}
+
+.fav-empty p {
+    color: #7b8f82;
+    margin-bottom: 1.5rem;
+}
+
+/* ---------- RESPONSIVO ---------- */
+
+@media (max-width: 560px) {
+
+    .fav-grid {
+        grid-template-columns: 1fr;
+    }
+
+}

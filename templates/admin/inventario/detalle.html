@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Existencia | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "inventario" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Existencia</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <a href="{{ url_for('admin_inventario.listado') }}" class="admin-back-link">← Volver al inventario</a>
+
+            <header class="admin-page-header admin-order-detail-header">
+                <div>
+                    <span class="admin-eyebrow">Existencia · {{ existencia.almacen_codigo }}</span>
+                    <h1>{{ existencia.nombre_comercial or "Producto sin catalogar" }}</h1>
+                    <p>
+                        {{ existencia.sabor }} · {{ existencia.presentacion }}
+                        {% if existencia.sku %} · {{ existencia.sku }}{% endif %}
+                    </p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ existencia.stock_disponible }} disponibles
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="admin-detail-grid" aria-label="Estados de stock">
+                <article class="admin-detail-card">
+                    <h2>Stock actual</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Stock físico</dt><dd>{{ existencia.stock_fisico }}</dd></div>
+                        <div><dt>Stock reservado</dt><dd>{{ existencia.stock_reservado }}</dd></div>
+                        <div><dt>Stock disponible</dt><dd>{{ existencia.stock_disponible }}</dd></div>
+                        <div><dt>Mínimo solicitado</dt><dd>{{ existencia.stock_minimo }}</dd></div>
+                        <div><dt>Almacén</dt><dd>{{ existencia.almacen_nombre }}</dd></div>
+                        <div><dt>Última actualización</dt><dd>{{ existencia.actualizado_en }}</dd></div>
+                    </dl>
+                </article>
+
+                <article class="admin-detail-card">
+                    <h2>Verificación física</h2>
+                    <p class="admin-muted" style="margin-bottom:.9rem">
+                        El conteo se compara contra el stock del sistema y queda
+                        guardado como evidencia histórica. La diferencia nunca se
+                        corrige sola: usa el ajuste <strong>AJUSTE_CONTEO</strong>
+                        si corresponde.
+                    </p>
+                    <form method="POST" action="{{ url_for('admin_inventario.accion_verificar', existencia_id=existencia.existencia_id) }}" class="admin-detail-grid" style="gap:.7rem">
+                        <label class="admin-filter-field">
+                            <span>Conteo físico</span>
+                            <input type="number" name="conteo_fisico" min="0" step="1" required placeholder="Unidades contadas">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Observación (opcional)</span>
+                            <input type="text" name="observacion" maxlength="500" placeholder="Nota de la verificación">
+                        </label>
+                        <div class="admin-filter-actions">
+                            <button type="submit" class="admin-button is-primary">Registrar verificación</button>
+                        </div>
+                    </form>
+                </article>
+            </section>
+
+            <section class="admin-detail-card admin-detail-wide" id="movimientos" style="margin-top:1rem">
+                <h2>Registrar movimiento</h2>
+                <p class="admin-muted" style="margin:0 0 .9rem">
+                    Toda modificación de stock queda trazada con un movimiento y
+                    su motivo. Las entradas usan motivos de categoría ENTRADA;
+                    las correcciones usan motivos de categoría AJUSTE.
+                </p>
+
+                <div class="admin-detail-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem">
+                    <form
+                        method="POST"
+                        action="{{ url_for('admin_inventario.accion_entrada', existencia_id=existencia.existencia_id) }}"
+                        class="admin-detail-card"
+                        style="box-shadow:none"
+                    >
+                        <h2 style="margin-bottom:.6rem">Entrada de stock</h2>
+                        <label class="admin-filter-field" style="margin-bottom:.7rem">
+                            <span>Motivo</span>
+                            <select name="motivo" required>
+                                <option value="">Selecciona</option>
+                                {% for motivo in existencia.motivos_entrada if motivo.categoria == "ENTRADA" %}
+                                    <option value="{{ motivo.codigo }}">{{ motivo.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="admin-filter-field" style="margin-bottom:.7rem">
+                            <span>Cantidad</span>
+                            <input type="number" name="cantidad" min="1" step="1" required placeholder="Unidades que ingresan">
+                        </label>
+                        <label class="admin-filter-field" style="margin-bottom:.9rem">
+                            <span>Observación (opcional)</span>
+                            <input type="text" name="observacion" maxlength="500" placeholder="Detalle de la entrada">
+                        </label>
+                        <div class="admin-filter-actions">
+                            <button type="submit" class="admin-button is-secondary">Registrar entrada</button>
+                        </div>
+                    </form>
+
+                    <form
+                        method="POST"
+                        action="{{ url_for('admin_inventario.accion_ajuste', existencia_id=existencia.existencia_id) }}"
+                        class="admin-detail-card"
+                        style="box-shadow:none"
+                    >
+                        <h2 style="margin-bottom:.6rem">Ajuste de stock</h2>
+                        <label class="admin-filter-field" style="margin-bottom:.7rem">
+                            <span>Motivo</span>
+                            <select name="motivo" required>
+                                <option value="">Selecciona</option>
+                                {% for motivo in existencia.motivos_entrada if motivo.categoria == "AJUSTE" %}
+                                    <option value="{{ motivo.codigo }}">{{ motivo.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <div class="admin-detail-grid" style="grid-template-columns:1fr 1fr;gap:.7rem">
+                            <label class="admin-filter-field">
+                                <span>Sentido</span>
+                                <select name="tipo_ajuste" required>
+                                    <option value="AJUSTE_POSITIVO">Agregar</option>
+                                    <option value="AJUSTE_NEGATIVO">Retirar</option>
+                                </select>
+                            </label>
+                            <label class="admin-filter-field">
+                                <span>Cantidad</span>
+                                <input type="number" name="cantidad" min="1" step="1" required placeholder="Unidades">
+                            </label>
+                        </div>
+                        <label class="admin-filter-field" style="margin:.7rem 0">
+                            <span>Respaldado por verificación (opcional)</span>
+                            <select name="verificacion_id">
+                                <option value="">Sin verificación</option>
+                                {% for verif in existencia.verificaciones[:5] %}
+                                    <option value="{{ verif.verificacion_id }}">
+                                        {{ verif.codigo_verificacion or verif.verificacion_id[:8] }}
+                                        · sistema {{ verif.stock_sistema }} vs conteo {{ verif.stock_fisico }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="admin-filter-field" style="margin-bottom:.9rem">
+                            <span>Observación</span>
+                            <input type="text" name="observacion" maxlength="500" placeholder="Explica el ajuste">
+                        </label>
+                        <div class="admin-filter-actions">
+                            <button type="submit" class="admin-button is-secondary">Registrar ajuste</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="admin-order-table-card admin-detail-wide" id="verificaciones" style="margin-top:1rem">
+                <div class="admin-section-heading admin-order-heading">
+                    <div>
+                        <span class="admin-section-kicker">Evidencia histórica</span>
+                        <h2>Verificaciones físicas</h2>
+                    </div>
+                </div>
+                {% if existencia.verificaciones %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th><th>Fecha</th><th>Sistema</th><th>Conteo</th>
+                                    <th>Diferencia</th><th>Resultado</th><th>Responsable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for verif in existencia.verificaciones %}
+                                    <tr>
+                                        <td data-label="Código"><strong>{{ verif.codigo_verificacion or "—" }}</strong></td>
+                                        <td data-label="Fecha"><span>{{ verif.verificada_en }}</span></td>
+                                        <td data-label="Sistema"><span>{{ verif.stock_sistema }}</span></td>
+                                        <td data-label="Conteo"><strong>{{ verif.stock_fisico }}</strong></td>
+                                        <td data-label="Diferencia">
+                                            <span>{{ "%+d"|format(verif.diferencia) }}</span>
+                                        </td>
+                                        <td data-label="Resultado">
+                                            {% if verif.coincide %}
+                                                <span class="admin-state is-completado">Coincide</span>
+                                            {% else %}
+                                                <span class="admin-state is-cancelado">Difiere</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Responsable"><small>{{ verif.responsable_correo or "—" }}</small></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="admin-empty-state" style="padding:2rem 1rem">
+                        <p>Aún no hay verificaciones registradas para esta existencia.</p>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="admin-order-table-card admin-detail-wide" id="movimientos" style="margin-top:1rem">
+                <div class="admin-section-heading admin-order-heading">
+                    <div>
+                        <span class="admin-section-kicker">Kardex</span>
+                        <h2>Movimientos recientes</h2>
+                    </div>
+                </div>
+                {% if existencia.movimientos %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Cantidad</th>
+                                    <th>Anterior → Posterior</th><th>Referencia</th><th>Responsable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mv in existencia.movimientos %}
+                                    <tr>
+                                        <td data-label="Fecha"><span>{{ mv.creado_en }}</span></td>
+                                        <td data-label="Tipo">
+                                            {% if mv.tipo_movimiento == "ENTRADA" %}
+                                                <span class="admin-state is-completado">{{ mv.tipo_movimiento }}</span>
+                                            {% elif "AJUSTE" in mv.tipo_movimiento %}
+                                                <span class="admin-state is-en_proceso">{{ mv.tipo_movimiento }}</span>
+                                            {% else %}
+                                                <span class="admin-state is-creado">{{ mv.tipo_movimiento }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Motivo">
+                                            <strong>{{ mv.motivo_codigo }}</strong>
+                                            <small>{{ mv.motivo_nombre }}</small>
+                                        </td>
+                                        <td data-label="Cantidad"><span>{{ mv.cantidad }}</span></td>
+                                        <td data-label="Anterior → Posterior">
+                                            <span>{{ mv.stock_anterior }} → {{ mv.stock_posterior }}</span>
+                                        </td>
+                                        <td data-label="Referencia">
+                                            <small>{{ mv.origen }}</small>
+                                            {% if mv.referencia_tipo %}
+                                                <small>{{ mv.referencia_tipo }} · {{ mv.referencia_id[:8] }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Responsable"><small>{{ mv.responsable_correo or "—" }}</small></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="admin-empty-state" style="padding:2rem 1rem">
+                        <p>No hay movimientos registrados para esta existencia.</p>
+                    </div>
+                {% endif %}
+            </section>
+
+        </div>
+    </main>
+</div>
+{% endblock %}

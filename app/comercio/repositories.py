@@ -2253,3 +2253,542 @@ def obtener_historial_pedido(pedido_id):
             return cursor.fetchall()
     finally:
         conexion.close()
+
+
+# ============================================================
+# 24. FAVORITOS DEL USUARIO — LISTAR
+# ============================================================
+
+def listar_favoritos_usuario(usuario_id):
+    """
+    Devuelve los favoritos REALES del usuario autenticado.
+
+    Siempre filtra por usuario_id: nunca se muestran
+    favoritos de otro usuario. Se limita a variantes
+    ACTIVAS para no exponer productos retirados del
+    catálogo comercial.
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    f.id AS favorito_id,
+                    f.variante_id,
+                    f.creado_en,
+
+                    v.sku,
+                    v.nombre_comercial,
+
+                    s.nombre AS sabor,
+                    p.nombre AS presentacion,
+
+                    av.id AS articulo_venta_id,
+
+                    (
+                        SELECT pr.monto
+                        FROM precios AS pr
+                        WHERE
+                            pr.articulo_venta_id = av.id
+                            AND pr.estado = 'ACTIVO'
+                            AND pr.tipo_precio_id = 1
+                            AND pr.vigente_desde <= NOW()
+                            AND (
+                                pr.vigente_hasta IS NULL
+                                OR pr.vigente_hasta >= NOW()
+                            )
+                        ORDER BY pr.vigente_desde DESC
+                        LIMIT 1
+                    ) AS precio,
+
+                    (
+                        SELECT pr.moneda
+                        FROM precios AS pr
+                        WHERE
+                            pr.articulo_venta_id = av.id
+                            AND pr.estado = 'ACTIVO'
+                            AND pr.tipo_precio_id = 1
+                            AND pr.vigente_desde <= NOW()
+                            AND (
+                                pr.vigente_hasta IS NULL
+                                OR pr.vigente_hasta >= NOW()
+                            )
+                        ORDER BY pr.vigente_desde DESC
+                        LIMIT 1
+                    ) AS moneda
+
+                FROM favoritos AS f
+
+                INNER JOIN variantes AS v
+                    ON v.id = f.variante_id
+                    AND v.estado = 'ACTIVO'
+
+                LEFT JOIN sabores AS s
+                    ON s.id = v.sabor_id
+
+                LEFT JOIN presentaciones AS p
+                    ON p.id = v.presentacion_id
+
+                LEFT JOIN articulos_venta AS av
+                    ON av.variante_id = v.id
+                    AND av.estado = 'ACTIVO'
+                    AND av.tipo = 'VARIANTE'
+
+                WHERE f.usuario_id = %s
+
+                ORDER BY f.creado_en DESC
+                """,
+                (usuario_id,),
+            )
+
+            return cursor.fetchall()
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 25. FAVORITOS — AGREGAR (IDEMPOTENTE)
+# ============================================================
+
+def agregar_favorito(usuario_id, variante_id):
+    """
+    Registra o conserva un favorito del usuario.
+
+    La tabla tiene UNIQUE(usuario_id, variante_id), por lo que
+    un segundo AGREGAR de la misma variante simplemente no
+    inserta una fila nueva (idempotente). Devuelve True si
+    ahora está en favoritos.
+    """
+
+    if not usuario_id or not variante_id:
+        return False
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO favoritos (
+                    usuario_id,
+                    variante_id
+                )
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE
+                    usuario_id = VALUES(usuario_id)
+                """,
+                (usuario_id, variante_id),
+            )
+
+            insertado = cursor.rowcount > 0
+
+            conexion.commit()
+
+            return insertado or True
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 26. FAVORITOS — QUITAR (IDEMPOTENTE)
+# ============================================================
+
+def quitar_favorito(usuario_id, variante_id):
+    """
+    Elimina un favorito del usuario.
+
+    La operación es idempotente: si la variante no estaba
+    en favoritos, simplemente no se elimina ninguna fila y
+    se devuelve False. Nunca modifica otros usuarios.
+    """
+
+    if not usuario_id or not variante_id:
+        return False
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                DELETE FROM favoritos
+                WHERE usuario_id = %s
+                  AND variante_id = %s
+                """,
+                (usuario_id, variante_id),
+            )
+
+            eliminado = cursor.rowcount > 0
+
+            conexion.commit()
+
+            return eliminado
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 27. FAVORITOS — AUDITORÍA (APPEND-ONLY, KPI-06)
+# ============================================================
+
+def registrar_auditoria_favorito(
+    usuario_id,
+    variante_id,
+    operacion,
+    resultado,
+):
+    """
+    Registra UN evento real de favorito en `favoritos_auditoria`.
+
+    La tabla es append-only (solo se agregan filas); no se
+    modifica ni se borra el histórico. Es la evidencia que
+    alimenta el KPI-06.
+
+    Args:
+        usuario_id: Quién intentó la operación (puede ser None).
+        variante_id: Variante sobre la que se actúa.
+        operacion: 'AGREGAR' o 'QUITAR'.
+        resultado: 'EXITO' o 'FALLO'.
+    """
+
+    if operacion not in ("AGREGAR", "QUITAR"):
+        raise ValueError(
+            "La operación de favorito no es válida."
+        )
+
+    if resultado not in ("EXITO", "FALLO"):
+        raise ValueError(
+            "El resultado de favorito no es válido."
+        )
+
+    if not usuario_id or not variante_id:
+        return False
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO favoritos_auditoria (
+                    usuario_id,
+                    variante_id,
+                    operacion,
+                    resultado
+                )
+                VALUES (%s, %s, %s, %s)
+                """,
+                (
+                    usuario_id,
+                    variante_id,
+                    operacion,
+                    resultado,
+                ),
+            )
+
+            conexion.commit()
+
+            return True
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 28. CONSULTA DE PRODUCTO (KPI-03)
+# ============================================================
+
+def obtener_variante_por_id(variante_id):
+    """
+    Busca una variante ACTIVA por su UUID exacto.
+
+    Se usa para validar intentos de agregar/quitar favoritos
+    desde el frontend (que recibe el variante_id del catálogo).
+    Devuelve None si el ID no corresponde a una variante activa.
+    """
+
+    variante_id = str(variante_id or "").strip()
+
+    if not variante_id:
+        return None
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    v.id AS variante_id,
+                    v.sku,
+                    v.nombre_comercial,
+                    v.peso_gramos,
+
+                    s.nombre AS sabor,
+                    p.nombre AS presentacion,
+
+                    av.id AS articulo_venta_id,
+
+                    (
+                        SELECT pr.monto
+                        FROM precios AS pr
+                        WHERE
+                            pr.articulo_venta_id = av.id
+                            AND pr.estado = 'ACTIVO'
+                            AND pr.tipo_precio_id = 1
+                            AND pr.vigente_desde <= NOW()
+                            AND (
+                                pr.vigente_hasta IS NULL
+                                OR pr.vigente_hasta >= NOW()
+                            )
+                        ORDER BY pr.vigente_desde DESC
+                        LIMIT 1
+                    ) AS precio,
+
+                    (
+                        SELECT pr.moneda
+                        FROM precios AS pr
+                        WHERE
+                            pr.articulo_venta_id = av.id
+                            AND pr.estado = 'ACTIVO'
+                            AND pr.tipo_precio_id = 1
+                            AND pr.vigente_desde <= NOW()
+                            AND (
+                                pr.vigente_hasta IS NULL
+                                OR pr.vigente_hasta >= NOW()
+                            )
+                        ORDER BY pr.vigente_desde DESC
+                        LIMIT 1
+                    ) AS moneda
+
+                FROM variantes AS v
+
+                INNER JOIN sabores AS s
+                    ON s.id = v.sabor_id
+
+                INNER JOIN presentaciones AS p
+                    ON p.id = v.presentacion_id
+
+                LEFT JOIN articulos_venta AS av
+                    ON av.variante_id = v.id
+                    AND av.estado = 'ACTIVO'
+                    AND av.tipo = 'VARIANTE'
+
+                WHERE
+                    v.id = %s
+                    AND v.estado = 'ACTIVO'
+
+                LIMIT 1
+                """,
+                (variante_id,),
+            )
+
+            return cursor.fetchone()
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_variante_por_sku(sku):
+    """
+    Busca una variante ACTIVA por su SKU comercial exacto.
+
+    Se usa para resolver la ficha pública de producto
+    (p.ej. /tienda/producto/<sku>). Devuelve None si el
+    SKU no corresponde a una variante activa.
+    """
+
+    sku = str(sku or "").strip()
+
+    if not sku:
+        return None
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    v.id AS variante_id,
+                    v.sku,
+                    v.nombre_comercial,
+                    v.peso_gramos,
+
+                    s.nombre AS sabor,
+                    p.nombre AS presentacion,
+
+                    av.id AS articulo_venta_id,
+
+                    (
+                        SELECT pr.monto
+                        FROM precios AS pr
+                        WHERE
+                            pr.articulo_venta_id = av.id
+                            AND pr.estado = 'ACTIVO'
+                            AND pr.tipo_precio_id = 1
+                            AND pr.vigente_desde <= NOW()
+                            AND (
+                                pr.vigente_hasta IS NULL
+                                OR pr.vigente_hasta >= NOW()
+                            )
+                        ORDER BY pr.vigente_desde DESC
+                        LIMIT 1
+                    ) AS precio,
+
+                    (
+                        SELECT pr.moneda
+                        FROM precios AS pr
+                        WHERE
+                            pr.articulo_venta_id = av.id
+                            AND pr.estado = 'ACTIVO'
+                            AND pr.tipo_precio_id = 1
+                            AND pr.vigente_desde <= NOW()
+                            AND (
+                                pr.vigente_hasta IS NULL
+                                OR pr.vigente_hasta >= NOW()
+                            )
+                        ORDER BY pr.vigente_desde DESC
+                        LIMIT 1
+                    ) AS moneda
+
+                FROM variantes AS v
+
+                INNER JOIN sabores AS s
+                    ON s.id = v.sabor_id
+
+                INNER JOIN presentaciones AS p
+                    ON p.id = v.presentacion_id
+
+                LEFT JOIN articulos_venta AS av
+                    ON av.variante_id = v.id
+                    AND av.estado = 'ACTIVO'
+                    AND av.tipo = 'VARIANTE'
+
+                WHERE
+                    v.sku = %s
+                    AND v.estado = 'ACTIVO'
+
+                LIMIT 1
+                """,
+                (sku,),
+            )
+
+            return cursor.fetchone()
+
+    finally:
+
+        conexion.close()
+
+
+# ============================================================
+# 29. CONSULTAS DE PRODUCTO — REGISTRAR (KPI-03)
+# ============================================================
+
+def registrar_consulta_producto(
+    sku,
+    variante_id,
+    usuario_id,
+    resultado,
+):
+    """
+    Registra UN intento real de consulta de producto (KPI-03).
+
+    La tabla acumula solo intentos funcionales del cliente
+    sobre un SKU real; nunca se registran assets ni navegación
+    genérica como consultas.
+
+    Args:
+        sku: Recurso solicitado (aunque no exista).
+        variante_id: Variante resuelta, None si no se encontró.
+        usuario_id: Usuario de sesión, None si no hay sesión.
+        resultado: 'EXITO' o 'FALLO'.
+    """
+
+    if resultado not in ("EXITO", "FALLO"):
+        raise ValueError(
+            "El resultado de la consulta no es válido."
+        )
+
+    sku = str(sku or "").strip()
+
+    if not sku:
+        return False
+
+    if len(sku) > 80:
+        sku = sku[:80]
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO consultas_producto (
+                    sku,
+                    variante_id,
+                    usuario_id,
+                    resultado
+                )
+                VALUES (%s, %s, %s, %s)
+                """,
+                (
+                    sku,
+                    variante_id,
+                    usuario_id,
+                    resultado,
+                ),
+            )
+
+            conexion.commit()
+
+            return True
+
+    except Exception:
+
+        conexion.rollback()
+        raise
+
+    finally:
+
+        conexion.close()

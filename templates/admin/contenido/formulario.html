@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Editar" if contenido else "Nuevo" }} contenido | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "contenido" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Contenido</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <a href="{{ url_for('admin_contenido.listado') }}" class="admin-back-link">← Volver al contenido</a>
+
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Experiencia "Aprende"</span>
+                    <h1>{{ contenido.titulo if contenido else "Nuevo contenido educativo" }}</h1>
+                    <p>El contenido publicado es visible públicamente en /aprende. Los borradores nunca se sirven al cliente.</p>
+                </div>
+                {% if contenido %}
+                    <div class="admin-live-status">
+                        <span class="admin-live-dot" aria-hidden="true"></span>
+                        {{ contenido.total_accesos }} accesos públicos
+                    </div>
+                {% endif %}
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form
+                method="POST"
+                action="{{ url_for('admin_contenido.nuevo' if not contenido else 'admin_contenido.detalle', contenido_id=contenido.contenido_id) if contenido else url_for('admin_contenido.nuevo') }}"
+                class="admin-detail-card"
+            >
+                <div class="admin-detail-grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1.2rem">
+                    <label class="admin-filter-field">
+                        <span>Título</span>
+                        <input type="text" name="titulo" required maxlength="150" value="{{ contenido.titulo if contenido else '' }}" placeholder="Título visible del contenido">
+                    </label>
+                    <label class="admin-filter-field">
+                        <span>Tipo</span>
+                        <select name="tipo" required>
+                            {% for tipo in tipos %}
+                                <option value="{{ tipo }}"{% if contenido and contenido.tipo == tipo %} selected{% endif %}>{{ tipo.replace("_", " ").title() }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+
+                <div class="admin-detail-grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1.2rem;margin-top:1rem">
+                    <label class="admin-filter-field">
+                        <span>Estado de publicación</span>
+                        <select name="estado" required>
+                            <option value="BORRADOR"{% if contenido and contenido.estado == "BORRADOR" %} selected{% endif %}>Borrador (oculto al público)</option>
+                            <option value="PUBLICADO"{% if contenido and contenido.estado == "PUBLICADO" %} selected{% endif %}>Publicado (visible)</option>
+                        </select>
+                    </label>
+                    <label class="admin-filter-field">
+                        <span>Orden (opcional)</span>
+                        <input type="number" name="orden" value="{{ contenido.orden if contenido and contenido.orden is not none else '' }}">
+                    </label>
+                </div>
+
+                <div style="margin-top:1rem">
+                    <label class="admin-filter-field">
+                        <span>Resumen (opcional, máx. 500)</span>
+                        <input type="text" name="resumen" maxlength="500" value="{{ contenido.resumen if contenido and contenido.resumen else '' }}" placeholder="Descripción breve para tarjetas">
+                    </label>
+                </div>
+
+                <div style="margin-top:1rem">
+                    <label class="admin-filter-field">
+                        <span>Imagen (ruta, opcional)</span>
+                        <input type="text" name="imagen_ruta" maxlength="500" value="{{ contenido.imagen_ruta if contenido and contenido.imagen_ruta else '' }}" placeholder="img/QueesKombucha.png">
+                    </label>
+                </div>
+
+                <div style="margin-top:1rem">
+                    <label class="admin-filter-field">
+                        <span>Contenido (texto enriquecido sencillo)</span>
+                        <textarea
+                            name="contenido"
+                            rows="14"
+                            placeholder="Describe la sección educativa sin afirmaciones médicas."
+                            style="width:100%;min-height:260px;padding:.8rem;border:1px solid var(--color-border);border-radius:10px;font:inherit;font-size:.85rem;line-height:1.6"
+                        >{{ contenido.contenido if contenido and contenido.contenido else '' }}</textarea>
+                    </label>
+                </div>
+
+                <div class="admin-filter-actions" style="margin-top:1.2rem">
+                    <button type="submit" class="admin-button is-primary">Guardar contenido</button>
+                    {% if contenido %}
+                        <button
+                            type="submit"
+                            form="form-eliminar-contenido"
+                            class="admin-button is-secondary"
+                            style="border-color:#efc3c3;color:#923b3b"
+                        >
+                            Eliminar
+                        </button>
+                    {% endif %}
+                </div>
+            </form>
+
+            {% if contenido %}
+                <form id="form-eliminar-contenido" method="POST" action="{{ url_for('admin_contenido.eliminar', contenido_id=contenido.contenido_id) }}"></form>
+
+                <section class="admin-detail-card admin-detail-wide" id="variantes" style="margin-top:1rem">
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Catálogo real</span>
+                            <h2>Variantes vinculadas</h2>
+                        </div>
+                    </div>
+                    <p class="admin-muted">Enlaza el contenido con variantes REALES del catálogo para mostrar "Ver en tienda". No se duplica información comercial.</p>
+                    {% if contenido.variantes %}
+                        <div class="admin-order-table-wrap" style="margin-top:.8rem">
+                            <table class="admin-order-table">
+                                <thead>
+                                    <tr><th>Producto</th><th>Sabor / Presentación</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for vinculo in contenido.variantes %}
+                                        <tr>
+                                            <td data-label="Producto">
+                                                <strong>{{ vinculo.nombre_comercial or "—" }}</strong>
+                                                <small>{{ vinculo.sku }}</small>
+                                            </td>
+                                            <td data-label="Sabor / Presentación">
+                                                <span>{{ vinculo.sabor }} · {{ vinculo.presentacion }}</span>
+                                            </td>
+                                            <td data-label="">
+                                                <form
+                                                    method="POST"
+                                                    action="{{ url_for('admin_contenido.eliminar_variante_ruta', contenido_id=contenido.contenido_id, vinculo_id=vinculo.vinculo_id) }}"
+                                                >
+                                                    <button type="submit" class="admin-button is-secondary" style="border-color:#efc3c3;color:#923b3b">Quitar</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="admin-muted">Aún no hay variantes vinculadas.</p>
+                    {% endif %}
+                    {% if catalogo_variantes %}
+                        <form method="POST" action="{{ url_for('admin_contenido.vincular_variante_ruta', contenido_id=contenido.contenido_id) }}" class="admin-order-filters" style="margin-top:1rem;box-shadow:none">
+                            <label class="admin-filter-field admin-filter-search">
+                                <span>Vincular variante</span>
+                                <select name="variante_id">
+                                    {% for variante in catalogo_variantes %}
+                                        <option value="{{ variante.catalogo_variante_id }}">{{ variante.nombre_comercial }} · {{ variante.sku }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <div class="admin-filter-actions">
+                                <button type="submit" class="admin-button is-primary">Vincular</button>
+                            </div>
+                        </form>
+                    {% endif %}
+                </section>
+
+                <section class="admin-detail-card admin-detail-wide" id="fuentes" style="margin-top:1rem">
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Respaldo opcional</span>
+                            <h2>Fuentes y referencias</h2>
+                        </div>
+                    </div>
+                    <p class="admin-muted">Permiten respaldar la información educativa. No se inventan afirmaciones médicas ni beneficios terapéuticos.</p>
+                    {% if contenido.fuentes %}
+                        <div class="admin-order-table-wrap" style="margin-top:.8rem">
+                            <table class="admin-order-table">
+                                <thead>
+                                    <tr><th>Nombre</th><th>Referencia</th><th>URL</th><th>Nota</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for fuente in contenido.fuentes %}
+                                        <tr>
+                                            <td data-label="Nombre"><strong>{{ fuente.nombre }}</strong></td>
+                                            <td data-label="Referencia"><span>{{ fuente.referencia or "—" }}</span></td>
+                                            <td data-label="URL">
+                                                {% if fuente.url %}
+                                                    <a href="{{ fuente.url }}" target="_blank" rel="noopener noreferrer" class="admin-table-link">{{ fuente.url }}</a>
+                                                {% else %}—{% endif %}
+                                            </td>
+                                            <td data-label="Nota"><span>{{ fuente.nota or "—" }}</span></td>
+                                            <td data-label="">
+                                                <form method="POST" action="{{ url_for('admin_contenido.eliminar_fuente_ruta', contenido_id=contenido.contenido_id, fuente_id=fuente.id) }}">
+                                                    <button type="submit" class="admin-button is-secondary" style="border-color:#efc3c3;color:#923b3b">Quitar</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="admin-muted">Aún no hay fuentes registradas.</p>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('admin_contenido.agregar_fuente_ruta', contenido_id=contenido.contenido_id) }}" class="admin-detail-grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:.8rem;margin-top:1rem">
+                        <label class="admin-filter-field">
+                            <span>Nombre</span>
+                            <input type="text" name="nombre" required maxlength="150" placeholder="Institución / entidad">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Referencia</span>
+                            <input type="text" name="referencia" maxlength="255" placeholder="Título / norma / estudio">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>URL</span>
+                            <input type="url" name="url" maxlength="500" placeholder="https://…">
+                        </label>
+                        <label class="admin-filter-field" style="grid-column:1/-1">
+                            <span>Nota (opcional)</span>
+                            <input type="text" name="nota" maxlength="500" placeholder="Aclaración corta">
+                        </label>
+                        <div class="admin-filter-actions" style="grid-column:1/-1">
+                            <button type="submit" class="admin-button is-secondary">Agregar fuente</button>
+                        </div>
+                    </form>
+                </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

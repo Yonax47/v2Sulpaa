@@ -1,0 +1,250 @@
+/* ============================================================
+   F I C H A   D E   P R O D U C T O   ·   SULPAA V2
+   ============================================================ */
+
+.ficha-page {
+    background: #fdfaf5;
+}
+
+.container {
+    width: min(1180px, 92%);
+    margin-inline: auto;
+}
+
+.ficha-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: 1.4rem 0 .6rem;
+    font-size: .85rem;
+    color: #8ba093;
+}
+
+.ficha-breadcrumb a {
+    color: #3f7d55;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.ficha-hero {
+    display: grid;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+    gap: 3rem;
+    align-items: center;
+    padding: 1.6rem 0 3rem;
+}
+
+/* ---------- VISUAL ---------- */
+
+.ficha-visual {
+    position: relative;
+    height: clamp(320px, 40vw, 420px);
+    display: grid;
+    place-items: center;
+    border-radius: 26px;
+    background:
+        radial-gradient(circle at 50% 52%, #eaf4ec 0%, transparent 66%),
+        linear-gradient(150deg, #f7efe3, #fdfaf5);
+    overflow: hidden;
+}
+
+.ficha-orbit {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(63, 125, 85, .4);
+    animation: ficha-girar 22s linear infinite;
+}
+
+@keyframes ficha-girar {
+    to { transform: rotate(360deg); }
+}
+
+.ficha-bottle {
+    position: relative;
+    width: clamp(120px, 20vw, 180px);
+    filter: drop-shadow(0 28px 26px rgba(63, 125, 85, .3));
+}
+
+.ficha-float {
+    position: absolute;
+    font-size: 1.4rem;
+    opacity: .8;
+    animation: ficha-flotar 4.5s ease-in-out infinite alternate;
+}
+
+.ficha-float-one {
+    top: 18%;
+    left: 16%;
+    color: #e8a7b5;
+}
+
+.ficha-float-two {
+    bottom: 20%;
+    right: 18%;
+    color: #d9b95f;
+}
+
+@keyframes ficha-flotar {
+    from { transform: translateY(0); }
+    to { transform: translateY(-12px); }
+}
+
+/* ---------- INFO ---------- */
+
+.ficha-info h1 {
+    font-size: clamp(1.8rem, 3.6vw, 2.7rem);
+    color: #24402e;
+    line-height: 1.12;
+    margin: 1rem 0 .5rem;
+}
+
+.ficha-profile {
+    color: #7a9181;
+    font-size: .95rem;
+    margin-bottom: 1rem;
+}
+
+.ficha-description {
+    color: #4c5f53;
+    line-height: 1.75;
+    max-width: 520px;
+    margin-bottom: 1.5rem;
+}
+
+.ficha-price-row {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.4rem;
+}
+
+.ficha-price {
+    font-size: 1.8rem;
+    color: #2d4034;
+}
+
+.ficha-price small {
+    font-size: .85rem;
+    color: #8ba093;
+    font-weight: 600;
+}
+
+.ficha-stock {
+    font-size: .84rem;
+    font-weight: 700;
+}
+
+.ficha-stock-ok {
+    color: #2f7d4d;
+    font-style: normal;
+    font-size: .6rem;
+}
+
+.ficha-stock-no {
+    color: #c06d6d;
+    font-style: normal;
+    font-size: .6rem;
+}
+
+.ficha-actions {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+}
+
+.ficha-favorite-button {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .8rem 1.1rem;
+    border-radius: 999px;
+    border: 1.5px solid #e7cfcf;
+    background: #fff;
+    color: #a05757;
+    font-weight: 700;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+
+.ficha-favorite-button:hover,
+.ficha-favorite-button.is-active {
+    border-color: #c98b91;
+    background: #fbeeee;
+    transform: translateY(-2px);
+}
+
+.ficha-favorite-button.is-active span {
+    color: #e04f5a;
+}
+
+.ficha-learn-link {
+    color: #3f7d55;
+    font-weight: 700;
+    font-size: .9rem;
+    text-decoration: none;
+}
+
+.ficha-learn-link:hover {
+    text-decoration: underline;
+}
+
+/* ---------- TARJETAS ---------- */
+
+.ficha-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    padding-bottom: 4rem;
+}
+
+.ficha-card {
+    background: #fff;
+    border: 1px solid #ece7dc;
+    border-radius: 18px;
+    padding: 1.4rem 1.3rem;
+}
+
+.ficha-card > span {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: .8rem;
+    border-radius: 14px;
+    background: #e7f2e9;
+    color: #3f7d55;
+    font-size: 1.25rem;
+}
+
+.ficha-card h3 {
+    color: #2d4034;
+    font-size: 1rem;
+    margin-bottom: .35rem;
+}
+
+.ficha-card p {
+    color: #7b8f82;
+    font-size: .88rem;
+    line-height: 1.55;
+}
+
+/* ---------- RESPONSIVO ---------- */
+
+@media (max-width: 880px) {
+
+    .ficha-hero {
+        grid-template-columns: 1fr;
+        gap: 1.6rem;
+    }
+
+    .ficha-cards {
+        grid-template-columns: 1fr;
+    }
+
+}

@@ -54,10 +54,26 @@ calcularlos sin inventar columnas.
 """
 
 
+import os
+import re
+
 from app.config.database import (
     conexion_comercio,
+    conexion_inventario,
     conexion_operaciones,
 )
+
+_IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def _esquema(nombre_variable):
+    """Devuelve un nombre de esquema MySQL validado desde entorno."""
+    valor = str(os.getenv(nombre_variable) or "").strip()
+    if not valor or not _IDENTIFICADOR_SQL.fullmatch(valor):
+        raise RuntimeError(
+            f"La variable {nombre_variable} no contiene un esquema MySQL válido."
+        )
+    return valor
 
 
 # ============================================================
@@ -460,4 +476,301 @@ def obtener_metrica_satisfaccion():
 
     finally:
 
+        conexion.close()
+
+
+# ============================================================
+# KPI-02 — EXACTITUD DE INVENTARIO (Bloque 3)
+# ============================================================
+#
+# Fórmula:
+#
+#     KPI-02 = ( verificaciones donde el conteo coincide /
+#                total de verificaciones físicas ) * 100
+#
+# Tabla real (creada en el Bloque 3):
+#     inventario.verificaciones_fisicas
+#         - coincide  (indica si stock_fisico == stock_sistema)
+#
+# NOTA DE DISEÑO (condición de autorización Bloque 3):
+# La verificación conserva la fotografía del stock en el
+# momento del conteo (stock_sistema, stock_fisico, diferencia);
+# el KPI se calcula con la columna booleana `coincide` real.
+# ============================================================
+
+
+def obtener_metrica_verificaciones_fisicas():
+    """
+    Métrica base del KPI-02: conteos de verificaciones físicas.
+
+    Consulta la tabla `verificaciones_fisicas` del esquema de
+    inventario y devuelve únicamente los DOS conteos reales:
+
+    - total_verificaciones:  filas de verificación registradas.
+    - verificaciones_ok:     filas donde coincide = 1.
+
+    Si la tabla aún no existe (primer arranque), devuelve
+    "disponible": False para que el dashboard conserve el KPI
+    como "Pendiente" sin inventar valores.
+    """
+
+    inventario = _esquema("DB_INVENTARIO")
+
+    conexion = conexion_inventario()
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS total "
+                "FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = %s "
+                "  AND TABLE_NAME = 'verificaciones_fisicas'",
+                (inventario,),
+            )
+            if cursor.fetchone()["total"] == 0:
+                return {
+                    "disponible": False,
+                    "total_verificaciones": 0,
+                    "verificaciones_ok": 0,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_verificaciones,
+                    COALESCE(SUM(CASE WHEN coincide = 1
+                                      THEN 1 ELSE 0 END), 0)
+                        AS verificaciones_ok
+                FROM {inventario}.verificaciones_fisicas
+                """
+            )
+            conteos = cursor.fetchone()
+
+        return {
+            "disponible": True,
+            "total_verificaciones": conteos["total_verificaciones"],
+            "verificaciones_ok": conteos["verificaciones_ok"],
+        }
+    finally:
+        conexion.close()
+
+
+# ============================================================
+# KPI-03 — ACCESO A INFORMACIÓN DE PRODUCTO (Bloque 3)
+# ============================================================
+#
+# Fórmula:
+#
+#     KPI-03 = ( consultas EXITO / total de consultas ) * 100
+#
+# Tabla real (creada en el Bloque 3):
+#     comercio.consultas_producto
+#         - resultado  (ENUM 'EXITO' / 'FALLO')
+#         - sku        (recurso solicitado)
+#
+# NOTA DE DISEÑO (condición de autorización Bloque 3):
+# La tabla acumula SOLO intentos funcionales de consulta del
+# cliente sobre un SKU real; nunca se registran assets ni
+# navegación genérica como consultas artificiales.
+# ============================================================
+
+
+def obtener_metrica_consultas_producto():
+    """
+    Métrica base del KPI-03: conteos de consultas de producto.
+
+    Devuelve únicamente los DOS conteos reales:
+
+    - total_consultas:     filas en `consultas_producto`.
+    - consultas_exitosas:  filas con resultado = 'EXITO'.
+
+    El porcentaje (y la meta ≥ 95 %) se calcula en services.py.
+    """
+
+    comercio = _esquema("DB_COMERCIO")
+
+    conexion = conexion_comercio()
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS total "
+                "FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = %s "
+                "  AND TABLE_NAME = 'consultas_producto'",
+                (comercio,),
+            )
+            if cursor.fetchone()["total"] == 0:
+                return {
+                    "disponible": False,
+                    "total_consultas": 0,
+                    "consultas_exitosas": 0,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_consultas,
+                    COALESCE(SUM(CASE WHEN resultado = 'EXITO'
+                                      THEN 1 ELSE 0 END), 0)
+                        AS consultas_exitosas
+                FROM {comercio}.consultas_producto
+                """
+            )
+            conteos = cursor.fetchone()
+
+        return {
+            "disponible": True,
+            "total_consultas": conteos["total_consultas"],
+            "consultas_exitosas": conteos["consultas_exitosas"],
+        }
+    finally:
+        conexion.close()
+
+
+# ============================================================
+# KPI-06 — ARTÍCULOS FAVORITOS DEL CLIENTE (Bloque 3)
+# ============================================================
+#
+# Fórmula:
+#
+#     KPI-06 = ( operaciones de favoritos EXITOSAS /
+#                total de operaciones de favoritos ) * 100
+#
+# Tabla real (creada en el Bloque 3):
+#     comercio.favoritos_auditoria
+#         - resultado  (ENUM 'EXITO' / 'FALLO')
+#         - operacion  (ENUM 'AGREGAR' / 'QUITAR')
+#
+# NOTA DE DISEÑO (condición de autorización Bloque 3):
+# `favoritos_auditoria` es append-only: registra cada intento
+# real de agregar/quitar un favorito, sin modificar el
+# historial existente. El KPI mide la eficacia real de estas
+# operaciones.
+# ============================================================
+
+
+def obtener_metrica_favoritos():
+    """
+    Métrica base del KPI-06: conteos de operaciones de favoritos.
+
+    Devuelve únicamente los DOS conteos reales:
+
+    - total_favoritos_ops:  filas en `favoritos_auditoria`.
+    - favoritos_exitosos:   filas con resultado = 'EXITO'.
+
+    El porcentaje (y la meta ≥ 95 %) se calcula en services.py.
+    """
+
+    comercio = _esquema("DB_COMERCIO")
+
+    conexion = conexion_comercio()
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS total "
+                "FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = %s "
+                "  AND TABLE_NAME = 'favoritos_auditoria'",
+                (comercio,),
+            )
+            if cursor.fetchone()["total"] == 0:
+                return {
+                    "disponible": False,
+                    "total_favoritos_ops": 0,
+                    "favoritos_exitosos": 0,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_favoritos_ops,
+                    COALESCE(SUM(CASE WHEN resultado = 'EXITO'
+                                      THEN 1 ELSE 0 END), 0)
+                        AS favoritos_exitosos
+                FROM {comercio}.favoritos_auditoria
+                """
+            )
+            conteos = cursor.fetchone()
+
+        return {
+            "disponible": True,
+            "total_favoritos_ops": conteos["total_favoritos_ops"],
+            "favoritos_exitosos": conteos["favoritos_exitosos"],
+        }
+    finally:
+        conexion.close()
+
+
+# ============================================================
+# KPI-10 — DISPONIBILIDAD DEL CONTENIDO EDUCATIVO (Bloque 3)
+# ============================================================
+#
+# Fórmula:
+#
+#     KPI-10 = ( accesos EXITO / total de accesos ) * 100
+#
+# Tabla real (creada en el Bloque 3):
+#     comercio.accesos_contenido
+#         - resultado   (ENUM 'EXITO' / 'FALLO')
+#         - slug_solicitado (recurso solicitado)
+#
+# NOTA DE DISEÑO (condición de autorización Bloque 3):
+# `accesos_contenido` registra la evidencia real de cada
+# consulta pública a la experiencia "Aprende"; el KPI mide la
+# disponibilidad efectiva del contenido publicado.
+# ============================================================
+
+
+def obtener_metrica_accesos_contenido():
+    """
+    Métrica base del KPI-10: conteos de accesos a contenido.
+
+    Devuelve únicamente los DOS conteos reales:
+
+    - total_accesos:  filas en `accesos_contenido`.
+    - accesos_exitosos:  filas con resultado = 'EXITO'.
+
+    El porcentaje (y la meta ≥ 95 %) se calcula en services.py.
+    """
+
+    comercio = _esquema("DB_COMERCIO")
+
+    conexion = conexion_comercio()
+
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS total "
+                "FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = %s "
+                "  AND TABLE_NAME = 'accesos_contenido'",
+                (comercio,),
+            )
+            if cursor.fetchone()["total"] == 0:
+                return {
+                    "disponible": False,
+                    "total_accesos": 0,
+                    "accesos_exitosos": 0,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_accesos,
+                    COALESCE(SUM(CASE WHEN resultado = 'EXITO'
+                                      THEN 1 ELSE 0 END), 0)
+                        AS accesos_exitosos
+                FROM {comercio}.accesos_contenido
+                """
+            )
+            conteos = cursor.fetchone()
+
+        return {
+            "disponible": True,
+            "total_accesos": conteos["total_accesos"],
+            "accesos_exitosos": conteos["accesos_exitosos"],
+        }
+    finally:
         conexion.close()

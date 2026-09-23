@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+{{ contenido.titulo }} | Aprende | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/aprende.css') }}"
+>
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="aprende-page aprende-detail-page">
+
+
+    <!-- ======================================================
+         1. ENCABEZADO DEL CONTENIDO
+         ====================================================== -->
+
+    <nav class="aprende-breadcrumb container" aria-label="Ruta">
+        <a href="{{ url_for('aprende.portada') }}">Aprende</a>
+        <span aria-hidden="true">/</span>
+        <span>{{ contenido.tipo.replace("_", " ").title() }}</span>
+    </nav>
+
+
+    <header class="aprende-detail-hero">
+
+        <div class="container aprende-detail-header">
+
+            <div class="aprende-detail-copy">
+
+                <span class="aprende-kicker">
+                    {{ contenido.tipo.replace("_", " ").title() }} · SULPAA
+                </span>
+
+                <h1>{{ contenido.titulo }}</h1>
+
+                <p>
+                    {{ contenido.resumen or "Sección de la experiencia educativa SULPAA." }}
+                </p>
+
+                {% if contenido.publicado_en %}
+                    <span class="aprende-detail-meta">
+                        Publicado el {{ contenido.publicado_en }}
+                    </span>
+                {% endif %}
+
+            </div>
+
+            {% if contenido.imagen_ruta %}
+                <div class="aprende-detail-visual" aria-hidden="true">
+                    <img
+                        src="{{ url_for('static', filename=contenido.imagen_ruta) }}"
+                        alt=""
+                        class="aprende-detail-img"
+                    >
+                </div>
+            {% endif %}
+
+        </div>
+
+    </header>
+
+
+    <!-- ======================================================
+         2. CUERPO DEL CONTENIDO
+         ====================================================== -->
+
+    <section class="aprende-detail-body">
+
+        <div class="container aprende-detail-grid">
+
+            <article class="aprende-detail-text">
+
+                {% if contenido.contenido %}
+                    {% for bloque in contenido.contenido.split("\n\n") %}
+                        {% set bloque = bloque | trim %}
+                        {% if bloque %}
+                            {% if loop.first and bloque.startswith("# ") %}
+                                <h2>{{ bloque[2:] }}</h2>
+                            {% else %}
+                                <p>{{ bloque }}</p>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p>Esta sección aún no tiene texto desarrollado.</p>
+                {% endif %}
+
+                <!-- Fuentes de respaldo (solo si hay) -->
+                {% if contenido.fuentes %}
+                    <div class="aprende-fuentes">
+                        <h3>Fuentes y referencias</h3>
+                        <ul>
+                            {% for fuente in contenido.fuentes %}
+                                <li>
+                                    <span>{{ fuente.nombre }}</span>
+                                    {% if fuente.referencia %}
+                                        — {{ fuente.referencia }}
+                                    {% endif %}
+                                    {% if fuente.url %}
+                                        · <a
+                                            href="{{ fuente.url }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >ver fuente</a>
+                                    {% endif %}
+                                    {% if fuente.nota %}
+                                        <small>{{ fuente.nota }}</small>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+            </article>
+
+            <!-- Variantes REALES vinculadas desde el catálogo -->
+            {% if contenido.variantes %}
+                <aside class="aprende-detail-side" aria-labelledby="tienda-ligada">
+
+                    <h2 id="tienda-ligada">Ver en tienda</h2>
+
+                    <ul class="aprende-variantes">
+                        {% for variante in contenido.variantes %}
+                            <li>
+                                <a href="{{ url_for('comercio.tienda') }}?q={{ variante.sku }}">
+                                    <strong>{{ variante.nombre_comercial or variante.sku }}</strong>
+                                    <small>{{ variante.sabor }} · {{ variante.presentacion }} · {{ variante.sku }}</small>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                    <a href="{{ url_for('comercio.tienda') }}" class="aprende-btn aprende-btn-soft">
+                        Ir a la tienda
+                    </a>
+
+                </aside>
+            {% endif %}
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         3. CTA / OTROS CONTENIDOS
+         ====================================================== -->
+
+    <section class="aprende-detail-more">
+
+        <div class="container aprende-detail-more-inner">
+
+            <a href="{{ url_for('aprende.portada') }}" class="aprende-btn aprende-btn-soft">
+                ← Volver a Aprende
+            </a>
+
+            <a href="{{ url_for('comercio.tienda') }}" class="aprende-btn aprende-btn-primary">
+                Descubrir los sabores
+                <span aria-hidden="true">→</span>
+            </a>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+{% endblock %}

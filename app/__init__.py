@@ -54,6 +54,9 @@ from app.admin.routes import admin_bp
 from app.admin.pedidos.routes import admin_pedidos_bp
 from app.admin.pedidos.commands import registrar_comandos_pedidos
 from app.admin.entregas.routes import admin_entregas_bp
+from app.admin.inventario.routes import admin_inventario_bp
+from app.admin.contenido.routes import admin_contenido_bp
+from app.aprende.routes import aprende_bp
 from app.repartidor.routes import repartidor_bp
 
 
@@ -218,6 +221,18 @@ def create_app():
 
     app.register_blueprint(
         admin_entregas_bp
+    )
+
+    app.register_blueprint(
+        admin_inventario_bp
+    )
+
+    app.register_blueprint(
+        admin_contenido_bp
+    )
+
+    app.register_blueprint(
+        aprende_bp
     )
 
     app.register_blueprint(

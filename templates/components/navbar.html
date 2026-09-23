@@ -78,6 +78,30 @@ Si cambia la navegación, se modifica únicamente aquí.
 
 
             <!-- =================================================
+                 Aprende
+                 ================================================= -->
+
+            <a
+                href="{{ url_for('aprende.portada') }}"
+                class="navbar-link"
+            >
+                Aprende
+            </a>
+
+
+            <!-- =================================================
+                 Mis favoritos
+                 ================================================= -->
+
+            <a
+                href="{{ url_for('comercio.mis_favoritos') }}"
+                class="navbar-link"
+            >
+                Favoritos
+            </a>
+
+
+            <!-- =================================================
                  PANEL ADMINISTRATIVO (Etapa 1)
                  =================================================
                  Enlace visible SOLO para usuarios cuyo
@@ -276,6 +300,26 @@ Si cambia la navegación, se modifica únicamente aquí.
                 class="navbar-mobile-link"
             >
                 Mis pedidos
+            </a>
+
+
+            <!-- Aprende -->
+
+            <a
+                href="{{ url_for('aprende.portada') }}"
+                class="navbar-mobile-link"
+            >
+                Aprende
+            </a>
+
+
+            <!-- Mis favoritos -->
+
+            <a
+                href="{{ url_for('comercio.mis_favoritos') }}"
+                class="navbar-mobile-link"
+            >
+                Mis favoritos
             </a>
 
 

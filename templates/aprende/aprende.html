@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Aprende | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/aprende.css') }}"
+>
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="aprende-page">
+
+
+    <!-- ======================================================
+         1. HERO EDUCATIVO
+         ====================================================== -->
+
+    <section class="aprende-hero">
+
+        <span class="aprende-hero-shape aprende-hero-shape-one" aria-hidden="true"></span>
+        <span class="aprende-hero-shape aprende-hero-shape-two" aria-hidden="true"></span>
+
+        <div class="container aprende-hero-grid">
+
+            <div class="aprende-hero-copy">
+
+                <span class="aprende-kicker">
+                    EXPERIENCIA SULPAA · APRENDE
+                </span>
+
+                <h1>
+                    Conoce el mundo
+                    <span>de tu kombucha.</span>
+                </h1>
+
+                <p>
+                    Qué es, cómo se elabora, cómo conviene disfrutarla
+                    y por qué cada sabor tiene su momento. Todo el
+                    contenido proviene de la experiencia educativa
+                    SULPAA.
+                </p>
+
+                <div class="aprende-hero-actions">
+                    <a href="#contenido" class="aprende-btn aprende-btn-primary">
+                        Explorar contenido
+                        <span aria-hidden="true">→</span>
+                    </a>
+                    <a href="{{ url_for('comercio.tienda') }}" class="aprende-btn aprende-btn-soft">
+                        Ir a la tienda
+                    </a>
+                </div>
+
+            </div>
+
+            <div class="aprende-hero-visual" aria-hidden="true">
+                <img
+                    src="{{ url_for('static', filename='img/QueesKombucha.png') }}"
+                    alt=""
+                    class="aprende-hero-img"
+                >
+                <span class="aprende-hero-bubble">
+                    Fermentada · viva · equilibrada
+                </span>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         2. PILARES VISUALES
+         ====================================================== -->
+
+    <section class="aprende-pillars" aria-label="Qué aprenderás">
+
+        <div class="container">
+
+            <div class="aprende-section-heading">
+                <span class="aprende-kicker">Tu guía</span>
+                <h2>¿Qué vas a descubrir?</h2>
+            </div>
+
+            <div class="aprende-pillars-grid">
+
+                <article class="aprende-pillar">
+                    <span class="aprende-pillar-icon" aria-hidden="true">◌</span>
+                    <h3>Qué es</h3>
+                    <p>La base natural de la kombucha y qué la hace especial.</p>
+                </article>
+
+                <article class="aprende-pillar">
+                    <span class="aprende-pillar-icon" aria-hidden="true">◍</span>
+                    <h3>Elaboración</h3>
+                    <p>El proceso de fermentación detrás de cada botella.</p>
+                </article>
+
+                <article class="aprende-pillar">
+                    <span class="aprende-pillar-icon" aria-hidden="true">◉</span>
+                    <h3>Sabores</h3>
+                    <p>Cada perfil SULPAA y cómo elegir el tuyo.</p>
+                </article>
+
+                <article class="aprende-pillar">
+                    <span class="aprende-pillar-icon" aria-hidden="true">◐</span>
+                    <h3>Consumo</h3>
+                    <p>Cómo disfrutarla y conservarla en casa.</p>
+                </article>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         3. CONTENIDO EDUCATIVO PUBLICADO (BD administrable)
+         ====================================================== -->
+
+    <section id="contenido" class="aprende-contenido" aria-labelledby="contenido-titulo">
+
+        <div class="container">
+
+            <div class="aprende-section-heading">
+                <span class="aprende-kicker">Biblioteca SULPAA</span>
+                <h2 id="contenido-titulo">Contenido educativo</h2>
+                <p>Todas las secciones se administran desde el panel y solo se
+                   publican cuando están completas.</p>
+            </div>
+
+            {% if contenidos %}
+
+                <div class="aprende-grid">
+
+                    {% for contenido in contenidos %}
+
+                        <a
+                            href="{{ url_for('aprende.detalle', slug=contenido.slug) }}"
+                            class="aprende-card"
+                        >
+
+                            {% if contenido.imagen_ruta %}
+                                <img
+                                    src="{{ url_for('static', filename=contenido.imagen_ruta) }}"
+                                    alt=""
+                                    class="aprende-card-img"
+                                >
+                            {% endif %}
+
+                            <div class="aprende-card-body">
+
+                                <span class="aprende-card-tag">
+                                    {{ contenido.tipo.replace("_", " ").title() }}
+                                </span>
+
+                                <h3>{{ contenido.titulo }}</h3>
+
+                                <p>
+                                    {{ contenido.resumen or "Explora esta sección de la experiencia educativa SULPAA." }}
+                                </p>
+
+                                <span class="aprende-card-link">
+                                    Leer sección
+                                    <span aria-hidden="true">→</span>
+                                    {% if contenido.total_fuentes %}
+                                        <small>· {{ contenido.total_fuentes }} fuente{{ "s" if contenido.total_fuentes != 1 }}</small>
+                                    {% endif %}
+                                </span>
+
+                            </div>
+
+                        </a>
+
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+
+                <div class="aprende-empty">
+                    <span aria-hidden="true">◌</span>
+                    <h3>Estamos preparando el contenido</h3>
+                    <p>Pronto habrá nuevas secciones educativas en esta experiencia.</p>
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         4. CTA A LA TIENDA
+         ====================================================== -->
+
+    <section class="aprende-cta">
+
+        <div class="container aprende-cta-inner">
+
+            <div>
+                <span class="aprende-kicker">SIGUE EXPLORANDO</span>
+                <h2>Ahora que la conoces, pruébala.</h2>
+                <p>Descubre los cuatro perfiles SULPAA y elige cómo disfrutarla.</p>
+            </div>
+
+            <a href="{{ url_for('comercio.tienda') }}" class="aprende-btn aprende-btn-light">
+                Explorar sabores en la tienda
+                <span aria-hidden="true">→</span>
+            </a>
+
+        </div>
+
+    </section>
+
+
+</main>
+
+{% endblock %}

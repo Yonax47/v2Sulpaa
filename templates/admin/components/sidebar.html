@@ -59,13 +59,41 @@
                 <span>Entregas</span>
             </span>
         {% endif %}
-        {% for modulo in ["Inventario", "Reportes"] %}
+        {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) or "INVENTARIO" in (session.get("roles") or []) %}
+            <a
+                href="{{ url_for('admin_inventario.listado') }}"
+                class="admin-nav-link{% if admin_activo == 'inventario' %} is-active{% endif %}"
+                {% if admin_activo == 'inventario' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">▤</span>
+                <span>Inventario</span>
+            </a>
+        {% else %}
             <span class="admin-nav-link is-disabled" aria-disabled="true">
-                <span class="admin-nav-icon" aria-hidden="true">•</span>
-                <span>{{ modulo }}</span>
-                <small>Próximamente</small>
+                <span class="admin-nav-icon" aria-hidden="true">▤</span>
+                <span>Inventario</span>
             </span>
-        {% endfor %}
+        {% endif %}
+        {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
+            <a
+                href="{{ url_for('admin_contenido.listado') }}"
+                class="admin-nav-link{% if admin_activo == 'contenido' %} is-active{% endif %}"
+                {% if admin_activo == 'contenido' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">◉</span>
+                <span>Contenido</span>
+            </a>
+        {% else %}
+            <span class="admin-nav-link is-disabled" aria-disabled="true">
+                <span class="admin-nav-icon" aria-hidden="true">◉</span>
+                <span>Contenido</span>
+            </span>
+        {% endif %}
+        <span class="admin-nav-link is-disabled" aria-disabled="true">
+            <span class="admin-nav-icon" aria-hidden="true">•</span>
+            <span>Reportes</span>
+            <small>Próximamente</small>
+        </span>
     </nav>
 
     <div class="admin-sidebar-footer">

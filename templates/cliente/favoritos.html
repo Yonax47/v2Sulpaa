@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Mis favoritos | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/store.css') }}"
+>
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/store-favoritos.css') }}"
+>
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="store-page fav-page">
+
+
+    <header class="fav-hero">
+
+        <div class="container fav-hero-inner">
+
+            <span class="store-kicker">TU LISTA SULPAA</span>
+
+            <h1>Mis favoritos</h1>
+
+            <p>
+                Guarda aquí los sabores que quieres volver a
+                disfrutar. Cada producto conserva su precio y
+                disponibilidad reales.
+            </p>
+
+        </div>
+
+    </header>
+
+
+    {% if favoritos %}
+
+        <section class="fav-grid container">
+
+            {% for favorito in favoritos %}
+
+                <article
+                    class="fav-card{% if not favorito.disponible %} is-agotado{% endif %}"
+                    data-variante-id="{{ favorito.variante_id }}"
+                >
+
+                    <div class="fav-card-visual"
+                         style="--sabor: 1"
+                         aria-hidden="true">
+                        <span class="fav-orbit"></span>
+                        <img
+                            src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
+                            alt=""
+                            class="fav-bottle"
+                        >
+                    </div>
+
+                    <div class="fav-card-body">
+
+                        <span class="fav-sku">{{ favorito.sku }}</span>
+
+                        <h2>{{ favorito.nombre_comercial }}</h2>
+
+                        <p class="fav-profile">
+                            {{ favorito.sabor }} · {{ favorito.presentacion }}
+                        </p>
+
+                        <div class="fav-stock">
+                            {% if favorito.disponible %}
+                                <span class="fav-stock-ok">
+                                    <i aria-hidden="true">●</i>
+                                    En stock
+                                    <small>
+                                        ({{ favorito.stock_disponible }} disp.)
+                                    </small>
+                                </span>
+                            {% else %}
+                                <span class="fav-stock-no">
+                                    <i aria-hidden="true">●</i>
+                                    Agotado
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="fav-footer">
+
+                            <strong class="fav-price">
+                                {% if favorito.precio is not none %}
+                                    S/ {{ "%.2f"|format(favorito.precio) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </strong>
+
+                            <div class="fav-actions">
+
+                                {% if favorito.articulo_venta_id %}
+                                    <a
+                                        href="{{ url_for('comercio.tienda') }}"
+                                        class="store-btn store-btn-primary fav-btn-buy"
+                                    >
+                                        Comprar
+                                    </a>
+                                {% endif %}
+
+                                <button
+                                    type="button"
+                                    class="store-btn store-btn-secondary fav-btn-remove"
+                                    data-variante-id="{{ favorito.variante_id }}"
+                                >
+                                    Quitar
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </article>
+
+            {% endfor %}
+
+        </section>
+
+    {% else %}
+
+        <section class="fav-empty container">
+
+            <span aria-hidden="true">♡</span>
+
+            <h2>Aún no tienes favoritos</h2>
+
+            <p>
+                Cuando veas un sabor que te encante, toca el
+                corazón para guardarlo en tu lista.
+            </p>
+
+            <a
+                href="{{ url_for('comercio.tienda') }}"
+                class="store-btn store-btn-primary"
+            >
+                Explorar la tienda
+            </a>
+
+        </section>
+
+    {% endif %}
+
+
+</main>
+
+
+<script>
+    document.addEventListener("click", async (event) => {
+
+        const boton = event.target.closest(".fav-btn-remove");
+
+        if (!boton) return;
+
+        const varianteId = boton.dataset.varianteId;
+
+        if (!varianteId) return;
+
+        boton.disabled = true;
+
+        try {
+
+            const respuesta = await fetch(
+                "{{ url_for('comercio.api_quitar_favorito') }}",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "variante_id": varianteId,
+                    }),
+                }
+            );
+
+            const datos = await respuesta.json();
+
+            if (datos.ok) {
+
+                window.location.reload();
+
+            } else {
+
+                alert(datos.mensaje || "No se pudo quitar el favorito.");
+                boton.disabled = false;
+
+            }
+
+        } catch (error) {
+
+            alert("Ocurrió un error de conexión. Inténtalo de nuevo.");
+            boton.disabled = false;
+
+        }
+
+    });
+</script>
+
+{% endblock %}

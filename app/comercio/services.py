@@ -51,11 +51,18 @@ from app.comercio.repositories import (
     cerrar_carrito_usuario,
     obtener_variantes_snapshot,
     reabrir_carrito_usuario,
-    obtener_pedidos_usuario,
+obtener_pedidos_usuario,
     obtener_pedido_usuario,
     obtener_detalles_pedido,
     obtener_composiciones_pedido,
     obtener_historial_pedido,
+    listar_favoritos_usuario,
+    agregar_favorito,
+    quitar_favorito,
+    registrar_auditoria_favorito,
+    obtener_variante_por_id,
+    obtener_variante_por_sku,
+    registrar_consulta_producto,
 )
 
 from app.comercio.pedido_states import etiqueta_estado_pedido
@@ -3308,4 +3315,329 @@ def obtener_detalle_pedido_usuario(
     return {
         "ok": True,
         "pedido": pedido,
+    }
+
+
+# ============================================================
+# 30. FAVORITOS — LISTAR
+# ============================================================
+
+def listar_favoritos_del_usuario(usuario_id):
+    """
+    Devuelve los favoritos REALES del usuario autenticado,
+    cada uno con su precio vigente y disponibilidad actual.
+
+    El repositorio filtra SIEMPRE por usuario_id y solo
+    devuelve variantes ACTIVAS.
+    """
+
+    favoritos = listar_favoritos_usuario(
+        usuario_id
+    )
+
+    variantes_ids = [
+        item["variante_id"]
+        for item in favoritos
+        if item.get("variante_id")
+    ]
+
+    disponibilidad = {}
+
+    if variantes_ids:
+
+        disponibilidad = obtener_disponibilidad_variantes(
+            variantes_ids
+        )
+
+    resultado = []
+
+    for favorito in favoritos:
+
+        variante_id = favorito["variante_id"]
+
+        stock = disponibilidad.get(
+            variante_id,
+            _stock_vacio(),
+        )
+
+        favorito.get("precio")
+        moneda = favorito.get("moneda") or "PEN"
+
+        precio = (
+            float(favorito["precio"])
+            if favorito.get("precio") is not None
+            else None
+        )
+
+        resultado.append({
+            "favorito_id":
+                favorito["favorito_id"],
+
+            "variante_id":
+                variante_id,
+
+            "sku":
+                favorito["sku"],
+
+            "nombre_comercial":
+                favorito["nombre_comercial"],
+
+            "sabor":
+                favorito["sabor"],
+
+            "presentacion":
+                favorito["presentacion"],
+
+            "articulo_venta_id":
+                favorito.get("articulo_venta_id"),
+
+            "precio":
+                precio,
+
+            "moneda":
+                moneda,
+
+            "creado_en":
+                favorito["creado_en"],
+
+            "stock_fisico":
+                stock["stock_fisico"],
+
+            "stock_reservado":
+                stock["stock_reservado"],
+
+            "stock_disponible":
+                stock["stock_disponible"],
+
+            "disponible":
+                stock["disponible"],
+        })
+
+    return resultado
+
+
+# ============================================================
+# 31. FAVORITOS — AGREGAR (CON AUDITORÍA KPI-06)
+# ============================================================
+
+def agregar_variante_a_favoritos(usuario_id, variante_id):
+    """
+    Agrega una variante REAL y ACTIVA a los favoritos del usuario.
+
+    Flujo (transaccional por diseño):
+
+    1. Valida que la variante exista y esté ACTIVA.
+    2. Registra el favorito (idempotente por UNIQUE).
+    3. Deja auditoría append-only del intento real (KPI-06).
+
+    Un intento inválido se registra con resultado FALLO,
+    de modo que el KPI-06 conserva la evidencia real.
+    """
+
+    if not usuario_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Debes iniciar sesión para usar favoritos.",
+        }
+
+    variante = obtener_variante_por_id(
+        str(variante_id or "")
+    )
+
+    if not variante:
+
+        # Evidencia de intento fallido (KPI-06).
+        registrar_auditoria_favorito(
+            usuario_id,
+            variante_id,
+            "AGREGAR",
+            "FALLO",
+        )
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El producto solicitado no está disponible.",
+        }
+
+    variante_id_real = variante["variante_id"]
+
+    agregar_favorito(
+        usuario_id,
+        variante_id_real,
+    )
+
+    registrar_auditoria_favorito(
+        usuario_id,
+        variante_id_real,
+        "AGREGAR",
+        "EXITO",
+    )
+
+    favoritos = listar_favoritos_del_usuario(
+        usuario_id
+    )
+
+    return {
+        "ok": True,
+        "mensaje":
+            "Producto agregado a favoritos.",
+        "favoritos": favoritos,
+    }
+
+
+# ============================================================
+# 32. FAVORITOS — QUITAR (CON AUDITORÍA KPI-06)
+# ============================================================
+
+def quitar_variante_de_favoritos(usuario_id, variante_id):
+    """
+    Quita una variante de los favoritos del usuario.
+
+    La operación es idempotente: si la variante no estaba en
+    favoritos, no se elimina nada y el intento queda en la
+    auditoría con resultado FALLO (evidencia real del KPI-06).
+    """
+
+    if not usuario_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "Debes iniciar sesión para usar favoritos.",
+        }
+
+    variante = obtener_variante_por_id(
+        str(variante_id or "")
+    )
+
+    variante_id_real = (
+        variante["variante_id"]
+        if variante
+        else str(variante_id or "")
+    )
+
+    eliminado = quitar_favorito(
+        usuario_id,
+        variante_id_real,
+    )
+
+    registrar_auditoria_favorito(
+        usuario_id,
+        variante_id_real,
+        "QUITAR",
+        "EXITO" if eliminado else "FALLO",
+    )
+
+    if not eliminado:
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El producto no estaba en tus favoritos.",
+        }
+
+    favoritos = listar_favoritos_del_usuario(
+        usuario_id
+    )
+
+    return {
+        "ok": True,
+        "mensaje":
+            "Producto quitado de favoritos.",
+        "favoritos": favoritos,
+    }
+
+
+# ============================================================
+# 33. FICHA DE PRODUCTO (KPI-03)
+# ============================================================
+
+def obtener_ficha_producto(sku, usuario_id=None):
+    """
+    Resuelve la ficha pública de un producto por SKU y
+    registra el intento real de consulta (KPI-03).
+
+    - Si el SKU corresponde a una variante ACTIVA:
+      resultado EXITO y se devuelve la ficha.
+    - Si el SKU no existe: resultado FALLO y se devuelve None
+      (la URL es legítima pero el recurso no está disponible).
+    """
+
+    sku = str(sku or "").strip()
+
+    variante = obtener_variante_por_sku(sku)
+
+    if not variante:
+
+        registrar_consulta_producto(
+            sku=sku,
+            variante_id=None,
+            usuario_id=usuario_id,
+            resultado="FALLO",
+        )
+
+        return None
+
+    disponibilidad = obtener_disponibilidad_variantes(
+        [variante["variante_id"]]
+    )
+
+    stock = disponibilidad.get(
+        variante["variante_id"],
+        _stock_vacio(),
+    )
+
+    registrar_consulta_producto(
+        sku=sku,
+        variante_id=variante["variante_id"],
+        usuario_id=usuario_id,
+        resultado="EXITO",
+    )
+
+    return {
+        "variante_id":
+            variante["variante_id"],
+
+        "sku":
+            variante["sku"],
+
+        "nombre_comercial":
+            variante["nombre_comercial"],
+
+        "sabor":
+            variante["sabor"],
+
+        "presentacion":
+            variante["presentacion"],
+
+        "precio":
+            (
+                float(variante["precio"])
+                if variante.get("precio") is not None
+                else None
+            ),
+
+        "moneda":
+            variante.get("moneda") or "PEN",
+
+        "peso_gramos":
+            variante.get("peso_gramos"),
+
+        "articulo_venta_id":
+            variante.get("articulo_venta_id"),
+
+        "stock_fisico":
+            stock["stock_fisico"],
+
+        "stock_reservado":
+            stock["stock_reservado"],
+
+        "stock_disponible":
+            stock["stock_disponible"],
+
+        "disponible":
+            stock["disponible"],
     }

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Inventario | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "inventario" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Inventario</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Operación de stock</span>
+                    <h1>Inventario</h1>
+                    <p>Consulta existencias reales, registra verificaciones físicas y administra movimientos con trazabilidad.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ existencias|length }} existencias
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de inventario">
+                <label class="admin-filter-field admin-filter-search">
+                    <span>Buscar</span>
+                    <input type="search" name="q" value="{{ filtros.q }}" placeholder="SKU o nombre comercial">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Nivel</span>
+                    <select name="bajo_minimo">
+                        <option value="">Todos</option>
+                        <option value="1"{% if filtros.bajo_minimo %} selected{% endif %}>Bajo el mínimo</option>
+                    </select>
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar filtros</button>
+                    <a href="{{ url_for('admin_inventario.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if existencias %}
+                <section class="admin-order-table-card" aria-labelledby="inventario-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Datos actuales</span>
+                            <h2 id="inventario-titulo">Existencias por variante</h2>
+                        </div>
+                    </div>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Sabor / Presentación</th>
+                                    <th>Stock físico</th>
+                                    <th>Reservado</th>
+                                    <th>Disponible</th>
+                                    <th>Mínimo</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ex in existencias %}
+                                    <tr>
+                                        <td data-label="Producto">
+                                            <strong>{{ ex.nombre_comercial or "—" }}</strong>
+                                            <small>{{ ex.sku or "" }}</small>
+                                        </td>
+                                        <td data-label="Sabor / Presentación">
+                                            <strong>{{ ex.sabor }}</strong>
+                                            <small>{{ ex.presentacion }}</small>
+                                        </td>
+                                        <td data-label="Stock físico">
+                                            <strong>{{ ex.stock_fisico }}</strong>
+                                        </td>
+                                        <td data-label="Reservado">
+                                            <span>{{ ex.stock_reservado }}</span>
+                                        </td>
+                                        <td data-label="Disponible">
+                                            <strong>{{ ex.stock_disponible }}</strong>
+                                        </td>
+                                        <td data-label="Mínimo">
+                                            <span>{{ ex.stock_minimo }}</span>
+                                        </td>
+                                        <td data-label="">
+                                            <a
+                                                href="{{ url_for('admin_inventario.detalle', existencia_id=ex.existencia_id) }}"
+                                                class="admin-table-link"
+                                            >
+                                                Gestionar
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% else %}
+                <div class="admin-empty-state">
+                    <span aria-hidden="true">▣</span>
+                    <h2>Sin existencias</h2>
+                    <p>No se encontraron registros con los filtros aplicados.</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}
