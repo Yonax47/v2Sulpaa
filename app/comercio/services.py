@@ -2981,6 +2981,41 @@ _ETIQUETAS_TIPO_ENTREGA = {
     "TRANSPORTISTA_ASOCIADO": "Transportista",
 }
 
+_ETIQUETAS_ASIGNACION = {
+    "ASIGNADA": "Asignada",
+    "ACEPTADA": "Aceptada",
+    "REASIGNADA": "Reasignada",
+    "FINALIZADA": "Finalizada",
+    "CANCELADA": "Cancelada",
+}
+
+_ETIQUETAS_ENVIO_SEGUIMIENTO = {
+    "PENDIENTE_DESPACHO": "Pendiente de despacho",
+    "ENTREGADO_TRANSPORTISTA": "Entregado al transportista",
+    "DESPACHADO": "Despachado",
+    "EN_TRANSITO": "En tránsito",
+    "EN_AGENCIA_DESTINO": "En agencia destino",
+    "EN_REPARTO": "En reparto",
+    "ENTREGADO": "Entregado",
+    "INCIDENCIA": "Incidencia",
+    "CANCELADO": "Cancelado",
+}
+
+_ESTADOS_ENTREGA_CON_CODIGO = {
+    "LISTO",
+    "LISTO_PARA_RECOJO",
+    "PROGRAMADO",
+    "EN_TRANSITO",
+}
+
+
+def _codigo_cliente_visible(token, estado):
+    """Devuelve el código solo al propietario y en estados vigentes."""
+    if str(estado or "").upper() not in _ESTADOS_ENTREGA_CON_CODIGO:
+        return None
+    from app.operaciones.codigos_cliente import descifrar_codigo
+    return descifrar_codigo(token)
+
 _CLASES_ESTADO_PEDIDO = {
     "CREADO": "pending",
     "CONFIRMADO": "confirmed",
@@ -3163,6 +3198,36 @@ def obtener_detalle_pedido_usuario(
             entrega["tipo_entrega"],
             _ETIQUETAS_TIPO_ENTREGA,
         )
+
+        # ----------------------------------------------------
+        # Código de retiro/entrega: SOLO al propietario y SOLO
+        # mientras la entrega sigue en curso. Fuera de esos
+        # estados el código no se muestra (ya fue consumido en
+        # la confirmación o la entrega fue cancelada).
+        # ----------------------------------------------------
+
+        entrega["codigo_cliente"] = _codigo_cliente_visible(
+            entrega.get("codigo_cliente_token"),
+            entrega["estado"],
+        )
+        entrega.pop("codigo_cliente_token", None)
+
+        # Etiquetas legibles del seguimiento y asignaciones.
+        for asignacion in entrega.get("asignaciones") or []:
+            asignacion["asignacion_estado_label"] = _etiqueta_estado(
+                asignacion.get("asignacion_estado"),
+                _ETIQUETAS_ASIGNACION,
+            )
+        eventos_seguimiento = [
+            evento for evento in (entrega.get("seguimiento") or [])
+            if evento.get("evento_estado")
+        ]
+        for evento in eventos_seguimiento:
+            evento["evento_estado_label"] = _etiqueta_estado(
+                evento.get("evento_estado"),
+                _ETIQUETAS_ENVIO_SEGUIMIENTO,
+            )
+        entrega["seguimiento"] = eventos_seguimiento
 
         # ----------------------------------------------------
         # Nombre legible del distrito destino (delivery)

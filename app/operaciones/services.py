@@ -1757,3 +1757,1117 @@ def crear_entrega_pedido(pedido_id, usuario_id, entrega):
 
 def compensar_entrega_pedido(pedido_id, usuario_id):
     return cancelar_entrega_checkout(pedido_id, usuario_id)
+
+
+# ============================================================
+# BLOQUE 2 — OPERACIÓN DE ENTREGAS Y FINALIZACIÓN DE PEDIDOS
+# ============================================================
+#
+# El frontend nunca decide estados: las rutas representan ACCIONES
+# (listo, programar, asignar, iniciar, confirmar, incidencia) y este
+# Service valida rol, modalidad, secuencia y coherencia antes de
+# coordinar escrituras con UN solo commit entre Comercio y Operaciones.
+#
+# COMPLETADO es el único estado terminal comercial: se alcanza de forma
+# automática cuando entrega, pago y trazabilidad quedan confirmados.
+# ============================================================
+
+import uuid as _uuid
+
+import bcrypt as _bcrypt
+
+from app.operaciones import repositories as _repos
+from app.operaciones.codigos_cliente import (
+    cifrar_codigo as _cifrar_codigo_cliente,
+    descifrar_codigo as _descifrar_codigo_cliente,
+    generar_codigo as _generar_codigo_cliente,
+    verificar_codigo as _verificar_codigo_cliente,
+)
+from app.comercio.pedido_states import ESTADO_COMPLETADO
+from app.shared.unit_of_work import UnidadTrabajo
+from app.shared.validators import (
+    validar_correo,
+    validar_password,
+    validar_nombre,
+    validar_telefono_peru,
+    normalizar_telefono,
+)
+
+ROLES_OPERACION_ENTREGAS = frozenset({
+    "GERENTE",
+    "ADMINISTRADOR",
+    "PEDIDOS_LOGISTICA",
+})
+
+ROLES_CONFIRMACION_ENTREGA = frozenset({
+    "GERENTE",
+    "ADMINISTRADOR",
+    "PEDIDOS_LOGISTICA",
+    "REPARTIDOR",
+})
+
+TRANSICIONES_ENTREGA = {
+    "EN_PREPARACION": {"LISTO", "LISTO_PARA_RECOJO", "CANCELADO", "INCIDENCIA"},
+    "LISTO": {"PROGRAMADO", "CANCELADO", "INCIDENCIA"},
+    "LISTO_PARA_RECOJO": {"ENTREGADO", "CANCELADO", "INCIDENCIA"},
+    "PROGRAMADO": {"EN_TRANSITO", "ENTREGADO", "CANCELADO", "INCIDENCIA"},
+    "EN_TRANSITO": {"ENTREGADO", "CANCELADO", "INCIDENCIA"},
+    "INCIDENCIA": {"CANCELADO"},
+}
+
+ESTADOS_ENTREGA_PENDIENTES_CODIGO = {
+    "LISTO", "LISTO_PARA_RECOJO", "PROGRAMADO", "EN_TRANSITO",
+}
+
+ETIQUETAS_ASIGNACION = {
+    "ASIGNADA": "Asignada",
+    "ACEPTADA": "Aceptada",
+    "REASIGNADA": "Reasignada",
+    "FINALIZADA": "Finalizada",
+    "CANCELADA": "Cancelada",
+}
+
+ETIQUETAS_ENVIO = {
+    "PENDIENTE_DESPACHO": "Pendiente de despacho",
+    "ENTREGADO_TRANSPORTISTA": "Entregado al transportista",
+    "DESPACHADO": "Despachado",
+    "EN_TRANSITO": "En tránsito",
+    "EN_AGENCIA_DESTINO": "En agencia destino",
+    "EN_REPARTO": "En reparto",
+    "ENTREGADO": "Entregado",
+    "INCIDENCIA": "Incidencia",
+    "CANCELADO": "Cancelado",
+}
+
+TRANSICIONES_ENVIO = {
+    "PENDIENTE_DESPACHO": {"ENTREGADO_TRANSPORTISTA", "INCIDENCIA", "CANCELADO"},
+    "ENTREGADO_TRANSPORTISTA": {"DESPACHADO", "INCIDENCIA", "CANCELADO"},
+    "DESPACHADO": {"EN_TRANSITO", "INCIDENCIA", "CANCELADO"},
+    "EN_TRANSITO": {"EN_AGENCIA_DESTINO", "EN_REPARTO", "INCIDENCIA", "CANCELADO"},
+    "EN_AGENCIA_DESTINO": {"EN_REPARTO", "INCIDENCIA", "CANCELADO"},
+    "EN_REPARTO": {"ENTREGADO", "INCIDENCIA", "CANCELADO"},
+    "INCIDENCIA": {"DESPACHADO", "EN_TRANSITO", "EN_REPARTO", "ENTREGADO", "CANCELADO"},
+}
+
+ESTADOS_ENVIO_DESCRIPCION = {
+    "ENTREGADO_TRANSPORTISTA": "El pedido fue recibido por el transportista.",
+    "DESPACHADO": "El envío fue despachado hacia el destino.",
+    "EN_TRANSITO": "El envío se encuentra en tránsito.",
+    "EN_AGENCIA_DESTINO": "El envío llegó a la agencia de destino.",
+    "EN_REPARTO": "El envío está en reparto dentro del destino.",
+    "ENTREGADO": "El envío fue entregado al destinatario.",
+}
+
+
+class ReglaOperativaError(Exception):
+    """Error de negocio seguro para mostrar en la operativa real."""
+
+
+def _roles_normalizados(roles):
+    return {str(rol).strip().upper() for rol in (roles or [])}
+
+
+def _puede_operar_entregas(roles):
+    return bool(_roles_normalizados(roles) & ROLES_OPERACION_ENTREGAS)
+
+
+def _puede_confirmar_entrega(roles):
+    return bool(_roles_normalizados(roles) & ROLES_CONFIRMACION_ENTREGA)
+
+
+def _transicion_habilitada(anterior, nuevo):
+    return nuevo in TRANSICIONES_ENTREGA.get(
+        str(anterior or "").upper(), set()
+    )
+
+
+def _transicion_envio_habilitada(anterior, nuevo):
+    return nuevo in TRANSICIONES_ENVIO.get(
+        str(anterior or "").upper(), set()
+    )
+
+
+def _valores_entrega_bloqueo(contexto, roles, accion):
+    """Valida identidad del contexto bloqueado y permisos del actor.
+
+    `accion == "confirmar_repartidor"` exige que el actor tenga asignada
+    y ACEPTADA la entrega, además de las validaciones comunes de contexto.
+    """
+    if not contexto:
+        raise ReglaOperativaError("La entrega solicitada no existe.")
+    if not contexto["entrega"] or not contexto["pedido"]:
+        raise ReglaOperativaError("No se encontró la entrega o su pedido.")
+    if contexto["incidencias_activas"] and accion not in ("resolver", "cancelar"):
+        raise ReglaOperativaError(
+            "La entrega tiene una incidencia abierta; resuélvela primero."
+        )
+    if accion == "confirmar_repartidor":
+        return
+    if not _puede_operar_entregas(roles):
+        raise ReglaOperativaError("No tienes permisos para esta operación.")
+
+
+def marcar_entrega_listo(actor_id, roles, entrega_id):
+    """Marca la entrega preparada (LISTO) y emite el código de delivery."""
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "listo")
+        entrega = contexto["entrega"]
+        destino = "LISTO"
+        if not _transicion_habilitada(entrega["estado"], destino):
+            raise ReglaOperativaError(
+                "La entrega ya no se encuentra en un estado que permita marcarla lista."
+            )
+        if entrega["tipo_entrega"] == "RECOJO_LOCAL":
+            raise ReglaOperativaError(
+                "El recojo en local usa 'confirmar recojo disponible'."
+            )
+
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino,
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino, actor_id,
+            "Pedido preparado; entrega lista para continuar.",
+        )
+        codigo = None
+        if entrega["tipo_entrega"] == "DELIVERY_LOCAL":
+            codigo = _generar_codigo_cliente()
+            _repos.actualizar_codigo_cliente_entrega(
+                unidad.conexion, unidad.esquemas, entrega_id,
+                _cifrar_codigo_cliente(codigo),
+            )
+        unidad.confirmar()
+
+    return {"ok": True, "estado": destino, "codigo_cliente": codigo}
+
+
+def confirmar_recojo_disponible(actor_id, roles, entrega_id):
+    """Activa el recojo: LISTO_PARA_RECOJO, notificación y código."""
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "recojo")
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] != "RECOJO_LOCAL":
+            raise ReglaOperativaError(
+                "Solo las entregas de recojo local usan esta acción."
+            )
+        destino = "LISTO_PARA_RECOJO"
+        if not _transicion_habilitada(entrega["estado"], destino):
+            raise ReglaOperativaError(
+                "El recojo ya no se encuentra en un estado que permita activarlo."
+            )
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino,
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino, actor_id,
+            "Recojo notificado y disponible en el punto seleccionado.",
+        )
+        _repos.actualizar_notificado_recojo(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        codigo = _generar_codigo_cliente()
+        _repos.actualizar_codigo_cliente_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            _cifrar_codigo_cliente(codigo),
+        )
+        unidad.confirmar()
+
+    return {"ok": True, "estado": destino, "codigo_cliente": codigo}
+
+
+def programar_entrega(actor_id, roles, entrega_id, fecha_programada):
+    """Programa la fecha de la entrega para delivery o transportista."""
+    if isinstance(fecha_programada, str):
+        fecha_programada = _fecha_iso_operativa(fecha_programada)
+    if not fecha_programada:
+        raise ReglaOperativaError("Selecciona una fecha de programación.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "programar")
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] == "RECOJO_LOCAL":
+            raise ReglaOperativaError(
+                "El recojo en local no requiere programación de reparto."
+            )
+        destino = "PROGRAMADO"
+        if not _transicion_habilitada(entrega["estado"], destino):
+            raise ReglaOperativaError(
+                "La entrega debe estar lista antes de programarse."
+            )
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino, fecha_programada=fecha_programada,
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino, actor_id,
+            f"Entrega programada para el {fecha_programada.strftime('%d/%m/%Y %H:%M')}.",
+        )
+        unidad.confirmar()
+
+    return {"ok": True, "estado": destino, "fecha_programada": fecha_programada}
+
+
+def _fecha_iso_operativa(valor):
+    from datetime import datetime as _datetime
+    try:
+        return _datetime.strptime(str(valor).strip(), "%Y-%m-%dT%H:%M")
+    except ValueError:
+        pass
+    try:
+        return _datetime.strptime(str(valor).strip(), "%Y-%m-%d %H:%M")
+    except ValueError as error:
+        raise ReglaOperativaError(
+            "La fecha de programación no es válida."
+        ) from error
+
+
+def asignar_repartidor(actor_id, roles, entrega_id, repartidor_id):
+    """Asigna el reparto a un repartidor ACTIVO y con disponibilidad real."""
+    if not repartidor_id:
+        raise ReglaOperativaError("Selecciona un repartidor.")
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "asignar")
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] != "DELIVERY_LOCAL":
+            raise ReglaOperativaError(
+                "Solo los deliveries locales se asignan a repartidores."
+            )
+        if entrega["estado"] not in {"PROGRAMADO", "EN_TRANSITO"}:
+            raise ReglaOperativaError(
+                "La entrega debe estar programada antes de asignar reparto."
+            )
+        repartidor = _repos.obtener_repartidor_activo(
+            unidad.conexion, unidad.esquemas, repartidor_id
+        )
+        if not repartidor:
+            raise ReglaOperativaError(
+                "El repartidor no existe o no está activo."
+            )
+        # Evita la doble asignación operativa del mismo repartidor.
+        asignaciones = _repos.obtener_asignaciones_activas_repartidor(
+            unidad.conexion, unidad.esquemas, repartidor_id
+        )
+        for asignacion in asignaciones:
+            if asignacion["entrega_id"] == entrega_id:
+                raise ReglaOperativaError(
+                    "Este repartidor ya tiene asignada la entrega."
+                )
+        if repartidor["disponible"] == 0 and asignaciones:
+            raise ReglaOperativaError(
+                "El repartidor se encuentra ocupado con otro reparto."
+            )
+
+        _repos.crear_asignacion_repartidor(
+            unidad.conexion, unidad.esquemas, str(_uuid.uuid4()),
+            entrega_id, repartidor_id, actor_id,
+        )
+        _repos.actualizar_disponibilidad_repartidor(
+            unidad.conexion, unidad.esquemas, repartidor_id, False
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], entrega["estado"], actor_id,
+            "Repartidor asignado al reparto.",
+        )
+        unidad.confirmar()
+
+    return {"ok": True, "accion": "ASIGNADA"}
+
+
+def aceptar_asignacion(actor_id, entrega_id):
+    """El repartidor autenticado acepta ÚNICAMENTE su propia asignación."""
+    if not actor_id:
+        raise ReglaOperativaError("Tu sesión de repartidor no es válida.")
+    with UnidadTrabajo() as unidad:
+        repartidor = _repos.obtener_repartidor_por_usuario(
+            unidad.conexion, unidad.esquemas, actor_id
+        )
+        if not repartidor:
+            raise ReglaOperativaError("Tu usuario no es un repartidor activo.")
+        asignacion = _repos.obtener_asignacion_repartidor_entrega(
+            unidad.conexion, unidad.esquemas, repartidor["id"], entrega_id
+        )
+        if not asignacion:
+            raise ReglaOperativaError(
+                "La entrega no te está asignada o ya fue procesada."
+            )
+        if asignacion["estado"] == "ACEPTADA":
+            raise ReglaOperativaError("Ya aceptaste esta asignación.")
+        if asignacion["estado"] != "ASIGNADA":
+            raise ReglaOperativaError(
+                "La asignación no se encuentra en estado ASIGNADA."
+            )
+        _repos.actualizar_asignacion_estado(
+            unidad.conexion, unidad.esquemas, asignacion["id"],
+            "ACEPTADA", aceptar=True,
+        )
+        unidad.confirmar()
+    return {"ok": True, "accion": "ACEPTADA"}
+
+
+def iniciar_reparto(actor_id, roles, entrega_id):
+    """Pone la entrega EN_TRANSITO con evidencia de asignación aceptada."""
+    roles_ok = _roles_normalizados(roles)
+    es_repartidor = "REPARTIDOR" in roles_ok
+    if not es_repartidor and not _puede_operar_entregas(roles_ok):
+        raise ReglaOperativaError("No tienes permisos para iniciar el reparto.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(
+            contexto, roles_ok,
+            "confirmar_repartidor" if es_repartidor else "iniciar",
+        )
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] != "DELIVERY_LOCAL":
+            raise ReglaOperativaError(
+                "Solo los deliveries locales inician reparto presencial."
+            )
+        destino = "EN_TRANSITO"
+        if not _transicion_habilitada(entrega["estado"], destino):
+            raise ReglaOperativaError(
+                "La entrega debe estar programada para iniciar el reparto."
+            )
+
+        asignacion_activa = None
+        if es_repartidor:
+            repartidor = _repos.obtener_repartidor_por_usuario(
+                unidad.conexion, unidad.esquemas, actor_id
+            )
+            if not repartidor:
+                raise ReglaOperativaError("Tu usuario no es repartidor activo.")
+            asignacion_activa = _repos.obtener_asignacion_repartidor_entrega(
+                unidad.conexion, unidad.esquemas, repartidor["id"], entrega_id
+            )
+            if not asignacion_activa:
+                raise ReglaOperativaError(
+                    "La entrega no te está asignada y no puedes iniciarla."
+                )
+            if asignacion_activa["estado"] != "ACEPTADA":
+                raise ReglaOperativaError(
+                    "Acepta primero la asignación para iniciar el reparto."
+                )
+        else:
+            asignacion_activa = _repos.obtener_asignacion_activa_entrega(
+                unidad.conexion, unidad.esquemas, entrega_id
+            )
+            if not asignacion_activa:
+                raise ReglaOperativaError(
+                    "La entrega requiere una asignación activa para iniciarse."
+                )
+
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino,
+        )
+        _repos.actualizar_iniciado_delivery(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], destino, actor_id,
+            "Reparto en curso hacia el destino.",
+        )
+        unidad.confirmar()
+
+    return {"ok": True, "estado": destino}
+
+
+def confirmar_entrega(actor_id, roles, entrega_id, codigo_cliente=None):
+    """Confirma la entrega, cobra si corresponde y evalúa COMPLETADO."""
+    roles_ok = _roles_normalizados(roles)
+    es_repartidor = "REPARTIDOR" in roles_ok
+    if not es_repartidor and not _puede_confirmar_entrega(roles_ok):
+        raise ReglaOperativaError("No tienes permisos para confirmar la entrega.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        if not contexto:
+            raise ReglaOperativaError("La entrega solicitada no existe.")
+        if es_repartidor and not _puede_operar_entregas(roles_ok):
+            repartidor = _repos.obtener_repartidor_por_usuario(
+                unidad.conexion, unidad.esquemas, actor_id
+            )
+            if not repartidor:
+                raise ReglaOperativaError("Tu usuario no es repartidor activo.")
+            asignacion = _repos.obtener_asignacion_repartidor_entrega(
+                unidad.conexion, unidad.esquemas,
+                repartidor["id"], entrega_id,
+            )
+            if not asignacion or asignacion["estado"] != "ACEPTADA":
+                raise ReglaOperativaError(
+                    "La entrega no te está asignada y aceptada."
+                )
+        _valores_entrega_bloqueo(
+            contexto, roles_ok,
+            "confirmar_repartidor" if es_repartidor else "confirmar",
+        )
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] != "DELIVERY_LOCAL":
+            raise ReglaOperativaError(
+                "Este flujo confirma deliveries locales; usa la acción de recojo o transportista."
+            )
+        if entrega["estado"] != "EN_TRANSITO":
+            raise ReglaOperativaError(
+                "La entrega debe estar en tránsito para confirmarse."
+            )
+        if not _verificar_codigo_cliente(
+            entrega["codigo_cliente_token"], codigo_cliente
+        ):
+            raise ReglaOperativaError("El código de entrega no es válido.")
+
+        pago = contexto["pago"]
+        _gestionar_cobro(
+            unidad, pago, "CONTRA_ENTREGA", entrega["tipo_entrega"],
+            actor_id, "Cobrado contra entrega al recibir el pedido.",
+        )
+
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], "ENTREGADO", completar=True,
+        )
+        _repos.actualizar_entregado_delivery(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        repartidores_finalizados = _repos.finalizar_asignaciones_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        for repartidor_id in repartidores_finalizados:
+            _repos.actualizar_disponibilidad_repartidor(
+                unidad.conexion, unidad.esquemas, repartidor_id, True
+            )
+        _repos.limpiar_codigo_cliente_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            "EN_TRANSITO", "ENTREGADO", actor_id,
+            "Entrega confirmada en el destino.",
+        )
+        _evaluar_finalizacion_pedido(
+            unidad, contexto["pedido"]["id"], actor_id,
+            motivo="Entrega confirmada.",
+        )
+        unidad.confirmar()
+
+    return {"ok": True, "estado": "ENTREGADO"}
+
+
+def confirmar_recojo(actor_id, roles, entrega_id, codigo_cliente=None):
+    """Confirma el recojo en el punto, cobra si corresponde y evalúa."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("Solo el equipo operativo confirma un recojo.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "confirmar")
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] != "RECOJO_LOCAL":
+            raise ReglaOperativaError(
+                "Este flujo confirma entregas de recojo en local."
+            )
+        if entrega["estado"] != "LISTO_PARA_RECOJO":
+            raise ReglaOperativaError(
+                "El recojo debe estar listo en el punto antes de confirmarse."
+            )
+        if not _verificar_codigo_cliente(
+            entrega["codigo_cliente_token"], codigo_cliente
+        ):
+            raise ReglaOperativaError("El código de recojo no es válido.")
+
+        pago = contexto["pago"]
+        _gestionar_cobro(
+            unidad, pago, "PAGO_EN_LOCAL", entrega["tipo_entrega"],
+            actor_id, "Pago efectuado en el punto de recojo.",
+        )
+
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], "ENTREGADO", completar=True,
+        )
+        _repos.actualizar_recogido_recojo(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _repos.limpiar_codigo_cliente_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            "LISTO_PARA_RECOJO", "ENTREGADO", actor_id,
+            "Recojo confirmado en el punto de recojo.",
+        )
+        _evaluar_finalizacion_pedido(
+            unidad, contexto["pedido"]["id"], actor_id,
+            motivo="Recojo confirmado.",
+        )
+        unidad.confirmar()
+
+    return {"ok": True, "estado": "ENTREGADO"}
+
+
+def _gestionar_cobro(unidad, pago, modalidad_esperada, tipo_entrega,
+                     actor_id, observacion):
+    """Marca el pago del flujo presencial dentro de la misma transacción."""
+    if not pago:
+        raise ReglaOperativaError("El pedido no tiene un pago registrado.")
+    modalidad = str(pago.get("modalidad") or "").upper()
+    estado = str(pago.get("estado") or "").upper()
+
+    if modalidad == "ANTICIPADO":
+        if estado != "PAGADO":
+            raise ReglaOperativaError(
+                "El pago anticipado debe estar pagado antes de cerrar la entrega."
+            )
+        return
+    if modalidad == modalidad_esperada:
+        if estado == "PAGADO":
+            return
+        if estado != "PENDIENTE":
+            raise ReglaOperativaError(
+                "El estado actual del pago no permite concluir la operación."
+            )
+        if not _repos.confirmar_pago_operativo(
+            unidad.conexion, unidad.esquemas, pago["id"], estado,
+            actor_id, observacion,
+        ):
+            raise ReglaOperativaError(
+                "El pago cambió mientras se confirmaba la entrega."
+            )
+        return
+    raise ReglaOperativaError(
+        "La modalidad de pago no es aplicable a esta forma de entrega."
+    )
+
+
+def _evaluar_finalizacion_pedido(unidad, pedido_id, actor_id, motivo):
+    """Cierra el pedido a COMPLETADO cuando la operación queda íntegra.
+
+    Requiere (evidencia real):
+    - pedido aún no terminal;
+    - entrega ENTREGADO con completado_en;
+    - pago PAGADO con pagado_en;
+    - sin incidencias ABIERTA/EN_REVISION.
+    """
+    comercio = unidad.esquemas["comercio"]
+    operaciones = unidad.esquemas["operaciones"]
+
+    def _total(sql):
+        with unidad.conexion.cursor() as cursor:
+            cursor.execute(sql)
+            return int(cursor.fetchone()["total"])
+
+    pedido = cursor_pedido_estado(unidad, pedido_id)
+    if not pedido:
+        return False
+    if pedido["estado"] in {"COMPLETADO", "CANCELADO"}:
+        return True
+
+    with unidad.conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT estado, completado_en
+            FROM {operaciones}.entregas
+            WHERE pedido_id = %s AND estado = 'ENTREGADO'
+            AND completado_en IS NOT NULL LIMIT 1
+            """,
+            (pedido_id,),
+        )
+        entrega = _repos.fetchone_safe(cursor)
+        cursor.execute(
+            f"""
+            SELECT estado, pagado_en
+            FROM {operaciones}.pagos
+            WHERE pedido_id = %s AND estado = 'PAGADO'
+            AND pagado_en IS NOT NULL
+            ORDER BY creado_en DESC LIMIT 1
+            """,
+            (pedido_id,),
+        )
+        pago = _repos.fetchone_safe(cursor)
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM {operaciones}.incidencias_entrega AS i
+            INNER JOIN {operaciones}.entregas AS e ON e.id = i.entrega_id
+            WHERE e.pedido_id = %s AND i.estado IN ('ABIERTA', 'EN_REVISION')
+            """,
+            (pedido_id,),
+        )
+        incidencias = int(cursor.fetchone()["total"])
+
+    if not entrega or not pago or incidencias:
+        return False
+
+    if not _repos.actualizar_pedido_completado(
+        unidad.conexion, unidad.esquemas, pedido_id,
+        pedido["estado"], actor_id, motivo,
+    ):
+        raise ReglaOperativaError(
+            "El pedido cambió mientras se finalizaba; reintenta la operación."
+        )
+    return True
+
+
+def cursor_pedido_estado(unidad, pedido_id):
+    """Lee el estado del pedido dentro de la transacción en curso."""
+    comercio = unidad.esquemas["comercio"]
+    with unidad.conexion.cursor() as cursor:
+        cursor.execute(
+            f"SELECT id, estado FROM {comercio}.pedidos WHERE id = %s LIMIT 1",
+            (pedido_id,),
+        )
+        return _repos.fetchone_safe(cursor)
+
+
+def confirmar_pago_anticipado(actor_id, roles, pedido_id):
+    """Confirma administrativamente un pago anticipado pendiente."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("Solo el equipo operativo confirma pagos.")
+    with UnidadTrabajo() as unidad:
+        operaciones = unidad.esquemas["operaciones"]
+        with unidad.conexion.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT id, modalidad, estado
+                FROM {operaciones}.pagos
+                WHERE pedido_id = %s
+                ORDER BY creado_en DESC LIMIT 1 FOR UPDATE
+                """,
+                (pedido_id,),
+            )
+            pago = _repos.fetchone_safe(cursor)
+        if not pago:
+            raise ReglaOperativaError("El pedido no tiene un pago registrado.")
+        if pago["modalidad"] != "ANTICIPADO":
+            raise ReglaOperativaError(
+                "Solo los pagos anticipados se confirman con esta acción."
+            )
+        if pago["estado"] == "PAGADO":
+            return {"ok": True, "estado": "PAGADO"}
+        if pago["estado"] != "PENDIENTE":
+            raise ReglaOperativaError(
+                "El estado actual del pago no permite confirmarlo."
+            )
+        if not _repos.confirmar_pago_operativo(
+            unidad.conexion, unidad.esquemas, pago["id"], pago["estado"],
+            actor_id, "Pago anticipado verificado por el equipo operativo.",
+        ):
+            raise ReglaOperativaError(
+                "El pago cambió mientras se confirmaba."
+            )
+        unidad.confirmar()
+    return {"ok": True, "estado": "PAGADO"}
+
+
+def registrar_incidencia(actor_id, roles, entrega_id, tipo, descripcion):
+    """Registra una incidencia y pone la entrega en INCIDENCIA."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("No tienes permisos para registrar incidencias.")
+    tipo = str(tipo or "").strip()[:80]
+    descripcion = str(descripcion or "").strip()[:500]
+    if not tipo:
+        raise ReglaOperativaError("Indica el tipo de incidencia.")
+    if len(descripcion) < 5:
+        raise ReglaOperativaError("Describe la incidencia con detalle.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "incidencia")
+        entrega = contexto["entrega"]
+        if entrega["estado"] in {"ENTREGADO", "CANCELADO"}:
+            raise ReglaOperativaError(
+                "No se puede abrir una incidencia sobre una entrega cerrada."
+            )
+        _repos.crear_incidencia_entrega(
+            unidad.conexion, unidad.esquemas, str(_uuid.uuid4()),
+            entrega_id, tipo, descripcion, actor_id,
+        )
+        if entrega["estado"] != "INCIDENCIA":
+            _repos.actualizar_estado_entrega(
+                unidad.conexion, unidad.esquemas, entrega_id,
+                entrega["estado"], "INCIDENCIA",
+            )
+            _repos.insertar_historial_entrega(
+                unidad.conexion, unidad.esquemas, entrega_id,
+                entrega["estado"], "INCIDENCIA", actor_id,
+                f"Incidencia registrada: {tipo}.",
+            )
+        unidad.confirmar()
+    return {"ok": True, "accion": "INCIDENCIA"}
+
+
+def resolver_incidencia(actor_id, roles, incidencia_id):
+    """Resuelve la incidencia y restaura el estado previo de la entrega."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("No tienes permisos para resolver incidencias.")
+    with UnidadTrabajo() as unidad:
+        incidencia = _repos.obtener_incidencia(
+            unidad.conexion, unidad.esquemas, incidencia_id
+        )
+        if not incidencia:
+            raise ReglaOperativaError("La incidencia no existe.")
+        estado_anterior = _repos.obtener_estado_anterior_incidencia(
+            unidad.conexion, unidad.esquemas, incidencia["entrega_id"]
+        )
+        if not _repos.resolver_incidencia_entrega(
+            unidad.conexion, unidad.esquemas, incidencia_id, actor_id,
+            estado_anterior, incidencia["entrega_id"],
+        ):
+            raise ReglaOperativaError(
+                "La incidencia ya fue resuelta o cambió mientras se procesaba."
+            )
+        if estado_anterior:
+            _repos.insertar_historial_entrega(
+                unidad.conexion, unidad.esquemas, incidencia["entrega_id"],
+                "INCIDENCIA", estado_anterior, actor_id,
+                "Incidencia resuelta; la entrega continúa su operativa.",
+            )
+        unidad.confirmar()
+    return {"ok": True, "accion": "RESUELTA"}
+
+
+def cancelar_entrega(actor_id, roles, entrega_id, motivo):
+    """Cancela la entrega, libera repartidores y registra la evidencia."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("No tienes permisos para cancelar la entrega.")
+    motivo = str(motivo or "").strip()[:500]
+    if len(motivo) < 5:
+        raise ReglaOperativaError("Indica el motivo de la cancelación.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "cancelar")
+        entrega = contexto["entrega"]
+        if entrega["estado"] in {"ENTREGADO", "CANCELADO"}:
+            raise ReglaOperativaError(
+                "La entrega ya se encuentra cerrada."
+            )
+        repartidores_cancelados = _repos.cancelar_asignaciones_activas(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        for repartidor_id in repartidores_cancelados:
+            _repos.actualizar_disponibilidad_repartidor(
+                unidad.conexion, unidad.esquemas, repartidor_id, True
+            )
+        _repos.actualizar_estado_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], "CANCELADO",
+        )
+        _repos.limpiar_codigo_cliente_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], "CANCELADO", actor_id,
+            f"Entrega cancelada: {motivo}.",
+        )
+        unidad.confirmar()
+    return {"ok": True, "estado": "CANCELADO"}
+
+
+def actualizar_estado_envio(actor_id, roles, entrega_id, estado_nuevo,
+                            codigo_seguimiento=None, url_seguimiento=None,
+                            ubicacion_texto=None):
+    """Avanza el envío trasportista y sincroniza la entrega al finalizar."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("No tienes permisos para operar el envío.")
+    estado_nuevo = str(estado_nuevo or "").strip().upper()
+    if estado_nuevo not in TRANSICIONES_ENVIO:
+        raise ReglaOperativaError("El estado del envío no es válido.")
+
+    with UnidadTrabajo() as unidad:
+        contexto = _repos.bloquear_entrega_operativa(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        _valores_entrega_bloqueo(contexto, roles, "envio")
+        entrega = contexto["entrega"]
+        if entrega["tipo_entrega"] != "TRANSPORTISTA_ASOCIADO":
+            raise ReglaOperativaError(
+                "Solo los envíos con transportista asociado usan seguimiento."
+            )
+        envio = _repos.obtener_envio_por_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+        if not envio:
+            raise ReglaOperativaError(
+                "La entrega no tiene envío trasportista registrado."
+            )
+        if not _transicion_envio_habilitada(envio["estado"], estado_nuevo):
+            raise ReglaOperativaError(
+                "La transición del envío no está habilitada."
+            )
+
+        _repos.actualizar_envio_estado(
+            unidad.conexion, unidad.esquemas, envio["id"], envio["estado"],
+            estado_nuevo, codigo_seguimiento=codigo_seguimiento,
+            url_seguimiento=url_seguimiento,
+            despachar=(estado_nuevo == "DESPACHADO"),
+            entregar=(estado_nuevo == "ENTREGADO"),
+        )
+        _repos.registrar_evento_seguimiento(
+            unidad.conexion, unidad.esquemas, envio["id"], estado_nuevo,
+            ESTADOS_ENVIO_DESCRIPCION.get(estado_nuevo, ""),
+            ubicacion_texto=ubicacion_texto,
+        )
+        _repos.insertar_historial_entrega(
+            unidad.conexion, unidad.esquemas, entrega_id,
+            entrega["estado"], entrega["estado"], actor_id,
+            f"Envío trasportista: {ETIQUETAS_ENVIO.get(estado_nuevo, estado_nuevo)}.",
+        )
+
+        if estado_nuevo == "ENTREGADO":
+            _repos.actualizar_estado_entrega(
+                unidad.conexion, unidad.esquemas, entrega_id,
+                entrega["estado"], "ENTREGADO", completar=True,
+            )
+            _repos.insertar_historial_entrega(
+                unidad.conexion, unidad.esquemas, entrega_id,
+                entrega["estado"], "ENTREGADO", actor_id,
+                "Envío entregado por el transportista.",
+            )
+            _evaluar_finalizacion_pedido(
+                unidad, contexto["pedido"]["id"], actor_id,
+                motivo="Envío trasportista entregado.",
+            )
+        unidad.confirmar()
+    return {"ok": True, "estado_envio": estado_nuevo}
+
+
+def registrar_repartidor(actor_id, roles, correo, password, nombres,
+                         apellido_paterno, apellido_materno,
+                         telefono, dni=None):
+    """Registra un repartidor real (usuario + rol + planilla) atómicamente."""
+    if not _puede_operar_entregas(_roles_normalizados(roles)):
+        raise ReglaOperativaError("No tienes permisos para registrar repartidores.")
+
+    correo = (correo or "").strip().lower()
+    nombres = (nombres or "").strip()
+    apellido_paterno = (apellido_paterno or "").strip()
+    apellido_materno = (apellido_materno or "").strip() or None
+    telefono = normalizar_telefono(telefono)
+    dni = (dni or "").strip() or None
+
+    valido, mensaje = validar_correo(correo)
+    if not valido:
+        raise ReglaOperativaError(mensaje)
+    valido, mensaje = validar_password(password)
+    if not valido:
+        raise ReglaOperativaError(mensaje)
+    valido, mensaje = validar_nombre(nombres, "Los nombres", obligatorio=True)
+    if not valido:
+        raise ReglaOperativaError(mensaje)
+    valido, mensaje = validar_nombre(
+        apellido_paterno, "El apellido paterno", obligatorio=True
+    )
+    if not valido:
+        raise ReglaOperativaError(mensaje)
+    valido, mensaje = validar_nombre(
+        apellido_materno, "El apellido materno", obligatorio=False
+    )
+    if not valido:
+        raise ReglaOperativaError(mensaje)
+    valido, mensaje = validar_telefono_peru(telefono, obligatorio=True)
+    if not valido:
+        raise ReglaOperativaError(mensaje)
+
+    with UnidadTrabajo() as unidad:
+        if _repos.buscar_usuario_por_correo_transaccion(
+            unidad.conexion, unidad.esquemas, correo
+        ):
+            raise ReglaOperativaError(
+                "Ya existe una cuenta registrada con ese correo."
+            )
+        rol = _repos.obtener_rol_por_codigo(
+            unidad.conexion, unidad.esquemas, "REPARTIDOR"
+        )
+        if not rol:
+            raise ReglaOperativaError(
+                "El rol REPARTIDOR no está configurado en identidad."
+            )
+        usuario_id = str(_uuid.uuid4())
+        perfil_id = str(_uuid.uuid4())
+        repartidor_id = str(_uuid.uuid4())
+        password_hash = _bcrypt.hashpw(
+            password.encode("utf-8"), _bcrypt.gensalt()
+        ).decode("utf-8")
+        _repos.crear_usuario_perfil(
+            unidad.conexion, unidad.esquemas, usuario_id, perfil_id,
+            correo, password_hash, nombres, apellido_paterno,
+            apellido_materno, dni, telefono,
+        )
+        _repos.asignar_rol_usuario(
+            unidad.conexion, unidad.esquemas, usuario_id, rol["id"], actor_id
+        )
+        _repos.crear_repartidor(
+            unidad.conexion, unidad.esquemas, repartidor_id, usuario_id
+        )
+        unidad.confirmar()
+
+    return {
+        "ok": True,
+        "mensaje": "Repartidor registrado correctamente.",
+        "repartidor_id": repartidor_id,
+        "usuario_id": usuario_id,
+    }
+
+
+def listar_entregas_operativa(estado=None, tipo=None, busqueda=None):
+    """Listado operativo real de entregas (solo lectura, sin commit)."""
+    estado = str(estado or "").strip().upper() or None
+    tipo = str(tipo or "").strip().upper() or None
+    busqueda = str(busqueda or "").strip()[:100] or None
+    if estado and estado not in ESTADOS_ENTREGA_PENDIENTES_CODIGO | {
+        "PENDIENTE", "EN_PREPARACION", "ENTREGADO", "CANCELADO", "INCIDENCIA",
+    }:
+        raise ReglaOperativaError("El filtro de estado no es válido.")
+    if tipo and tipo not in {
+        "RECOJO_LOCAL", "DELIVERY_LOCAL", "TRANSPORTISTA_ASOCIADO",
+    }:
+        raise ReglaOperativaError("El filtro de tipo no es válido.")
+
+    with UnidadTrabajo() as unidad:
+        entregas = _repos.listar_entregas_admin(
+            unidad.conexion, unidad.esquemas,
+            estado=estado, tipo=tipo, busqueda=busqueda,
+        )
+    for entrega in entregas:
+        entrega["estado_label"] = _etiqueta_estado_entrega(
+            entrega["estado"]
+        )
+        entrega["tipo_label"] = _etiqueta_tipo_entrega(
+            entrega["tipo_entrega"]
+        )
+        entrega["pago_estado_label"] = _etiqueta_pago(
+            entrega["pago_estado"]
+        )
+    return entregas
+
+
+def obtener_detalle_entrega_operativa(entrega_id):
+    """Detalle operativo completo de una entrega (solo lectura)."""
+    if not entrega_id:
+        return None
+    with UnidadTrabajo() as unidad:
+        return _repos.obtener_entrega_admin(
+            unidad.conexion, unidad.esquemas, entrega_id
+        )
+
+
+def listar_repartidores_operativa():
+    """Lista la planilla real de repartidores registrados."""
+    with UnidadTrabajo() as unidad:
+        repartidores = _repos.listar_repartidores(
+            unidad.conexion, unidad.esquemas
+        )
+    return repartidores
+
+
+def _etiqueta_estado_entrega(estado):
+    return {
+        "PENDIENTE": "Pendiente",
+        "EN_PREPARACION": "En preparación",
+        "LISTO": "Listo",
+        "PROGRAMADO": "Programado",
+        "EN_TRANSITO": "En tránsito",
+        "LISTO_PARA_RECOJO": "Listo para recojo",
+        "ENTREGADO": "Entregado",
+        "CANCELADO": "Cancelado",
+        "INCIDENCIA": "Incidencia",
+    }.get(str(estado or "").upper(), str(estado or "—") or "—")
+
+
+def _etiqueta_tipo_entrega(tipo):
+    return {
+        "RECOJO_LOCAL": "Recojo en local",
+        "DELIVERY_LOCAL": "Delivery local",
+        "TRANSPORTISTA_ASOCIADO": "Transportista asociado",
+    }.get(str(tipo or "").upper(), str(tipo or "—") or "—")
+
+
+def _etiqueta_pago(estado):
+    return {
+        "PENDIENTE": "Pendiente",
+        "EN_REVISION": "En revisión",
+        "PAGADO": "Pagado",
+        "RECHAZADO": "Rechazado",
+        "CANCELADO": "Cancelado",
+        "REEMBOLSADO": "Reembolsado",
+    }.get(str(estado or "").upper(), str(estado or "—") or "—")
+
+
+# ============================================================
+# REPARTIDOR: solo sus propias asignaciones
+# ============================================================
+
+def _repartidor_de_sesion(unidad, usuario_id):
+    repartidor = _repos.obtener_repartidor_por_usuario(
+        unidad.conexion, unidad.esquemas, usuario_id
+    )
+    if not repartidor:
+        raise ReglaOperativaError("Tu usuario no es un repartidor activo.")
+    return repartidor
+
+
+def listar_repartos_repartidor(usuario_id):
+    """Asignaciones actives del repartidor autenticado."""
+    with UnidadTrabajo() as unidad:
+        repartidor = _repartidor_de_sesion(unidad, usuario_id)
+        asignaciones = _repos.listar_asignaciones_repartidor(
+            unidad.conexion, unidad.esquemas, repartidor["id"]
+        )
+        historial = _repos.listar_asignaciones_repartidor_historial(
+            unidad.conexion, unidad.esquemas, repartidor["id"]
+        )
+    for item in asignaciones:
+        item["entrega_estado_label"] = _etiqueta_estado_entrega(
+            item["entrega_estado"]
+        )
+        item["asignacion_estado_label"] = ETIQUETAS_ASIGNACION.get(
+            item["asignacion_estado"], item["asignacion_estado"]
+        )
+    return {"activas": asignaciones, "historial": historial}
+
+
+def obtener_detalle_reparto_repartidor(usuario_id, entrega_id):
+    """Detalle de UNA entrega asignada al repartidor autenticado."""
+    with UnidadTrabajo() as unidad:
+        repartidor = _repartidor_de_sesion(unidad, usuario_id)
+        detalle = _repos.obtener_detalle_asignacion(
+            unidad.conexion, unidad.esquemas, repartidor["id"], entrega_id
+        )
+        if not detalle:
+            return None
+        detalle["entrega_estado_label"] = _etiqueta_estado_entrega(
+            detalle["entrega_estado"]
+        )
+        detalle["asignacion_estado_label"] = ETIQUETAS_ASIGNACION.get(
+            detalle["asignacion_estado"], detalle["asignacion_estado"]
+        )
+        return detalle

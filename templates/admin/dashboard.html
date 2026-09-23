@@ -74,7 +74,12 @@
                     <span>Pedidos</span>
                 </a>
 
-                {% for modulo in ["Inventario", "Entregas", "Reportes"] %}
+                <a href="{{ url_for('admin_entregas.listado') }}" class="admin-nav-link">
+                    <span class="admin-nav-icon" aria-hidden="true">▷</span>
+                    <span>Entregas</span>
+                </a>
+
+                {% for modulo in ["Inventario", "Reportes"] %}
                     <span
                         class="admin-nav-link is-disabled"
                         aria-disabled="true"
@@ -265,9 +270,11 @@
 
                 <footer class="admin-data-note">
                     <strong>Panel de solo lectura.</strong>
-                    KPI-04 se calcula con datos reales. KPI-01 y los demás
-                    indicadores permanecen pendientes hasta contar con una
-                    fuente inequívoca para su definición oficial.
+                    KPI-01, KPI-04, KPI-07 y KPI-08 se calculan con datos
+                    reales de Comercio y Operaciones. KPI-09 está listo como
+                    gancho para la tabla de encuestas; los demás indicadores
+                    permanecen pendientes hasta contar con una fuente
+                    inequívoca para su definición oficial.
                 </footer>
 
             </div>

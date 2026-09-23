@@ -44,7 +44,22 @@
             <span class="admin-nav-icon" aria-hidden="true">□</span>
             <span>Pedidos</span>
         </a>
-        {% for modulo in ["Inventario", "Entregas", "Reportes"] %}
+        {% if "PEDIDOS_LOGISTICA" in (session.get("roles") or []) or "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
+            <a
+                href="{{ url_for('admin_entregas.listado') }}"
+                class="admin-nav-link{% if admin_activo == 'entregas' %} is-active{% endif %}"
+                {% if admin_activo == 'entregas' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">➤</span>
+                <span>Entregas</span>
+            </a>
+        {% else %}
+            <span class="admin-nav-link is-disabled" aria-disabled="true">
+                <span class="admin-nav-icon" aria-hidden="true">➤</span>
+                <span>Entregas</span>
+            </span>
+        {% endif %}
+        {% for modulo in ["Inventario", "Reportes"] %}
             <span class="admin-nav-link is-disabled" aria-disabled="true">
                 <span class="admin-nav-icon" aria-hidden="true">•</span>
                 <span>{{ modulo }}</span>

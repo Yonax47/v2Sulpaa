@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Mis repartos | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-content-lite">
+    <header class="admin-page-header">
+        <div>
+            <span class="admin-eyebrow">Panel del repartidor</span>
+            <h1>Mis repartos</h1>
+            <p>Las asignaciones que te han sido encomendadas y su historial operativo.</p>
+        </div>
+    </header>
+
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+            <div class="admin-alert-stack" aria-live="polite">
+                {% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <section class="admin-detail-card admin-detail-wide" aria-labelledby="repartos-activos">
+        <div class="admin-section-heading">
+            <div>
+                <span class="admin-section-kicker">En curso</span>
+                <h2 id="repartos-activos">Repartos asignados</h2>
+            </div>
+            <div class="admin-live-status"><span class="admin-live-dot" aria-hidden="true"></span>{{ activas|length }} activo{{ 's' if activas|length != 1 }}</div>
+        </div>
+        {% if activas %}
+            <div class="admin-order-table-wrap">
+                <table class="admin-order-table">
+                    <thead>
+                        <tr><th>Pedido</th><th>Cliente</th><th>Estado entrega</th><th>Asignación</th><th>Programación</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in activas %}
+                            <tr>
+                                <td data-label="Pedido"><strong>{{ item.numero_pedido }}</strong></td>
+                                <td data-label="Cliente">{{ item.cliente_nombre or item.cliente_correo }}</td>
+                                <td data-label="Estado"><span class="admin-state is-{{ (item.entrega_estado or 'sin-registro')|lower }}">{{ item.entrega_estado_label }}</span></td>
+                                <td data-label="Asignación">{{ item.asignacion_estado_label }}</td>
+                                <td data-label="Programación">{{ item.fecha_programada.strftime('%d/%m/%Y %H:%M') if item.fecha_programada else "Sin programar" }}</td>
+                                <td class="admin-table-action"><a class="admin-button is-primary is-small" href="{{ url_for('repartidor.detalle_reparto', entrega_id=item.entrega_id) }}">Ver reparto</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="admin-muted" style="padding: 1.2rem;">No tienes repartos asignados en este momento.</p>
+        {% endif %}
+    </section>
+
+    <section class="admin-detail-card admin-detail-wide" aria-labelledby="repartos-historial">
+        <div class="admin-section-heading">
+            <div>
+                <span class="admin-section-kicker">Cerrados</span>
+                <h2 id="repartos-historial">Historial de repartos</h2>
+            </div>
+        </div>
+        {% if historial %}
+            <div class="admin-order-table-wrap">
+                <table class="admin-order-table">
+                    <thead>
+                        <tr><th>Pedido</th><th>Estado entrega</th><th>Asignación</th><th>Asignado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in historial %}
+                            <tr>
+                                <td data-label="Pedido"><strong>{{ item.numero_pedido }}</strong></td>
+                                <td data-label="Estado"><span class="admin-state is-{{ (item.entrega_estado or 'sin-registro')|lower }}">{{ item.entrega_estado }}</span></td>
+                                <td data-label="Asignación">{{ (item.asignacion_estado or "")|title }}</td>
+                                <td data-label="Asignado">{{ item.asignado_en.strftime('%d/%m/%Y %H:%M') if item.asignado_en else "—" }}</td>
+                                <td class="admin-table-action">{% if item.entrega_id %}<a class="admin-button is-secondary is-small" href="{{ url_for('repartidor.detalle_reparto', entrega_id=item.entrega_id) }}">Ver</a>{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="admin-muted" style="padding: 1.2rem;">Aún no hay repartos finalizados.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

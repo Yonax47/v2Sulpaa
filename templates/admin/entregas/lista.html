@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Entregas operativas | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "entregas" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label>
+            <strong>Entregas</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Operación logística</span>
+                    <h1>Entregas</h1>
+                    <p>Prepara, programa, asigna y confirma entregas con evidencia real en cada paso.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ entregas|length }} resultados
+                </div>
+                <a href="{{ url_for('admin_entregas.repartidores') }}" class="admin-button is-secondary">Repartidores</a>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de entregas">
+                <label class="admin-filter-field admin-filter-search">
+                    <span>Buscar</span>
+                    <input type="search" name="q" value="{{ filtros.q }}" placeholder="Pedido, cliente o correo">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        {% for valor, etiqueta in [("PENDIENTE", "Pendiente"), ("EN_PREPARACION", "En preparación"), ("LISTO", "Listo"), ("PROGRAMADO", "Programado"), ("EN_TRANSITO", "En tránsito"), ("LISTO_PARA_RECOJO", "Listo para recojo"), ("INCIDENCIA", "Incidencia"), ("ENTREGADO", "Entregado"), ("CANCELADO", "Cancelado")] %}
+                            <option value="{{ valor }}"{% if filtros.estado == valor %} selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Tipo</span>
+                    <select name="tipo">
+                        <option value="">Todos</option>
+                        {% for valor, etiqueta in [("RECOJO_LOCAL", "Recojo en local"), ("DELIVERY_LOCAL", "Delivery local"), ("TRANSPORTISTA_ASOCIADO", "Transportista")] %}
+                            <option value="{{ valor }}"{% if filtros.tipo == valor %} selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar filtros</button>
+                    <a href="{{ url_for('admin_entregas.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if entregas %}
+                <section class="admin-order-table-card" aria-labelledby="entregas-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Datos actuales</span>
+                            <h2 id="entregas-titulo">Listado de entregas</h2>
+                        </div>
+                    </div>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th><th>Cliente</th><th>Tipo</th><th>Estado</th>
+                                    <th>Programada</th><th>Pago</th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entrega in entregas %}
+                                    <tr>
+                                        <td data-label="Pedido"><strong>{{ entrega.numero_pedido }}</strong></td>
+                                        <td data-label="Cliente">
+                                            <strong>{{ entrega.cliente_nombre or "Sin perfil" }}</strong>
+                                            <small>{{ entrega.cliente_correo }}</small>
+                                        </td>
+                                        <td data-label="Tipo">{{ entrega.tipo_label }}</td>
+                                        <td data-label="Estado"><span class="admin-state is-{{ (entrega.estado or 'sin-registro')|lower }}">{{ entrega.estado_label }}</span></td>
+                                        <td data-label="Programada">{{ entrega.fecha_programada.strftime('%d/%m/%Y %H:%M') if entrega.fecha_programada else "—" }}</td>
+                                        <td data-label="Pago"><span class="admin-state is-{{ (entrega.pago_estado or 'sin-registro')|lower }}">{{ entrega.pago_estado_label }}</span></td>
+                                        <td class="admin-order-action">
+                                            <a href="{{ url_for('admin_entregas.detalle', entrega_id=entrega.id) }}" class="admin-table-link">Operar</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% else %}
+                <section class="admin-empty-state">
+                    <span aria-hidden="true">➤</span>
+                    <h2>No se encontraron entregas</h2>
+                    <p>Ajusta los filtros o espera el registro de una compra real.</p>
+                </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

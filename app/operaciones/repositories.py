@@ -1217,6 +1217,16 @@ def obtener_historial_pago(
 # ENTREGA DE UN PEDIDO (LECTURA PARA SEGUIMIENTO)
 # ============================================================
 
+def _esquema_identidad():
+    """Devuelve el nombre validado del esquema identidad para JOIN seguros."""
+    import os
+    import re
+    nombre = str(os.getenv("DB_IDENTIDAD") or "").strip()
+    if not nombre or not re.fullmatch(r"[A-Za-z0-9_]+", nombre):
+        raise RuntimeError("La variable DB_IDENTIDAD no contiene un esquema válido.")
+    return nombre
+
+
 def obtener_entrega_pedido(
     pedido_id,
 ):
@@ -1244,7 +1254,8 @@ def obtener_entrega_pedido(
                     tipo_entrega,
                     costo_cobrado_cliente,
                     estado,
-                    creado_en
+                    creado_en,
+                    codigo_cliente_token
 
                 FROM entregas
 
@@ -1287,6 +1298,9 @@ def obtener_entrega_pedido(
                 "creado_en":
                     entrega["creado_en"],
 
+                "codigo_cliente_token":
+                    entrega["codigo_cliente_token"],
+
                 "recojo":
                     None,
 
@@ -1295,6 +1309,12 @@ def obtener_entrega_pedido(
 
                 "transportista":
                     None,
+
+                "asignaciones":
+                    [],
+
+                "seguimiento":
+                    [],
             }
 
             # ----------------------------------------------------
@@ -1551,8 +1571,1117 @@ def obtener_entrega_pedido(
                 for fila in filas
             ]
 
+            # ----------------------------------------------------
+            # ASIGNACIONES VISIBLES PARA EL CLIENTE
+            # ----------------------------------------------------
+            #
+            # Solo se exponen campos públicos del repartidor asignado;
+            # el historial del reparto es lo que el cliente puede seguir.
+            # ----------------------------------------------------
+
+            cursor.execute(
+                f"""
+                SELECT
+                    a.estado AS asignacion_estado,
+                    a.asignado_en,
+                    a.aceptado_en,
+                    a.finalizado_en,
+                    CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                              pf.apellido_materno) AS repartidor_nombre
+
+                FROM asignaciones_reparto a
+
+                INNER JOIN repartidores r
+                    ON r.id = a.repartidor_id
+
+                LEFT JOIN {_esquema_identidad()}.perfiles pf
+                    ON pf.usuario_id = r.usuario_id
+
+                WHERE a.entrega_id = %s
+
+                ORDER BY a.asignado_en ASC
+                """,
+                (
+                    entrega_id,
+                ),
+            )
+
+            resultado["asignaciones"] = cursor.fetchall()
+
+            # ----------------------------------------------------
+            # SEGUIMIENTO DEL ENVÍO TRANSPORTISTA
+            # ----------------------------------------------------
+
+            cursor.execute(
+                """
+                SELECT
+                    e.estado AS envio_estado,
+                    e.transportista_nombre_snapshot,
+                    s.estado AS evento_estado,
+                    s.descripcion,
+                    s.ubicacion_texto,
+                    s.fecha_evento,
+                    s.fuente
+
+                FROM envios_transportista e
+
+                LEFT JOIN seguimiento_envio s
+                    ON s.envio_transportista_id = e.id
+
+                WHERE e.entrega_id = %s
+
+                ORDER BY s.fecha_evento ASC
+                """,
+                (
+                    entrega_id,
+                ),
+            )
+
+            resultado["seguimiento"] = cursor.fetchall()
+
             return resultado
 
     finally:
 
         conexion.close()
+
+
+# ============================================================
+# BLOQUE 2 — FLUJO OPERATIVO DE ENTREGAS
+# ============================================================
+#
+# Estas escrituras reciben una conexión de la Unidad de Trabajo
+# y NUNCA confirman por separado: la atomicidad entre Comercio,
+# Operaciones e Identidad pertenece a la capa Service.
+# Las lecturas usan la misma conexión de la transacción para
+# observar datos recién bloqueados y coherentes.
+# ============================================================
+
+
+def listar_entregas_admin(conexion, esquemas, estado=None, tipo=None,
+                          busqueda=None):
+    """Lista entregas con su pedido, cliente y pago para la operativa."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    condiciones = []
+    parametros = []
+
+    if estado:
+        condiciones.append("e.estado = %s")
+        parametros.append(estado)
+    if tipo:
+        condiciones.append("e.tipo_entrega = %s")
+        parametros.append(tipo)
+    if busqueda:
+        termino = f"%{busqueda}%"
+        condiciones.append(
+            "(p.numero_pedido LIKE %s OR u.correo LIKE %s OR "
+            "CONCAT_WS(' ', pf.nombres, pf.apellido_paterno, "
+            "pf.apellido_materno) LIKE %s)"
+        )
+        parametros.extend([termino, termino, termino])
+
+    where = " WHERE " + " AND ".join(condiciones) if condiciones else ""
+    consulta = f"""
+        SELECT
+            e.id, e.pedido_id, e.tipo_entrega, e.estado,
+            e.costo_cobrado_cliente, e.fecha_programada,
+            e.completado_en, e.creado_en,
+            p.numero_pedido, p.total AS pedido_total,
+            u.correo AS cliente_correo,
+            CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                      pf.apellido_materno) AS cliente_nombre,
+            pa.estado AS pago_estado, pa.modalidad AS pago_modalidad,
+            mp.nombre AS pago_metodo_nombre
+        FROM {operaciones}.entregas AS e
+        INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+        INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
+        LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
+        LEFT JOIN {operaciones}.pagos AS pa
+            ON pa.id = (
+                SELECT pa2.id FROM {operaciones}.pagos AS pa2
+                WHERE pa2.pedido_id = p.id
+                ORDER BY pa2.creado_en DESC LIMIT 1
+            )
+        LEFT JOIN {operaciones}.metodos_pago AS mp
+            ON mp.id = pa.metodo_pago_id
+        {where}
+        ORDER BY e.creado_en DESC, p.numero_pedido DESC
+    """
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, tuple(parametros))
+        return cursor.fetchall()
+
+
+def obtener_entrega_admin(conexion, esquemas, entrega_id):
+    """Compone el detalle completo de una entrega para la operativa."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    consulta = f"""
+        SELECT
+            e.id, e.pedido_id, e.tipo_entrega, e.estado,
+            e.costo_cobrado_cliente, e.fecha_programada,
+            e.completado_en, e.creado_en, e.actualizado_en,
+            p.numero_pedido, p.total AS pedido_total, p.moneda,
+            p.origen AS pedido_origen, p.creado_en AS pedido_creado_en,
+            u.correo AS cliente_correo,
+            CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                      pf.apellido_materno) AS cliente_nombre,
+            pf.telefono AS cliente_telefono,
+            pa.id AS pago_id, pa.modalidad AS pago_modalidad,
+            pa.monto AS pago_monto, pa.estado AS pago_estado,
+            pa.pagado_en AS pago_pagado_en,
+            pa.referencia_externa AS pago_referencia,
+            mp.codigo AS pago_metodo_codigo,
+            mp.nombre AS pago_metodo_nombre
+        FROM {operaciones}.entregas AS e
+        INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+        INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
+        LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
+        LEFT JOIN {operaciones}.pagos AS pa
+            ON pa.id = (
+                SELECT pa2.id FROM {operaciones}.pagos AS pa2
+                WHERE pa2.pedido_id = p.id
+                ORDER BY pa2.creado_en DESC LIMIT 1
+            )
+        LEFT JOIN {operaciones}.metodos_pago AS mp
+            ON mp.id = pa.metodo_pago_id
+        WHERE e.id = %s
+        LIMIT 1
+    """
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, (entrega_id,))
+        entrega = cursor.fetchone()
+        if not entrega:
+            return None
+
+        tipo = str(entrega["tipo_entrega"] or "").upper()
+        entrega["delivery"] = None
+        entrega["recojo"] = None
+        entrega["transportista"] = None
+
+        if tipo == "DELIVERY_LOCAL":
+            cursor.execute(
+                f"""
+                SELECT d.distrito_id, d.nombre_receptor, d.telefono_receptor,
+                       d.direccion, d.referencia, d.latitud, d.longitud,
+                       c.distancia_km, c.costo_estimado
+                FROM {operaciones}.delivery_destinos AS d
+                LEFT JOIN {operaciones}.cotizaciones_delivery AS c
+                    ON c.entrega_id = d.entrega_id
+                WHERE d.entrega_id = %s LIMIT 1
+                """,
+                (entrega_id,),
+            )
+            entrega["delivery"] = cursor.fetchone()
+        elif tipo == "RECOJO_LOCAL":
+            cursor.execute(
+                f"""
+                SELECT punto_recojo_id, nombre_punto_snapshot,
+                       direccion_snapshot, codigo_recojo_hash,
+                       notificado_en, recogido_en
+                FROM {operaciones}.entregas_recojo
+                WHERE entrega_id = %s LIMIT 1
+                """,
+                (entrega_id,),
+            )
+            entrega["recojo"] = cursor.fetchone()
+        elif tipo == "TRANSPORTISTA_ASOCIADO":
+            cursor.execute(
+                f"""
+                SELECT id, transportista_id, servicio_transportista_id,
+                       codigo_seguimiento, clave_recojo,
+                       url_seguimiento_snapshot, estado,
+                       fecha_despacho, fecha_entrega
+                FROM {operaciones}.envios_transportista
+                WHERE entrega_id = %s LIMIT 1
+                """,
+                (entrega_id,),
+            )
+            envio = cursor.fetchone()
+            if envio:
+                cursor.execute(
+                    f"""
+                    SELECT estado, descripcion, ubicacion_texto,
+                           fecha_evento, fuente
+                    FROM {operaciones}.seguimiento_envio
+                    WHERE envio_transportista_id = %s
+                    ORDER BY fecha_evento ASC, id ASC
+                    """,
+                    (envio["id"],),
+                )
+                envio["seguimiento"] = cursor.fetchall()
+            entrega["transportista"] = envio
+
+        cursor.execute(
+            f"""
+            SELECT a.id, a.estado, a.asignado_en, a.aceptado_en,
+                   a.finalizado_en, a.repartidor_id,
+                   CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                             pf.apellido_materno) AS repartidor_nombre,
+                   u.correo AS repartidor_correo
+            FROM {operaciones}.asignaciones_reparto AS a
+            INNER JOIN {operaciones}.repartidores AS r ON r.id = a.repartidor_id
+            LEFT JOIN {identidad}.usuarios AS u ON u.id = r.usuario_id
+            LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = r.usuario_id
+            WHERE a.entrega_id = %s
+            ORDER BY a.asignado_en ASC, a.id ASC
+            """,
+            (entrega_id,),
+        )
+        entrega["asignaciones"] = cursor.fetchall()
+
+        cursor.execute(
+            f"""
+            SELECT i.id, i.tipo, i.descripcion, i.estado, i.creado_en,
+                   i.resuelto_en,
+                   CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                             pf.apellido_materno) AS reportado_por_nombre
+            FROM {operaciones}.incidencias_entrega AS i
+            LEFT JOIN {identidad}.usuarios AS u
+                ON u.id = i.reportado_por_usuario_id
+            LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = u.id
+            WHERE i.entrega_id = %s
+            ORDER BY i.creado_en DESC, i.id DESC
+            """,
+            (entrega_id,),
+        )
+        entrega["incidencias"] = cursor.fetchall()
+
+        cursor.execute(
+            f"""
+            SELECT h.id, h.estado_anterior, h.estado_nuevo, h.comentario,
+                   h.creado_en,
+                   CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                             pf.apellido_materno) AS actor_nombre,
+                   u.correo AS actor_correo
+            FROM {operaciones}.entrega_historial AS h
+            LEFT JOIN {identidad}.usuarios AS u
+                ON u.id = h.usuario_responsable_id
+            LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = u.id
+            WHERE h.entrega_id = %s
+            ORDER BY h.creado_en ASC, h.id ASC
+            """,
+            (entrega_id,),
+        )
+        entrega["historial"] = cursor.fetchall()
+
+        cursor.execute(
+            f"""
+            SELECT h.estado_anterior, h.estado_nuevo, h.observacion,
+                   h.creado_en
+            FROM {operaciones}.pago_historial AS h
+            WHERE h.pago_id = %s
+            ORDER BY h.creado_en ASC, h.id ASC
+            """,
+            (entrega.get("pago_id"),),
+        )
+        entrega["pago_historial"] = cursor.fetchall()
+
+        return entrega
+
+
+def bloquear_entrega_operativa(conexion, esquemas, entrega_id):
+    """Bloquea entrega, pedido y pago para validar un estado estable."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, pedido_id, tipo_entrega, estado, fecha_programada,
+                   codigo_cliente_token
+            FROM {operaciones}.entregas
+            WHERE id = %s LIMIT 1 FOR UPDATE
+            """,
+            (entrega_id,),
+        )
+        entrega = cursor.fetchone()
+        if not entrega:
+            return None
+
+        cursor.execute(
+            f"""
+            SELECT id, numero_pedido, estado
+            FROM {comercio}.pedidos
+            WHERE id = %s LIMIT 1 FOR UPDATE
+            """,
+            (entrega["pedido_id"],),
+        )
+        pedido = cursor.fetchone()
+
+        cursor.execute(
+            f"""
+            SELECT id, modalidad, estado, monto, pagado_en
+            FROM {operaciones}.pagos
+            WHERE pedido_id = %s
+            ORDER BY creado_en DESC LIMIT 1 FOR UPDATE
+            """,
+            (entrega["pedido_id"],),
+        )
+        pago = cursor.fetchone()
+
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM {operaciones}.incidencias_entrega
+            WHERE entrega_id = %s AND estado IN ('ABIERTA', 'EN_REVISION')
+            """,
+            (entrega_id,),
+        )
+        incidencias_activas = cursor.fetchone()["total"]
+
+    return {
+        "entrega": entrega,
+        "pedido": pedido,
+        "pago": pago,
+        "incidencias_activas": incidencias_activas,
+    }
+
+
+def actualizar_estado_entrega(conexion, esquemas, entrega_id,
+                              estado_anterior, estado_nuevo,
+                              completar=False, fecha_programada=None):
+    """Actualiza la entrega solo si conserva el estado bloqueado."""
+    operaciones = esquemas["operaciones"]
+    asignaciones = ["estado = %s"]
+    parametros = [estado_nuevo]
+    if completar:
+        asignaciones.append("completado_en = NOW()")
+    if fecha_programada is not None:
+        asignaciones.append("fecha_programada = %s")
+        parametros.append(fecha_programada)
+    asignaciones.append("actualizado_en = NOW()")
+    parametros.extend([entrega_id, estado_anterior])
+    consulta = (
+        f"UPDATE {operaciones}.entregas SET "
+        + ", ".join(asignaciones)
+        + " WHERE id = %s AND estado = %s"
+    )
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, tuple(parametros))
+        return cursor.rowcount == 1
+
+
+def insertar_historial_entrega(conexion, esquemas, entrega_id,
+                               estado_anterior, estado_nuevo, actor_id,
+                               comentario):
+    """Inserta la evidencia operativa dentro de la transacción recibida."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {operaciones}.entrega_historial
+                (entrega_id, estado_anterior, estado_nuevo,
+                 usuario_responsable_id, comentario)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (entrega_id, estado_anterior, estado_nuevo,
+             actor_id, comentario),
+        )
+
+
+def actualizar_codigo_cliente_entrega(conexion, esquemas, entrega_id, token):
+    """Persiste el token cifrado del código visible para el cliente."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"UPDATE {operaciones}.entregas SET codigo_cliente_token = %s "
+            "WHERE id = %s AND estado <> 'ENTREGADO' AND estado <> 'CANCELADO'",
+            (token, entrega_id),
+        )
+        return cursor.rowcount == 1
+
+
+def limpiar_codigo_cliente_entrega(conexion, esquemas, entrega_id):
+    """Consume el código: deja de ser utilizable al cerrarse la entrega."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"UPDATE {operaciones}.entregas SET codigo_cliente_token = NULL "
+            "WHERE id = %s",
+            (entrega_id,),
+        )
+
+
+def actualizar_notificado_recojo(conexion, esquemas, entrega_id):
+    """Marca el momento en que el punto de recojo fue notificado."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.entregas_recojo SET notificado_en = NOW()
+            WHERE entrega_id = %s
+            """,
+            (entrega_id,),
+        )
+        return cursor.rowcount == 1
+
+
+def actualizar_iniciado_delivery(conexion, esquemas, entrega_id):
+    """Registra el inicio real del reparto por el repartidor."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.entregas_delivery SET iniciado_en = NOW()
+            WHERE entrega_id = %s
+            """,
+            (entrega_id,),
+        )
+        return cursor.rowcount == 1
+
+
+def actualizar_entregado_delivery(conexion, esquemas, entrega_id):
+    """Registra la confirmación de entrega en la modalidad delivery."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.entregas_delivery SET entregado_en = NOW()
+            WHERE entrega_id = %s
+            """,
+            (entrega_id,),
+        )
+        return cursor.rowcount == 1
+
+
+def actualizar_recogido_recojo(conexion, esquemas, entrega_id):
+    """Registra la confirmación del recojo en la modalidad recojo."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.entregas_recojo SET recogido_en = NOW()
+            WHERE entrega_id = %s
+            """,
+            (entrega_id,),
+        )
+        return cursor.rowcount == 1
+
+
+def confirmar_pago_operativo(conexion, esquemas, pago_id, estado_anterior,
+                             actor_id, observacion):
+    """Marca un pago como PAGADO y registra su historial en transacción."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"UPDATE {operaciones}.pagos SET estado = 'PAGADO', "
+            "pagado_en = NOW(), actualizado_en = NOW() "
+            "WHERE id = %s AND estado = %s",
+            (pago_id, estado_anterior),
+        )
+        if cursor.rowcount != 1:
+            return False
+        cursor.execute(
+            f"""
+            INSERT INTO {operaciones}.pago_historial
+                (pago_id, estado_anterior, estado_nuevo,
+                 usuario_responsable_id, observacion)
+            VALUES (%s, %s, 'PAGADO', %s, %s)
+            """,
+            (pago_id, estado_anterior, actor_id, observacion),
+        )
+        return True
+
+
+def crear_asignacion_repartidor(conexion, esquemas, asignacion_id,
+                                entrega_id, repartidor_id, actor_id):
+    """Registra la asignación de reparto en estado ASIGNADA."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {operaciones}.asignaciones_reparto
+                (id, entrega_id, repartidor_id, asignado_por_usuario_id,
+                 estado)
+            VALUES (%s, %s, %s, %s, 'ASIGNADA')
+            """,
+            (asignacion_id, entrega_id, repartidor_id, actor_id),
+        )
+        return True
+
+
+def actualizar_asignacion_estado(conexion, esquemas, asignacion_id,
+                                 estado_nuevo, aceptar=False,
+                                 finalizar=False):
+    """Avanza el estado de una asignación de reparto."""
+    operaciones = esquemas["operaciones"]
+    asignaciones = ["estado = %s"]
+    parametros = [estado_nuevo]
+    if aceptar:
+        asignaciones.append("aceptado_en = NOW()")
+    if finalizar:
+        asignaciones.append("finalizado_en = NOW()")
+    parametros.append(asignacion_id)
+    consulta = (
+        f"UPDATE {operaciones}.asignaciones_reparto SET "
+        + ", ".join(asignaciones)
+        + " WHERE id = %s"
+    )
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, tuple(parametros))
+        return cursor.rowcount == 1
+
+
+def cancelar_asignaciones_activas(conexion, esquemas, entrega_id):
+    """Cancela todas las asignaciones abiertas y devuelve los repartidores."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT repartidor_id
+            FROM {operaciones}.asignaciones_reparto
+            WHERE entrega_id = %s AND estado IN ('ASIGNADA', 'ACEPTADA')
+            """,
+            (entrega_id,),
+        )
+        repartidores = [fila["repartidor_id"] for fila in cursor.fetchall()]
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.asignaciones_reparto
+            SET estado = 'CANCELADA'
+            WHERE entrega_id = %s AND estado IN ('ASIGNADA', 'ACEPTADA')
+            """,
+            (entrega_id,),
+        )
+        return repartidores
+
+
+def actualizar_disponibilidad_repartidor(conexion, esquemas, repartidor_id,
+                                         disponible):
+    """Refleja si el repartidor tiene un reparto en curso."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.repartidores
+            SET disponible = %s, actualizado_en = NOW()
+            WHERE id = %s
+            """,
+            (int(disponible), repartidor_id),
+        )
+        return cursor.rowcount == 1
+
+
+def listar_repartidores(conexion, esquemas):
+    """Lista repartidores con su identidad y carga activa."""
+    operaciones = esquemas["operaciones"]
+    identidad = esquemas["identidad"]
+    consulta = f"""
+        SELECT
+            r.id, r.usuario_id, r.disponible, r.estado, r.creado_en,
+            u.correo,
+            CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                      pf.apellido_materno) AS nombre,
+            pf.telefono,
+            (SELECT COUNT(*) FROM {operaciones}.asignaciones_reparto AS a
+             WHERE a.repartidor_id = r.id
+               AND a.estado IN ('ASIGNADA', 'ACEPTADA')) AS carga_activa
+        FROM {operaciones}.repartidores AS r
+        INNER JOIN {identidad}.usuarios AS u ON u.id = r.usuario_id
+        LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = r.usuario_id
+        ORDER BY r.creado_en DESC
+    """
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta)
+        return cursor.fetchall()
+
+
+def obtener_repartidor_activo(conexion, esquemas, repartidor_id):
+    """Obtiene un repartidor ACTIVO por su id (para asignar)."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, usuario_id, disponible, estado
+            FROM {operaciones}.repartidores
+            WHERE id = %s AND estado = 'ACTIVO' LIMIT 1 FOR UPDATE
+            """,
+            (repartidor_id,),
+        )
+        return fetchone_safe(cursor)
+
+
+def obtener_repartidor_por_usuario(conexion, esquemas, usuario_id):
+    """Resuelve el repartidor asociado al usuario autenticado."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, usuario_id, disponible, estado
+            FROM {operaciones}.repartidores
+            WHERE usuario_id = %s AND estado = 'ACTIVO' LIMIT 1
+            """,
+            (usuario_id,),
+        )
+        return fetchone_safe(cursor)
+
+
+def obtener_asignaciones_activas_repartidor(conexion, esquemas,
+                                            repartidor_id):
+    """Asignaciones en curso de un repartidor (para evaluar la carga real)."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, entrega_id, estado
+            FROM {operaciones}.asignaciones_reparto
+            WHERE repartidor_id = %s
+              AND estado IN ('ASIGNADA', 'ACEPTADA')
+            ORDER BY asignado_en ASC
+            """,
+            (repartidor_id,),
+        )
+        return cursor.fetchall()
+
+
+def obtener_asignacion_repartidor_entrega(conexion, esquemas,
+                                          repartidor_id, entrega_id):
+    """Asignación vigente del repartidor para una entrega concreta."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, entrega_id, repartidor_id, estado
+            FROM {operaciones}.asignaciones_reparto
+            WHERE repartidor_id = %s AND entrega_id = %s
+              AND estado IN ('ASIGNADA', 'ACEPTADA')
+            ORDER BY asignado_en DESC LIMIT 1 FOR UPDATE
+            """,
+            (repartidor_id, entrega_id),
+        )
+        return fetchone_safe(cursor)
+
+
+def obtener_asignacion_activa_entrega(conexion, esquemas, entrega_id):
+    """Asignación vigente de una entrega (para validar su inicio)."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, entrega_id, repartidor_id, estado
+            FROM {operaciones}.asignaciones_reparto
+            WHERE entrega_id = %s
+              AND estado IN ('ASIGNADA', 'ACEPTADA')
+            ORDER BY asignado_en DESC LIMIT 1 FOR UPDATE
+            """,
+            (entrega_id,),
+        )
+        return fetchone_safe(cursor)
+
+
+def obtener_repartidor_asignado_activo(conexion, esquemas, entrega_id):
+    """Repartidor con asignación vigente sobre la entrega."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT repartidor_id
+            FROM {operaciones}.asignaciones_reparto
+            WHERE entrega_id = %s
+              AND estado IN ('ASIGNADA', 'ACEPTADA')
+            ORDER BY asignado_en DESC LIMIT 1
+            """,
+            (entrega_id,),
+        )
+        fila = fetchone_safe(cursor)
+        return bool(fila) and fila["repartidor_id"]
+
+
+def finalizar_asignaciones_entrega(conexion, esquemas, entrega_id):
+    """Finaliza las asignaciones vigentes y devuelve los afectados."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT repartidor_id
+            FROM {operaciones}.asignaciones_reparto
+            WHERE entrega_id = %s
+              AND estado IN ('ASIGNADA', 'ACEPTADA')
+            """,
+            (entrega_id,),
+        )
+        repartidores = [fila["repartidor_id"] for fila in cursor.fetchall()]
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.asignaciones_reparto
+            SET estado = 'FINALIZADA', finalizado_en = NOW()
+            WHERE entrega_id = %s
+              AND estado IN ('ASIGNADA', 'ACEPTADA')
+            """,
+            (entrega_id,),
+        )
+        return repartidores
+
+
+def listar_asignaciones_repartidor(conexion, esquemas, repartidor_id):
+    """Lista las entregas asignadas al repartidor con su contexto."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    consulta = f"""
+        SELECT
+            a.id AS asignacion_id, a.estado AS asignacion_estado,
+            a.asignado_en, a.aceptado_en,
+            e.id AS entrega_id, e.tipo_entrega, e.estado AS entrega_estado,
+            e.fecha_programada, e.costo_cobrado_cliente,
+            p.numero_pedido, p.total AS pedido_total,
+            CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                      pf.apellido_materno) AS cliente_nombre,
+            pf.telefono AS cliente_telefono,
+            u.correo AS cliente_correo
+        FROM {operaciones}.asignaciones_reparto AS a
+        INNER JOIN {operaciones}.entregas AS e ON e.id = a.entrega_id
+        INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+        INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
+        LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
+        WHERE a.repartidor_id = %s
+          AND a.estado IN ('ASIGNADA', 'ACEPTADA')
+        ORDER BY a.asignado_en ASC
+    """
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, (repartidor_id,))
+        return cursor.fetchall()
+
+
+def listar_asignaciones_repartidor_historial(conexion, esquemas,
+                                             repartidor_id):
+    """Historial de entregas ya finalizadas del repartidor."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    consulta = f"""
+        SELECT
+            a.id AS asignacion_id, a.estado AS asignacion_estado,
+            a.asignado_en, a.finalizado_en,
+            e.id AS entrega_id, e.tipo_entrega, e.estado AS entrega_estado,
+            p.numero_pedido
+        FROM {operaciones}.asignaciones_reparto AS a
+        INNER JOIN {operaciones}.entregas AS e ON e.id = a.entrega_id
+        INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+        WHERE a.repartidor_id = %s
+          AND a.estado IN ('FINALIZADA', 'CANCELADA')
+        ORDER BY a.asignado_en DESC
+        LIMIT 50
+    """
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, (repartidor_id,))
+        return cursor.fetchall()
+
+
+def obtener_detalle_asignacion(conexion, esquemas, repartidor_id,
+                               entrega_id):
+    """Detalle de la asignación del repartidor para una entrega."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    consulta = f"""
+        SELECT
+            a.id AS asignacion_id, a.estado AS asignacion_estado,
+            a.asignado_en, a.aceptado_en,
+            e.id AS entrega_id, e.tipo_entrega, e.estado AS entrega_estado,
+            e.fecha_programada, e.costo_cobrado_cliente,
+            e.creado_en AS entrega_creado_en,
+            p.id AS pedido_id, p.numero_pedido, p.total AS pedido_total,
+            CONCAT_WS(' ', pf.nombres, pf.apellido_paterno,
+                      pf.apellido_materno) AS cliente_nombre,
+            pf.telefono AS cliente_telefono,
+            u.correo AS cliente_correo
+        FROM {operaciones}.asignaciones_reparto AS a
+        INNER JOIN {operaciones}.entregas AS e ON e.id = a.entrega_id
+        INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+        INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
+        LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
+        WHERE a.repartidor_id = %s AND a.entrega_id = %s
+          AND a.estado IN ('ASIGNADA', 'ACEPTADA')
+        LIMIT 1
+    """
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, (repartidor_id, entrega_id))
+        asignacion = fetchone_safe(cursor)
+        if not asignacion:
+            return None
+        tipo = str(asignacion["tipo_entrega"] or "").upper()
+        asignacion["delivery"] = None
+        if tipo == "DELIVERY_LOCAL":
+            cursor.execute(
+                f"""
+                SELECT d.nombre_receptor, d.telefono_receptor, d.direccion,
+                       d.referencia, d.distrito_id
+                FROM {operaciones}.delivery_destinos AS d
+                WHERE d.entrega_id = %s LIMIT 1
+                """,
+                (entrega_id,),
+            )
+            asignacion["delivery"] = fetchone_safe(cursor)
+        return asignacion
+
+
+def crear_incidencia_entrega(conexion, esquemas, incidencia_id, entrega_id,
+                             tipo, descripcion, actor_id):
+    """Registra una incidencia abierta para la entrega."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {operaciones}.incidencias_entrega
+                (id, entrega_id, tipo, descripcion, estado,
+                 reportado_por_usuario_id)
+            VALUES (%s, %s, %s, %s, 'ABIERTA', %s)
+            """,
+            (incidencia_id, entrega_id, tipo, descripcion, actor_id),
+        )
+        return True
+
+
+def resolver_incidencia_entrega(conexion, esquemas, incidencia_id, actor_id,
+                                estado_anterior_entrega, entrega_id):
+    """Cierra una incidencia y restaura el estado previo de la entrega."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {operaciones}.incidencias_entrega
+            SET estado = 'RESUELTA', resuelto_por_usuario_id = %s,
+                resuelto_en = NOW()
+            WHERE id = %s AND estado IN ('ABIERTA', 'EN_REVISION')
+            """,
+            (actor_id, incidencia_id),
+        )
+        if cursor.rowcount != 1:
+            return False
+        if estado_anterior_entrega:
+            cursor.execute(
+                f"UPDATE {operaciones}.entregas SET estado = %s, "
+                "actualizado_en = NOW() "
+                "WHERE id = %s AND estado = 'INCIDENCIA'",
+                (estado_anterior_entrega, entrega_id),
+            )
+        return True
+
+
+def obtener_estado_anterior_incidencia(conexion, esquemas, entrega_id):
+    """Devuelve el estado previo del último evento INCIDENCIA registrado."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT estado_anterior
+            FROM {operaciones}.entrega_historial
+            WHERE entrega_id = %s AND estado_nuevo = 'INCIDENCIA'
+            ORDER BY creado_en DESC, id DESC LIMIT 1
+            """,
+            (entrega_id,),
+        )
+        fila = fetchone_safe(cursor)
+        return (fila["estado_anterior"] if fila else None)
+
+
+def obtener_incidencia(conexion, esquemas, incidencia_id):
+    """Obtiene una incidencia por su id para validar su resolución."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, entrega_id, estado
+            FROM {operaciones}.incidencias_entrega
+            WHERE id = %s LIMIT 1 FOR UPDATE
+            """,
+            (incidencia_id,),
+        )
+        return fetchone_safe(cursor)
+
+
+def obtener_envio_por_entrega(conexion, esquemas, entrega_id):
+    """Obtiene el envío transportista asociado a la entrega."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, estado, codigo_seguimiento, url_seguimiento_snapshot
+            FROM {operaciones}.envios_transportista
+            WHERE entrega_id = %s LIMIT 1 FOR UPDATE
+            """,
+            (entrega_id,),
+        )
+        return fetchone_safe(cursor)
+
+
+def actualizar_envio_estado(conexion, esquemas, envio_id,
+                            estado_anterior, estado_nuevo,
+                            codigo_seguimiento=None,
+                            url_seguimiento=None,
+                            despachar=False, entregar=False):
+    """Avanza el estado del envío trasportista dentro de la transacción."""
+    operaciones = esquemas["operaciones"]
+    asignaciones = ["estado = %s", "actualizado_en = NOW()"]
+    parametros = [estado_nuevo]
+    if codigo_seguimiento:
+        asignaciones.append("codigo_seguimiento = %s")
+        parametros.append(codigo_seguimiento)
+    if url_seguimiento:
+        asignaciones.append("url_seguimiento_snapshot = %s")
+        parametros.append(url_seguimiento)
+    if despachar:
+        asignaciones.append("fecha_despacho = NOW()")
+    if entregar:
+        asignaciones.append("fecha_entrega = NOW()")
+    parametros.extend([envio_id, estado_anterior])
+    consulta = (
+        f"UPDATE {operaciones}.envios_transportista SET "
+        + ", ".join(asignaciones)
+        + " WHERE id = %s AND estado = %s"
+    )
+    with conexion.cursor() as cursor:
+        cursor.execute(consulta, tuple(parametros))
+        return cursor.rowcount == 1
+
+
+def registrar_evento_seguimiento(conexion, esquemas, envio_id, estado,
+                                 descripcion, ubicacion_texto=None,
+                                 fuente="SULPAA"):
+    """Registra un evento de seguimiento del envío trasportista."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {operaciones}.seguimiento_envio
+                (envio_transportista_id, estado, descripcion,
+                 ubicacion_texto, fecha_evento, fuente)
+            VALUES (%s, %s, %s, %s, NOW(), %s)
+            """,
+            (envio_id, estado, descripcion, ubicacion_texto, fuente),
+        )
+        return True
+
+
+# ============================================================
+# REGISTRO OPERATIVO DE REPARTIDORES
+# (usuario + perfil + rol + planilla de reparto, en UNA transacción)
+# ============================================================
+
+def obtener_rol_por_codigo(conexion, esquemas, codigo):
+    """Obtiene el rol ACTIVO por su código canónico."""
+    identidad = esquemas["identidad"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id, codigo, estado
+            FROM {identidad}.roles
+            WHERE codigo = %s AND estado = 'ACTIVO' LIMIT 1
+            """,
+            (codigo,),
+        )
+        return fetchone_safe(cursor)
+
+
+def crear_usuario_perfil(conexion, esquemas, usuario_id, perfil_id, correo,
+                         password_hash, nombres, apellido_paterno,
+                         apellido_materno, dni, telefono):
+    """Crea el usuario y su perfil dentro de la transacción recibida."""
+    identidad = esquemas["identidad"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {identidad}.usuarios
+                (id, correo, password_hash, estado, correo_verificado)
+            VALUES (%s, %s, %s, 'ACTIVO', 0)
+            """,
+            (usuario_id, correo, password_hash),
+        )
+        cursor.execute(
+            f"""
+            INSERT INTO {identidad}.perfiles
+                (id, usuario_id, nombres, apellido_paterno,
+                 apellido_materno, dni, telefono)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (perfil_id, usuario_id, nombres, apellido_paterno,
+             apellido_materno, dni, telefono),
+        )
+        return True
+
+
+def asignar_rol_usuario(conexion, esquemas, usuario_id, rol_id, actor_id):
+    """Asigna un rol ACTIVO a un usuario dentro de la transacción."""
+    identidad = esquemas["identidad"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {identidad}.usuario_roles
+                (id, usuario_id, rol_id, asignado_por_usuario_id, estado)
+            VALUES (%s, %s, %s, %s, 'ACTIVO')
+            """,
+            (str(uuid_generado()), usuario_id, rol_id, actor_id),
+        )
+        return True
+
+
+def crear_repartidor(conexion, esquemas, repartidor_id, usuario_id):
+    """Registra al usuario como repartidor OPERATIVO (planilla)."""
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO {operaciones}.repartidores
+                (id, usuario_id, disponible, estado)
+            VALUES (%s, %s, 1, 'ACTIVO')
+            """,
+            (repartidor_id, usuario_id),
+        )
+        return True
+
+
+def fetchone_safe(cursor):
+    """Devuelve la fila sin romper en cursos cerrados durante tests."""
+    try:
+        return cursor.fetchone()
+    except Exception:
+        return None
+
+
+def uuid_generado():
+    import uuid
+    return uuid.uuid4()
+
+
+def actualizar_pedido_completado(conexion, esquemas, pedido_id,
+                                 estado_anterior, actor_id, comentario):
+    """Finaliza el pedido a COMPLETADO y registra la evidencia comercial."""
+    comercio = esquemas["comercio"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE {comercio}.pedidos SET estado = 'COMPLETADO',
+                actualizado_en = NOW()
+            WHERE id = %s AND estado = %s
+            """,
+            (pedido_id, estado_anterior),
+        )
+        if cursor.rowcount != 1:
+            return False
+        cursor.execute(
+            f"""
+            INSERT INTO {comercio}.pedido_historial
+                (pedido_id, estado_anterior, estado_nuevo,
+                 cambiado_por_usuario_id, origen, comentario)
+            VALUES (%s, %s, 'COMPLETADO', %s, 'SISTEMA', %s)
+            """,
+            (pedido_id, estado_anterior, actor_id, comentario),
+        )
+        return True
+
+
+def buscar_usuario_por_correo_transaccion(conexion, esquemas, correo):
+    """Comprueba duplicados de correo dentro de la transacción recibida."""
+    identidad = esquemas["identidad"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT id FROM {identidad}.usuarios
+            WHERE correo = %s LIMIT 1
+            """,
+            (correo,),
+        )
+        return fetchone_safe(cursor)

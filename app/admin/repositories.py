@@ -171,16 +171,16 @@ def obtener_metrica_entregas():
 
 def obtener_metrica_historial_pedidos():
     """
-    M\u00e9trica base del KPI-04: conteos de pedidos vs historial.
+    Métrica base del KPI-04: conteos de pedidos vs historial.
 
-    Devuelve \u00fanicamente los DOS conteos reales:
+    Devuelve únicamente los DOS conteos reales:
 
     - total_pedidos:          filas en `pedidos` (comercio).
     - pedidos_con_historial:  pedidos distintos que aparecen
                               en `pedido_historial`.
 
-    El porcentaje (y la meta \u2265 98 %) se calculan en
-    services.py; esta capa s\u00f3lo LEE los conteos.
+    El porcentaje (y la meta ≥ 98 %) se calculan en
+    services.py; esta capa sólo LEE los conteos.
     """
 
     conexion = conexion_comercio()
@@ -212,6 +212,250 @@ def obtener_metrica_historial_pedidos():
         return {
             "total_pedidos": total_pedidos,
             "pedidos_con_historial": pedidos_con_historial,
+        }
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_metrica_pedidos_procesados():
+    """
+    Métrica base del KPI-01: pedidos iniciados vs completados.
+
+    Devuelve únicamente los DOS conteos reales:
+
+    - pedidos_iniciados:   pedidos cuyo estado alcanzó la zona
+                           operativa real (EN_PREPARACION o
+                           COMPLETADO).
+    - pedidos_completados: pedidos en estado COMPLETADO que
+                           además tienen una entrega ENTREGADO
+                           y un pago PAGADO (finalización
+                           legítima de extremo a extremo).
+
+    El porcentaje se calcula en services.py; esta capa sólo
+    LEE los conteos.
+    """
+    import os
+    import re
+
+    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
+    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
+        raise RuntimeError("DB_COMERCIO no contiene un esquema válido.")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
+        raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(DISTINCT p.id) AS pedidos_iniciados,
+                    COUNT(DISTINCT CASE
+                        WHEN p.estado = 'COMPLETADO'
+                         AND e.estado = 'ENTREGADO'
+                         AND pg.estado = 'PAGADO'
+                        THEN p.id
+                    END) AS pedidos_completados
+                FROM {comercio}.pedidos AS p
+                LEFT JOIN {operaciones}.entregas AS e
+                    ON e.pedido_id = p.id
+                LEFT JOIN {operaciones}.pagos AS pg
+                    ON pg.pedido_id = p.id
+                WHERE p.estado IN ('EN_PREPARACION', 'COMPLETADO')
+                """
+            )
+
+            conteos = cursor.fetchone()
+
+        return {
+            "pedidos_iniciados": conteos["pedidos_iniciados"],
+            "pedidos_completados": conteos["pedidos_completados"],
+        }
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_metrica_consistencia_estados():
+    """
+    Métrica base del KPI-07: consistencia estado actual.
+
+    Devuelve únicamente los DOS conteos reales:
+
+    - total_pedidos_historial:   pedidos con al menos un evento
+                                 en `pedido_historial`.
+    - estados_consistentes:      pedidos cuyo estado ACTUAL
+                                 coincide con el último evento
+                                 (estado_nuevo) registrado.
+
+    El porcentaje se calcula en services.py; esta capa sólo
+    LEE los conteos.
+    """
+
+    conexion = conexion_comercio()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(DISTINCT h.pedido_id) AS total_pedidos_historial
+                FROM pedido_historial AS h
+                """
+            )
+
+            total_pedidos_historial = cursor.fetchone()[
+                "total_pedidos_historial"
+            ]
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS estados_consistentes
+                FROM pedidos AS p
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM pedido_historial AS h1
+                    WHERE h1.pedido_id = p.id
+                      AND h1.id = (
+                          SELECT MAX(h2.id)
+                          FROM pedido_historial AS h2
+                          WHERE h2.pedido_id = h1.pedido_id
+                      )
+                      AND h1.estado_nuevo = p.estado
+                )
+                """
+            )
+
+            estados_consistentes = cursor.fetchone()["estados_consistentes"]
+
+        return {
+            "total_pedidos_historial": total_pedidos_historial,
+            "estados_consistentes": estados_consistentes,
+        }
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_metrica_programacion_entregas():
+    """
+    Métrica base del KPI-08: entregas programadas.
+
+    Devuelve únicamente los DOS conteos reales:
+
+    - total_entregas:        filas en `entregas` (operaciones),
+                             es decir, la totalidad de
+                             solicitudes de entrega.
+    - entregas_programadas:  entregas con `fecha_programada`
+                             registrada (programadas de forma
+                             correcta).
+
+    El porcentaje se calcula en services.py; esta capa sólo
+    LEE los conteos.
+    """
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_entregas,
+                    SUM(CASE WHEN fecha_programada IS NOT NULL
+                             THEN 1 ELSE 0 END) AS entregas_programadas
+                FROM entregas
+                """
+            )
+
+            conteos = cursor.fetchone()
+
+        return {
+            "total_entregas": conteos["total_entregas"],
+            "entregas_programadas": conteos["entregas_programadas"],
+        }
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_metrica_satisfaccion():
+    """
+    Métrica base del KPI-09 (GANCHO): satisfacción del cliente.
+
+    Devuelve únicamente los conteos reales disponibles:
+
+    - encuestas_completadas:     encuestas con calificación.
+    - encuestas_satisfactorias:  calificación >= 4.
+
+    IMPORTANTE (GANCHO): el dominio Operaciones aún no
+    define la tabla `encuestas` en el dump vigente, así que
+    esta métrica consulta `information_schema` y, si el
+    campo `estado`/`calificacion` no existe, devuelve
+    "disponible": False. El dashboard conserva entonces el
+    KPI como "Pendiente" sin inventar un valor.
+    """
+
+    import os
+    import re
+
+    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
+        raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'encuestas'
+                """,
+                (operaciones,),
+            )
+
+            if cursor.fetchone()["total"] == 0:
+                return {
+                    "disponible": False,
+                    "encuestas_completadas": None,
+                    "encuestas_satisfactorias": None,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS encuestas_completadas,
+                    COALESCE(SUM(CASE WHEN calificacion >= 4
+                                      THEN 1 ELSE 0 END), 0)
+                        AS encuestas_satisfactorias
+                FROM {operaciones}.encuestas
+                WHERE calificacion IS NOT NULL
+                """
+            )
+
+            conteos = cursor.fetchone()
+
+        return {
+            "disponible": True,
+            "encuestas_completadas": conteos["encuestas_completadas"],
+            "encuestas_satisfactorias": conteos["encuestas_satisfactorias"],
         }
 
     finally:

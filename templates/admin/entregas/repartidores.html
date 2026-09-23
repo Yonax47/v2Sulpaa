@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Repartidores | Administración SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "entregas" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label>
+            <strong>Repartidores</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+        <div class="admin-content">
+            <a href="{{ url_for('admin_entregas.listado') }}" class="admin-back-link">← Volver a entregas</a>
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Planilla operativa</span>
+                    <h1>Repartidores</h1>
+                    <p>Registra y administra el equipo que opera los deliveries locales.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ repartidores|length }} registrados
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="admin-detail-card admin-detail-wide">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Nuevo miembro</span><h2>Registrar repartidor</h2></div>
+                </div>
+                <form method="POST" action="{{ url_for('admin_entregas.registrar_repartidor_route') }}" class="admin-repartidor-form">
+                    <label>Correo electrónico
+                        <input type="email" name="correo" required>
+                    </label>
+                    <label>Contraseña
+                        <input type="password" name="password" required minlength="8">
+                    </label>
+                    <label>Nombres
+                        <input type="text" name="nombres" required>
+                    </label>
+                    <label>Apellido paterno
+                        <input type="text" name="apellido_paterno" required>
+                    </label>
+                    <label>Apellido materno
+                        <input type="text" name="apellido_materno">
+                    </label>
+                    <label>Teléfono (9 dígitos)
+                        <input type="text" name="telefono" required placeholder="987654321">
+                    </label>
+                    <label>DNI (opcional)
+                        <input type="text" name="dni" maxlength="8">
+                    </label>
+                    <button type="submit" class="admin-button is-primary">Registrar repartidor</button>
+                </form>
+            </section>
+
+            <section class="admin-order-table-card" aria-labelledby="planilla-titulo">
+                <div class="admin-section-heading admin-order-heading">
+                    <div>
+                        <span class="admin-section-kicker">Datos actuales</span>
+                        <h2 id="planilla-titulo">Planilla de repartidores</h2>
+                    </div>
+                </div>
+                {% if repartidores %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr><th>Repartidor</th><th>Correo</th><th>Teléfono</th><th>Estado</th><th>Disponible</th><th>Carga activa</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for repartidor in repartidores %}
+                                    <tr>
+                                        <td data-label="Repartidor"><strong>{{ repartidor.nombre or "Sin perfil" }}</strong></td>
+                                        <td data-label="Correo">{{ repartidor.correo }}</td>
+                                        <td data-label="Teléfono">{{ repartidor.telefono or "—" }}</td>
+                                        <td data-label="Estado"><span class="admin-state is-{{ (repartidor.estado or 'sin-registro')|lower }}">{{ repartidor.estado_label }}</span></td>
+                                        <td data-label="Disponible"><span class="admin-state is-{{ 'ok' if repartidor.disponible else 'pendiente' }}">{{ repartidor.disponible_label }}</span></td>
+                                        <td data-label="Carga activa">{{ repartidor.carga_activa }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="admin-muted" style="padding: 1.2rem;">Aún no hay repartidores registrados. Usa el formulario superior para crear el primero.</p>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

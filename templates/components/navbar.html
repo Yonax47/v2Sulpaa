@@ -93,7 +93,7 @@ Si cambia la navegación, se modifica únicamente aquí.
                    entrar aunque CACHEE esta URL.
                  ================================================= -->
 
-            {% if
+{% if
                 "GERENTE" in (session.get("roles") or [])
                 or "ADMINISTRADOR" in (session.get("roles") or [])
                 or "PEDIDOS_LOGISTICA" in (session.get("roles") or [])
@@ -104,6 +104,17 @@ Si cambia la navegación, se modifica únicamente aquí.
                     class="navbar-link"
                 >
                     Panel administrativo
+                </a>
+
+            {% endif %}
+
+            {% if "REPARTIDOR" in (session.get("roles") or []) %}
+
+                <a
+                    href="{{ url_for('repartidor.repartos') }}"
+                    class="navbar-link"
+                >
+                    Mis repartos
                 </a>
 
             {% endif %}
@@ -281,7 +292,7 @@ Si cambia la navegación, se modifica únicamente aquí.
                  entrar aunque NO vea este enlace.
                  ================================================= -->
 
-            {% if
+{% if
                 "GERENTE" in (session.get("roles") or [])
                 or "ADMINISTRADOR" in (session.get("roles") or [])
                 or "PEDIDOS_LOGISTICA" in (session.get("roles") or [])
@@ -292,6 +303,17 @@ Si cambia la navegación, se modifica únicamente aquí.
                     class="navbar-mobile-link"
                 >
                     Panel administrativo
+                </a>
+
+            {% endif %}
+
+            {% if "REPARTIDOR" in (session.get("roles") or []) %}
+
+                <a
+                    href="{{ url_for('repartidor.repartos') }}"
+                    class="navbar-mobile-link"
+                >
+                    Mis repartos
                 </a>
 
             {% endif %}

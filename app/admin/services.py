@@ -24,6 +24,10 @@ NO se inventan valores.
 
 from app.admin.repositories import (
     obtener_metrica_historial_pedidos,
+    obtener_metrica_pedidos_procesados,
+    obtener_metrica_consistencia_estados,
+    obtener_metrica_programacion_entregas,
+    obtener_metrica_satisfaccion,
 )
 
 
@@ -43,20 +47,29 @@ def resumen_dashboard():
     # ========================================================
     # KPI-01 — TASA DE PEDIDOS REALIZADOS CORRECTAMENTE
     # ========================================================
+    #
     # Fórmula oficial:
     #
-    #     pedidos completados correctamente
-    #     ---------------------------------- × 100
-    #            pedidos iniciados
+    #     pedidos completados correctamente (COMPLETADO legítimo)
+    #     ------------------------------------------------------ × 100
+    #            pedidos iniciados (EN_PREPARACION o COMPLETADO)
     #
-    # Un pedido iniciado sí puede identificarse por una fila en
-    # comercio.pedidos. Sin embargo, el modelo no registra un
-    # estado final exitoso y canónico del pedido: entrega y pago
-    # evolucionan en Operaciones sin sincronizar una finalización
-    # integral en Comercio. Por seguridad metodológica, KPI-01
-    # permanece pendiente y NO reutiliza ENTREGADO como una
-    # equivalencia no demostrada de "pedido correcto".
+    # Un "COMPLETADO legítimo" es un pedido en estado COMPLETADO
+    # que además tiene una entrega ENTREGADO y un pago PAGADO en
+    # Operaciones, es decir, cerró el flujo extremo a extremo por
+    # la ruta canónica del Bloque 2.
     # ========================================================
+
+    metrica_procesados = obtener_metrica_pedidos_procesados()
+    pedidos_iniciados = metrica_procesados["pedidos_iniciados"]
+
+    kpi_01_valor = (
+        (
+            metrica_procesados["pedidos_completados"]
+            / pedidos_iniciados
+        )
+        * 100
+    ) if pedidos_iniciados > 0 else 0.0
 
 
     # ========================================================
@@ -79,15 +92,92 @@ def resumen_dashboard():
         * 100
     ) if total_pedidos_kpi04 > 0 else 0.0
 
+
+    # ========================================================
+    # KPI-07 — ESTADOS DE PEDIDO ACTUALIZADOS (consistencia)
+    # ========================================================
+    #
+    # Fórmula oficial:
+    #
+    #     pedidos cuyo estado actual coincide con el último
+    #     evento registrado en pedido_historial
+    #     ---------------------------------------------------- × 100
+    #           pedidos con al menos un evento de historial
+    # ========================================================
+
+    metrica_consistencia = obtener_metrica_consistencia_estados()
+    total_pedidos_historial = metrica_consistencia[
+        "total_pedidos_historial"
+    ]
+
+    kpi_07_valor = (
+        (
+            metrica_consistencia["estados_consistentes"]
+            / total_pedidos_historial
+        )
+        * 100
+    ) if total_pedidos_historial > 0 else 0.0
+
+
+    # ========================================================
+    # KPI-08 — PROGRAMACIÓN DE ENTREGAS
+    # ========================================================
+    #
+    # Fórmula oficial:
+    #
+    #     entregas programadas correctamente
+    #     --------------------------------- × 100
+    #            total de solicitudes
+    #
+    # Una solicitud está "programada correctamente" cuando su
+    # `fecha_programada` quedó registrada en Operaciones.
+    # ========================================================
+
+    metrica_programacion = obtener_metrica_programacion_entregas()
+    total_entregas_kpi08 = metrica_programacion["total_entregas"]
+
+    kpi_08_valor = (
+        (
+            metrica_programacion["entregas_programadas"]
+            / total_entregas_kpi08
+        )
+        * 100
+    ) if total_entregas_kpi08 > 0 else 0.0
+
+
+    # ========================================================
+    # KPI-09 (GANCHO) — ENCUESTA DE SATISFACCIÓN
+    # ========================================================
+    #
+    # El dominio Operaciones aún no define la tabla `encuestas`
+    # en el dump vigente. La métrica base consulta
+    # information_schema y, si la tabla no existe, devuelve
+    # "disponible": False. El dashboard conserva el KPI como
+    # "Pendiente" sin inventar un valor.
+    # ========================================================
+
+    metrica_satisfaccion = obtener_metrica_satisfaccion()
+    kpi_09_valor = None
+    if metrica_satisfaccion.get("disponible") and (
+        metrica_satisfaccion["encuestas_completadas"] or 0
+    ) > 0:
+        kpi_09_valor = (
+            (
+                metrica_satisfaccion["encuestas_satisfactorias"]
+                / metrica_satisfaccion["encuestas_completadas"]
+            )
+            * 100
+        )
+
     kpis = [
             {
                 "codigo": "KPI-01",
                 "nombre": "Pedidos procesados correctamente",
                 "clasificacion": "RF-01",
                 "meta": "≥95%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "Pendiente: estado final canónico del pedido",
+                "valor": kpi_01_valor,
+                "estado": "ok",
+                "fuente": "comercio.pedidos + operaciones.entregas/pagos",
             },
             {
                 "codigo": "KPI-02",
@@ -139,18 +229,18 @@ def resumen_dashboard():
                 "nombre": "Estados de pedido actualizados",
                 "clasificacion": "RF-07",
                 "meta": "≥98%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "operaciones (m\u00e1quina de estados)",
+                "valor": kpi_07_valor,
+                "estado": "ok",
+                "fuente": "comercio.pedidos + comercio.pedido_historial",
             },
             {
                 "codigo": "KPI-08",
                 "nombre": "Programaci\u00f3n de entregas",
                 "clasificacion": "RF-08",
                 "meta": "≥95%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "operaciones (entregas programadas)",
+                "valor": kpi_08_valor,
+                "estado": "ok",
+                "fuente": "operaciones.entregas (fecha_programada)",
             },
             {
                 "codigo": "KPI-09",
@@ -256,7 +346,10 @@ def resumen_dashboard():
 
     kpis_funcionales = kpis[:10]
     metas_porcentuales = {
+        "KPI-01": 95.0,
         "KPI-04": 98.0,
+        "KPI-07": 98.0,
+        "KPI-08": 95.0,
     }
 
     for kpi in kpis_funcionales:

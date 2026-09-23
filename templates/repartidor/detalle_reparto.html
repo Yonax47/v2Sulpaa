@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Reparto {{ reparto.numero_pedido }} | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-content-lite">
+    <a href="{{ url_for('repartidor.repartos') }}" class="admin-back-link">← Volver a mis repartos</a>
+
+    <header class="admin-page-header admin-order-detail-header">
+        <div>
+            <span class="admin-eyebrow">Entrega asignada</span>
+            <h1>{{ reparto.numero_pedido }}</h1>
+            <p>
+                {{ reparto.cliente_nombre or reparto.cliente_correo }} ·
+                {{ reparto.cliente_telefono or "sin teléfono" }} ·
+                total S/ {{ "%.2f"|format(reparto.pedido_total|float) }}
+            </p>
+        </div>
+        <span class="admin-state is-{{ (reparto.entrega_estado or 'sin-registro')|lower }} is-large">{{ reparto.entrega_estado_label }}</span>
+    </header>
+
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+            <div class="admin-alert-stack" aria-live="polite">
+                {% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="admin-detail-grid">
+        <section class="admin-detail-card">
+            <span class="admin-section-kicker">Asignación</span><h2>Estado</h2>
+            <dl class="admin-detail-list">
+                <div><dt>Asignación</dt><dd><span class="admin-state is-{{ (reparto.asignacion_estado or 'sin-registro')|lower }}">{{ reparto.asignacion_estado_label }}</span></dd></div>
+                <div><dt>Entrega</dt><dd>{{ reparto.entrega_estado_label }}</dd></div>
+                <div><dt>Programada</dt><dd>{{ reparto.fecha_programada.strftime('%d/%m/%Y %H:%M') if reparto.fecha_programada else "Sin programar" }}</dd></div>
+                <div><dt>Asignada</dt><dd>{{ reparto.asignado_en.strftime('%d/%m/%Y %H:%M') if reparto.asignado_en else "—" }}</dd></div>
+                <div><dt>Aceptada</dt><dd>{{ reparto.aceptado_en.strftime('%d/%m/%Y %H:%M') if reparto.aceptado_en else "—" }}</dd></div>
+                <div><dt>Costo de reparto</dt><dd>S/ {{ "%.2f"|format(reparto.costo_cobrado_cliente|float) }}</dd></div>
+            </dl>
+        </section>
+
+        {% if reparto.delivery %}
+        <section class="admin-detail-card">
+            <span class="admin-section-kicker">Destino</span><h2>Dirección de entrega</h2>
+            <dl class="admin-detail-list">
+                <div><dt>Receptor</dt><dd>{{ reparto.delivery.nombre_receptor }}</dd></div>
+                <div><dt>Teléfono</dt><dd>{{ reparto.delivery.telefono_receptor }}</dd></div>
+                <div><dt>Dirección</dt><dd>{{ reparto.delivery.direccion }}</dd></div>
+                {% if reparto.delivery.referencia %}<div><dt>Referencia</dt><dd>{{ reparto.delivery.referencia }}</dd></div>{% endif %}
+                <div><dt>Distrito</dt><dd>{{ reparto.delivery.distrito_id or "—" }}</dd></div>
+            </dl>
+        </section>
+        {% endif %}
+
+        <section class="admin-detail-card">
+            <span class="admin-section-kicker">Operación</span><h2>Tu siguiente paso</h2>
+            <div class="admin-action-stack">
+                {% set aes = (reparto.asignacion_estado or "")|upper %}
+                {% set ees = (reparto.entrega_estado or "")|upper %}
+                {% set tipo = (reparto.tipo_entrega or "")|upper %}
+
+                {% if aes == "ASIGNADA" %}
+                    <form method="POST" action="{{ url_for('repartidor.aceptar', entrega_id=reparto.entrega_id) }}" onsubmit="return confirm('¿Aceptar esta asignación?');">
+                        <button type="submit" class="admin-button is-primary">Aceptar asignación</button>
+                    </form>
+                {% endif %}
+
+                {% if aes == "ACEPTADA" and ees == "PROGRAMADO" and tipo == "DELIVERY_LOCAL" %}
+                    <form method="POST" action="{{ url_for('repartidor.iniciar', entrega_id=reparto.entrega_id) }}" onsubmit="return confirm('¿Iniciar el reparto hacia el destino?');">
+                        <button type="submit" class="admin-button is-primary">Iniciar reparto</button>
+                    </form>
+                {% endif %}
+
+                {% if aes == "ACEPTADA" and ees == "EN_TRANSITO" and tipo == "DELIVERY_LOCAL" %}
+                    <form method="POST" action="{{ url_for('repartidor.confirmar', entrega_id=reparto.entrega_id) }}">
+                        <label>Código de entrega presentado por el cliente
+                            <input type="text" name="codigo_cliente" required placeholder="Ej. A7K2M9XQ">
+                        </label>
+                        <button type="submit" class="admin-button is-primary">Confirmar entrega</button>
+                    </form>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

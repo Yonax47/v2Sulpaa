@@ -364,6 +364,20 @@
 
                     </div>
 
+                    {% if pedido.entrega.codigo_cliente %}
+
+                    <div class="order-detail-code">
+
+                        <span>Código de retiro / entrega</span>
+
+                        <strong>{{ pedido.entrega.codigo_cliente }}</strong>
+
+                        <small>Preséntalo al repartidor o al punto de recojo para confirmar tu pedido.</small>
+
+                    </div>
+
+                    {% endif %}
+
                 </article>
 
                 {% endif %}
@@ -800,6 +814,122 @@
             </article>
 
         </div>
+
+        {% if pedido.entrega.seguimiento %}
+
+        <div class="container tracking-timeline">
+
+            <div class="orders-section-heading">
+
+                <div>
+
+                    <span class="orders-kicker">
+                        SEGUIMIENTO
+                    </span>
+
+                    <h2>
+                        Avance del
+                        <span>envío.</span>
+                    </h2>
+
+                </div>
+
+            </div>
+
+            <ol class="tracking-timeline-list">
+
+                {% for evento in pedido.entrega.seguimiento %}
+
+                <li>
+
+                    <span class="tracking-timeline-dot" aria-hidden="true"></span>
+
+                    <div>
+
+                        <strong>{{ evento.evento_estado_label }}</strong>
+
+                        <span>
+                            {{
+                                evento.fecha_evento.strftime('%d/%m/%Y %H:%M')
+                                if evento.fecha_evento else "Sin fecha"
+                            }}
+                            · {{ evento.fuente }}
+                        </span>
+
+                        {% if evento.descripcion %}
+                            <p>{{ evento.descripcion }}</p>
+                        {% endif %}
+
+                        {% if evento.ubicacion_texto %}
+                            <small>{{ evento.ubicacion_texto }}</small>
+                        {% endif %}
+
+                    </div>
+
+                </li>
+
+                {% endfor %}
+
+            </ol>
+
+        </div>
+
+        {% endif %}
+
+        {% if pedido.entrega.asignaciones %}
+
+        <div class="container tracking-timeline">
+
+            <div class="orders-section-heading">
+
+                <div>
+
+                    <span class="orders-kicker">
+                        REPARTO
+                    </span>
+
+                    <h2>
+                        Estado del
+                        <span>repartidor.</span>
+                    </h2>
+
+                </div>
+
+            </div>
+
+            <ol class="tracking-timeline-list">
+
+                {% for asignacion in pedido.entrega.asignaciones %}
+
+                <li>
+
+                    <span class="tracking-timeline-dot" aria-hidden="true"></span>
+
+                    <div>
+
+                        <strong>
+                            {{ asignacion.repartidor_nombre or "Repartidor asignado" }}
+                        </strong>
+
+                        <span>
+                            {{ asignacion.asignacion_estado_label }}
+                            {{
+                                "· " ~ asignacion.aceptado_en.strftime('%d/%m/%Y %H:%M')
+                                if asignacion.aceptado_en else ""
+                            }}
+                        </span>
+
+                    </div>
+
+                </li>
+
+                {% endfor %}
+
+            </ol>
+
+        </div>
+
+        {% endif %}
 
     </section>
 

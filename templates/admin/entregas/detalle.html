@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Entrega operativa | Administración SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "entregas" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label>
+            <strong>Entrega operativa</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+        <div class="admin-content">
+            <a href="{{ url_for('admin_entregas.listado') }}" class="admin-back-link">← Volver a entregas</a>
+            <header class="admin-page-header admin-order-detail-header">
+                <div>
+                    <span class="admin-eyebrow">Entrega real</span>
+                    <h1>{{ entrega.numero_pedido }}</h1>
+                    <p>{{ entrega.tipo_label }} · registrada {{ entrega.creado_en.strftime('%d/%m/%Y a las %H:%M') if entrega.creado_en else "sin fecha disponible" }}.</p>
+                </div>
+                <span class="admin-state is-{{ (entrega.estado or 'sin-registro')|lower }} is-large">{{ entrega.estado_label }}</span>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="admin-detail-grid">
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Pedido</span><h2>Resumen</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Número</dt><dd>{{ entrega.numero_pedido }}</dd></div>
+                        <div><dt>Origen</dt><dd>{{ entrega.pedido_origen }}</dd></div>
+                        <div><dt>Total pedido</dt><dd>S/ {{ "%.2f"|format(entrega.pedido_total|float) }}</dd></div>
+                        <div><dt>Costo entrega</dt><dd>S/ {{ "%.2f"|format(entrega.costo_cobrado_cliente|float) }}</dd></div>
+                        <div><dt>Programada</dt><dd>{{ entrega.fecha_programada.strftime('%d/%m/%Y %H:%M') if entrega.fecha_programada else "Sin programar" }}</dd></div>
+                    </dl>
+                </section>
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Cliente</span><h2>Contacto</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Nombre</dt><dd>{{ entrega.cliente_nombre or "Sin perfil" }}</dd></div>
+                        <div><dt>Correo</dt><dd>{{ entrega.cliente_correo }}</dd></div>
+                        <div><dt>Teléfono</dt><dd>{{ entrega.cliente_telefono or "No registrado" }}</dd></div>
+                    </dl>
+                </section>
+                <section class="admin-detail-card" id="pago">
+                    <span class="admin-section-kicker">Pago</span><h2>{{ entrega.pago_metodo_label }}</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Modalidad</dt><dd>{{ entrega.pago_modalidad_label }}</dd></div>
+                        <div><dt>Estado</dt><dd><span class="admin-state is-{{ (entrega.pago_estado or 'sin-registro')|lower }}">{{ entrega.pago_estado_label }}</span></dd></div>
+                        <div><dt>Importe</dt><dd>S/ {{ "%.2f"|format(entrega.pago_monto|float) }}</dd></div>
+                        <div><dt>Referencia</dt><dd>{{ entrega.pago_referencia or "No disponible" }}</dd></div>
+                    </dl>
+                    {% if (entrega.pago_modalidad or "")|upper == "ANTICIPADO" and (entrega.pago_estado or "")|upper == "PENDIENTE" %}
+                        <form method="POST" action="{{ url_for('admin_entregas.accion_pago_anticipado', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Confirmar el pago anticipado como recibido?');">
+                            <button type="submit" class="admin-button is-primary">Confirmar pago anticipado</button>
+                        </form>
+                    {% endif %}
+                </section>
+
+                {% if entrega.delivery %}
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Delivery</span><h2>Destino local</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Receptor</dt><dd>{{ entrega.delivery.nombre_receptor }}</dd></div>
+                        <div><dt>Teléfono</dt><dd>{{ entrega.delivery.telefono_receptor }}</dd></div>
+                        <div><dt>Dirección</dt><dd>{{ entrega.delivery.direccion }}</dd></div>
+                        {% if entrega.delivery.referencia %}<div><dt>Referencia</dt><dd>{{ entrega.delivery.referencia }}</dd></div>{% endif %}
+                        <div><dt>Distancia</dt><dd>{% if entrega.delivery.distancia_km is not none %}{{ "%.2f"|format(entrega.delivery.distancia_km|float) }} km{% else %}—{% endif %}</dd></div>
+                    </dl>
+                </section>
+                {% elif entrega.recojo %}
+                <section class="admin-detail-card">
+                    <span class="admin-section-kicker">Recojo</span><h2>Punto de recojo</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Punto</dt><dd>{{ entrega.recojo.nombre_punto_snapshot }}</dd></div>
+                        <div><dt>Dirección</dt><dd>{{ entrega.recojo.direccion_snapshot }}</dd></div>
+                        <div><dt>Notificado</dt><dd>{{ "Sí" if entrega.recojo.notificado_en else "No" }}</dd></div>
+                        <div><dt>Recogido</dt><dd>{{ "Sí" if entrega.recojo.recogido_en else "No" }}</dd></div>
+                    </dl>
+                </section>
+                {% elif entrega.transportista %}
+                <section class="admin-detail-card" id="transportista">
+                    <span class="admin-section-kicker">Transportista</span><h2>Envío asociado</h2>
+                    <dl class="admin-detail-list">
+                        <div><dt>Estado envío</dt><dd><span class="admin-state is-{{ (entrega.transportista.estado or 'sin-registro')|lower }}">{{ entrega.transportista.estado_label }}</span></dd></div>
+                        <div><dt>Código</dt><dd>{{ entrega.transportista.codigo_seguimiento or "Sin asignar" }}</dd></div>
+                        <div><dt>Despacho</dt><dd>{{ entrega.transportista.fecha_despacho.strftime('%d/%m/%Y %H:%M') if entrega.transportista.fecha_despacho else "—" }}</dd></div>
+                        <div><dt>Entrega</dt><dd>{{ entrega.transportista.fecha_entrega.strftime('%d/%m/%Y %H:%M') if entrega.transportista.fecha_entrega else "—" }}</dd></div>
+                    </dl>
+                    {% if not (entrega.transportista.estado or "") == "ENTREGADO" %}
+                    <form method="POST" action="{{ url_for('admin_entregas.accion_envio', entrega_id=entrega.id) }}" class="admin-inline-form">
+                        <label>Nuevo estado del envío
+                            <select name="estado_envio">
+                                {% for valor in ["ENTREGADO_TRANSPORTISTA", "DESPACHADO", "EN_TRANSITO", "EN_AGENCIA_DESTINO", "EN_REPARTO", "ENTREGADO", "INCIDENCIA"] %}
+                                    <option value="{{ valor }}">{{ valor|replace('_', ' ')|title }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>Código de seguimiento
+                            <input type="text" name="codigo_seguimiento" value="{{ entrega.transportista.codigo_seguimiento or '' }}">
+                        </label>
+                        <label>Ubicación / observación
+                            <input type="text" name="ubicacion_texto" placeholder="Opcional">
+                        </label>
+                        <button type="submit" class="admin-button is-primary">Registrar avance</button>
+                    </form>
+                    {% endif %}
+                </section>
+                {% endif %}
+            </div>
+
+            <section class="admin-detail-card admin-detail-wide" id="acciones">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Siguiente paso permitido</span><h2>Acciones de la entrega</h2></div>
+                </div>
+                <p class="admin-muted">Cada acción valida rol, código cuando corresponda, secuencia y transacción en MySQL.</p>
+
+                <div class="admin-action-stack">
+                    {% set est = (entrega.estado or "")|upper %}
+                    {% set tipo = (entrega.tipo_entrega or "")|upper %}
+
+                    {% if est == "EN_PREPARACION" %}
+                        {% if tipo == "DELIVERY_LOCAL" %}
+                            <form method="POST" action="{{ url_for('admin_entregas.accion_listo', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Marcar la entrega como lista? Se generará el código de entrega.');">
+                                <button type="submit" class="admin-button is-primary">Marcar como lista</button>
+                            </form>
+                        {% elif tipo == "RECOJO_LOCAL" %}
+                            <form method="POST" action="{{ url_for('admin_entregas.accion_recojo', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Notificar el recojo disponible? Se generará el código de recojo.');">
+                                <button type="submit" class="admin-button is-primary">Confirmar recojo disponible</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if est == "LISTO" and tipo in ["DELIVERY_LOCAL", "TRANSPORTISTA_ASOCIADO"] %}
+                        <form method="POST" action="{{ url_for('admin_entregas.accion_programar', entrega_id=entrega.id) }}">
+                            <label>Fecha de programación
+                                <input type="datetime-local" name="fecha_programada" required>
+                            </label>
+                            <button type="submit" class="admin-button is-primary">Programar</button>
+                        </form>
+                    {% endif %}
+
+                    {% if est == "PROGRAMADO" and tipo == "DELIVERY_LOCAL" %}
+                        <form method="POST" action="{{ url_for('admin_entregas.accion_asignar', entrega_id=entrega.id) }}">
+                            <label>Repartidor disponible
+                                <select name="repartidor_id" required>
+                                    <option value="">Selecciona un repartidor</option>
+                                    {% for repartidor in repartidores %}
+                                        {% if repartidor.estado == "ACTIVO" and repartidor.disponible %}
+                                            <option value="{{ repartidor.id }}">{{ repartidor.nombre }} ({{ repartidor.correo }})</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <button type="submit" class="admin-button is-primary">Asignar repartidor</button>
+                        </form>
+                    {% endif %}
+
+                    {% if est == "EN_TRANSITO" and tipo == "DELIVERY_LOCAL" %}
+                        <form method="POST" action="{{ url_for('admin_entregas.accion_confirmar', entrega_id=entrega.id) }}">
+                            <label>Código de entrega presentado por el cliente
+                                <input type="text" name="codigo_cliente" required placeholder="Ej. A7K2M9XQ">
+                            </label>
+                            <button type="submit" class="admin-button is-primary">Confirmar entrega</button>
+                        </form>
+                    {% endif %}
+
+                    {% if est == "LISTO_PARA_RECOJO" and tipo == "RECOJO_LOCAL" %}
+                        <form method="POST" action="{{ url_for('admin_entregas.accion_confirmar_recojo', entrega_id=entrega.id) }}">
+                            <label>Código de recojo presentado por el cliente
+                                <input type="text" name="codigo_cliente" required placeholder="Ej. A7K2M9XQ">
+                            </label>
+                            <button type="submit" class="admin-button is-primary">Confirmar recojo</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% if entrega.asignaciones %}
+            <section class="admin-detail-card admin-detail-wide">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Reparto</span><h2>Asignaciones registradas</h2></div>
+                </div>
+                <ol class="admin-history-list">
+                    {% for asignacion in entrega.asignaciones %}
+                        <li>
+                            <span class="admin-history-dot" aria-hidden="true"></span>
+                            <div>
+                                <strong>{{ asignacion.repartidor_nombre or "Repartidor" }} · {{ asignacion.estado }}</strong>
+                                <span>Asignada {{ asignacion.asignado_en.strftime('%d/%m/%Y %H:%M') if asignacion.asignado_en else "—" }}{% if asignacion.aceptado_en %} · Aceptada {{ asignacion.aceptado_en.strftime('%d/%m/%Y %H:%M') }}{% endif %}</span>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </section>
+            {% endif %}
+
+            {% if entrega.incidencias %}
+            <section class="admin-detail-card admin-detail-wide" id="incidencias">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Atención</span><h2>Incidencias</h2></div>
+                </div>
+                {% for incidencia in entrega.incidencias %}
+                    <article class="admin-incidence">
+                        <div>
+                            <strong>{{ incidencia.tipo }}</strong>
+                            <span class="admin-state is-{{ (incidencia.estado or 'sin-registro')|lower }}">{{ incidencia.estado_label }}</span>
+                            <p>{{ incidencia.descripcion }}</p>
+                            <small>{{ incidencia.creado_en.strftime('%d/%m/%Y %H:%M') if incidencia.creado_en else "Sin fecha" }} · {{ incidencia.reportado_por_nombre or "Sistema" }}</small>
+                        </div>
+                        {% if incidencia.estado in ["ABIERTA", "EN_REVISION"] %}
+                            <form method="POST" action="{{ url_for('admin_entregas.accion_resolver', entrega_id=entrega.id, incidencia_id=incidencia.id) }}" onsubmit="return confirm('¿Resolver esta incidencia? La entrega retomará su estado previo.');">
+                                <button type="submit" class="admin-button is-secondary">Resolver</button>
+                            </form>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            {% if (entrega.estado or "")|upper not in ["ENTREGADO", "CANCELADO"] %}
+            <section class="admin-detail-card admin-detail-wide">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Gestión</span><h2>Incidencia y cancelación</h2></div>
+                </div>
+                <div class="admin-action-stack">
+                    <form method="POST" action="{{ url_for('admin_entregas.accion_incidencia', entrega_id=entrega.id) }}">
+                        <label>Tipo de incidencia
+                            <select name="tipo" required>
+                                <option value="">Selecciona</option>
+                                {% for valor, etiqueta in [("DIRECCION_INCORRECTA", "Dirección incorrecta"), ("CLIENTE_AUSENTE", "Cliente ausente"), ("PAQUETE_DANADO", "Paquete dañado"), ("RETRASO", "Retraso"), ("OTRO", "Otro")] %}
+                                    <option value="{{ valor }}">{{ etiqueta }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>Descripción
+                            <input type="text" name="descripcion" required placeholder="Describe qué ocurrió">
+                        </label>
+                        <button type="submit" class="admin-button is-warning">Registrar incidencia</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin_entregas.accion_cancelar', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Cancelar definitivamente la entrega? Esta acción no se revierte.');">
+                        <label>Motivo de cancelación
+                            <input type="text" name="motivo" required placeholder="Indica el motivo">
+                        </label>
+                        <button type="submit" class="admin-button is-danger">Cancelar entrega</button>
+                    </form>
+                </div>
+            </section>
+            {% endif %}
+
+            <section class="admin-detail-card admin-detail-wide">
+                <div class="admin-section-heading">
+                    <div><span class="admin-section-kicker">Evidencia operativa</span><h2>Historial de la entrega</h2></div>
+                </div>
+                {% if entrega.historial %}
+                    <ol class="admin-history-list">
+                        {% for evento in entrega.historial %}
+                            <li>
+                                <span class="admin-history-dot" aria-hidden="true"></span>
+                                <div>
+                                    <strong>{% if evento.estado_anterior %}{{ evento.estado_anterior }} → {% endif %}{{ evento.estado_nuevo }}</strong>
+                                    <span>{{ evento.creado_en.strftime('%d/%m/%Y %H:%M') if evento.creado_en else "Sin fecha" }}</span>
+                                    <p>{{ evento.comentario or "Sin comentario" }}</p>
+                                    <small>Actor: {{ evento.actor_nombre or evento.actor_correo or "Sistema" }}</small>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}<p class="admin-muted">Esta entrega todavía no cuenta con evidencia operativa.</p>{% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

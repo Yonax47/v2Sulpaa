@@ -1,0 +1,1 @@
+"""Módulo del repartidor: sus propios repartos y confirmaciones."""
