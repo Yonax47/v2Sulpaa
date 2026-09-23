@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo egreso | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "caja" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Nuevo egreso</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Control financiero</span>
+                    <h1>Registrar egreso manual</h1>
+                    <p>El egreso queda trazado con tu usuario como responsable (GERENTE/ADMINISTRADOR).</p>
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('admin_caja.registrar_egreso') }}" class="admin-form-card">
+                <div class="admin-form-grid">
+                    <label class="admin-form-field">
+                        <span>Categoría de egreso</span>
+                        <select name="categoria_id" required>
+                            <option value="">Selecciona una categoría</option>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="admin-form-field">
+                        <span>Monto (S/)</span>
+                        <input type="number" name="monto" min="0.01" step="0.01" placeholder="0.00" required>
+                    </label>
+                    <label class="admin-form-field">
+                        <span>Fecha</span>
+                        <input type="date" name="fecha">
+                    </label>
+                    <label class="admin-form-field">
+                        <span>Método de pago</span>
+                        <select name="metodo_pago_id">
+                            <option value="">Sin método</option>
+                            {% for metodo in metodos %}
+                                <option value="{{ metodo.id }}">{{ metodo.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="admin-form-field is-full">
+                        <span>Concepto</span>
+                        <textarea name="concepto" rows="2" placeholder="Detalla el motivo del egreso" required></textarea>
+                    </label>
+                </div>
+                <div class="admin-form-actions">
+                    <button type="submit" class="admin-button is-primary">Registrar egreso</button>
+                    <a href="{{ url_for('admin_caja.listado') }}" class="admin-button is-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+{% endblock %}

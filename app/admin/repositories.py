@@ -408,21 +408,32 @@ def obtener_metrica_programacion_entregas():
         conexion.close()
 
 
-def obtener_metrica_satisfaccion():
+def obtener_metrica_kpi09():
     """
-    Métrica base del KPI-09 (GANCHO): satisfacción del cliente.
+    Fórmula OFICIAL del KPI-09 (invariable, canal PORTAL):
 
-    Devuelve únicamente los conteos reales disponibles:
+        KPI-09 = ( pedidos entregados con invitación válida /
+                   pedidos entregados elegibles ) * 100
 
-    - encuestas_completadas:     encuestas con calificación.
-    - encuestas_satisfactorias:  calificación >= 4.
+    - Numerador:  COUNT DISTINCT de pedidos (encuestas) que tienen al
+      menos un evento ``INVITACION_OK`` (la invitación PORTAL quedó
+      efectivamente disponible para el cliente) y cuya entrega está
+      realmente ``ENTREGADO``.
+    - Denominador: COUNT DISTINCT de pedidos elegibles: los que entraron
+      al circuito de encuestas (1 fila en ``encuestas``) y cuya entrega
+      está ``ENTREGADO``.
 
-    IMPORTANTE (GANCHO): el dominio Operaciones aún no
-    define la tabla `encuestas` en el dump vigente, así que
-    esta métrica consulta `information_schema` y, si el
-    campo `estado`/`calificacion` no existe, devuelve
-    "disponible": False. El dashboard conserva entonces el
-    KPI como "Pendiente" sin inventar un valor.
+    INVARIANTES:
+    - Varios ``INVITACION_OK`` para el mismo pedido NO duplican el
+      numerador (COUNT DISTINCT por pedido).
+    - Una encuesta RESPONDIDA NO altera el numerador: el KPI mide solo
+      la invitación entregada, no la respuesta.
+    - Si el denominador es 0, el KPI queda PENDIENTE (disponible True,
+      pero el cálculo en Services devuelve None).
+
+    La satisfacción (promedios, tasa de respuesta) es una métrica
+    GERENCIAL complementaria: vive en ``obtener_metrica_satisfaccion``
+    y NUNCA alimenta este KPI.
     """
 
     import os
@@ -442,27 +453,37 @@ def obtener_metrica_satisfaccion():
                 """
                 SELECT COUNT(*) AS total
                 FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'encuestas'
+                WHERE TABLE_SCHEMA = %s
+                  AND TABLE_NAME IN ('encuestas', 'encuesta_eventos')
                 """,
                 (operaciones,),
             )
-
-            if cursor.fetchone()["total"] == 0:
+            tablas_encontradas = cursor.fetchone()["total"]
+            if tablas_encontradas < 2:
                 return {
                     "disponible": False,
-                    "encuestas_completadas": None,
-                    "encuestas_satisfactorias": None,
+                    "invitaciones_ok": None,
+                    "pedidos_entregados": None,
                 }
 
             cursor.execute(
                 f"""
                 SELECT
-                    COUNT(*) AS encuestas_completadas,
-                    COALESCE(SUM(CASE WHEN calificacion >= 4
-                                      THEN 1 ELSE 0 END), 0)
-                        AS encuestas_satisfactorias
-                FROM {operaciones}.encuestas
-                WHERE calificacion IS NOT NULL
+                    (SELECT COUNT(DISTINCT e.pedido_id)
+                     FROM {operaciones}.encuestas AS e
+                     INNER JOIN {operaciones}.encuesta_eventos AS ev
+                         ON ev.encuesta_id = e.id
+                     INNER JOIN {operaciones}.entregas AS g_ped
+                         ON g_ped.pedido_id = e.pedido_id
+                     WHERE ev.tipo = 'INVITACION_OK'
+                       AND g_ped.estado = 'ENTREGADO')
+                        AS invitaciones_ok,
+                    (SELECT COUNT(DISTINCT e.pedido_id)
+                     FROM {operaciones}.encuestas AS e
+                     INNER JOIN {operaciones}.entregas AS g
+                         ON g.pedido_id = e.pedido_id
+                     WHERE g.estado = 'ENTREGADO')
+                        AS pedidos_entregados
                 """
             )
 
@@ -470,8 +491,201 @@ def obtener_metrica_satisfaccion():
 
         return {
             "disponible": True,
-            "encuestas_completadas": conteos["encuestas_completadas"],
-            "encuestas_satisfactorias": conteos["encuestas_satisfactorias"],
+            "invitaciones_ok": int(conteos["invitaciones_ok"]),
+            "pedidos_entregados": int(conteos["pedidos_entregados"]),
+        }
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_metrica_satisfaccion():
+    """
+    Métricas GERENCIALES complementarias de satisfacción (Bloque 4).
+
+    Estas métricas NO son el KPI-09. Describen la calidad percibida de
+    las encuestas ya completadas y se muestran aparte:
+
+    - satisfaccion_promedio / promedio_producto / promedio_entrega /
+      promedio_atencion:  promedio 1-5 de las encuestas RESPONDIDA.
+    - recomendacion_porcentaje: % de respuestas con recomendaria = SI.
+    - tasa_respuesta_porcentaje: % de encuestas respondidas sobre las
+      que recibieron invitación efectiva (INVITACION_OK).
+    - respuestas_satisfactorias: respuestas con promedio general >= 4
+      (umbral complementario de esta implementación, auditable aquí).
+
+    Si las tablas no existieran, devuelve "disponible": False.
+    """
+
+    import os
+    import re
+
+    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
+        raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = %s
+                  AND TABLE_NAME IN ('encuestas', 'encuesta_respuestas',
+                                     'encuesta_eventos')
+                """,
+                (operaciones,),
+            )
+            tablas_encontradas = cursor.fetchone()["total"]
+            if tablas_encontradas < 3:
+                return {
+                    "disponible": False,
+                    "total_encuestas": None,
+                    "encuestas_completadas": None,
+                    "encuestas_enviadas": None,
+                    "satisfaccion_promedio": None,
+                    "promedio_producto": None,
+                    "promedio_entrega": None,
+                    "promedio_atencion": None,
+                    "recomendacion_porcentaje": None,
+                    "tasa_respuesta_porcentaje": None,
+                    "respuestas_satisfactorias": None,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    (SELECT COUNT(*) FROM {operaciones}.encuestas)
+                        AS total_encuestas,
+                    (SELECT COUNT(*)
+                     FROM {operaciones}.encuesta_respuestas)
+                        AS encuestas_completadas,
+                    (SELECT COUNT(DISTINCT e.pedido_id)
+                     FROM {operaciones}.encuestas AS e
+                     INNER JOIN {operaciones}.encuesta_eventos AS ev
+                         ON ev.encuesta_id = e.id
+                     INNER JOIN {operaciones}.entregas AS g
+                         ON g.pedido_id = e.pedido_id
+                     WHERE ev.tipo = 'INVITACION_OK'
+                       AND g.estado = 'ENTREGADO')
+                        AS encuestas_enviadas,
+                    COALESCE(AVG(r.calificacion_general), 0)
+                        AS satisfaccion_promedio,
+                    COALESCE(AVG(r.calificacion_producto), 0)
+                        AS promedio_producto,
+                    COALESCE(AVG(r.calificacion_entrega), 0)
+                        AS promedio_entrega,
+                    COALESCE(AVG(r.calificacion_atencion), 0)
+                        AS promedio_atencion,
+                    COALESCE(SUM(CASE WHEN r.recomendaria = 'SI'
+                                      THEN 1 ELSE 0 END), 0)
+                        AS recomendaciones_ok,
+                    COALESCE(SUM(CASE WHEN
+                        (r.calificacion_general
+                         + r.calificacion_producto
+                         + r.calificacion_entrega
+                         + r.calificacion_atencion) / 4 >= 4
+                        THEN 1 ELSE 0 END), 0)
+                        AS respuestas_satisfactorias
+                FROM {operaciones}.encuestas AS e
+                LEFT JOIN {operaciones}.encuesta_respuestas AS r
+                    ON r.encuesta_id = e.id
+                """
+            )
+
+            conteos = cursor.fetchone()
+
+        completadas = int(conteos["encuestas_completadas"])
+        enviadas = int(conteos["encuestas_enviadas"])
+
+        return {
+            "disponible": True,
+            "total_encuestas": int(conteos["total_encuestas"]),
+            "encuestas_completadas": completadas,
+            "encuestas_enviadas": enviadas,
+            "satisfaccion_promedio": round(
+                float(conteos["satisfaccion_promedio"]), 2),
+            "promedio_producto": round(
+                float(conteos["promedio_producto"]), 2),
+            "promedio_entrega": round(
+                float(conteos["promedio_entrega"]), 2),
+            "promedio_atencion": round(
+                float(conteos["promedio_atencion"]), 2),
+            "recomendacion_porcentaje": round(
+                (float(conteos["recomendaciones_ok"]) / completadas * 100)
+                if completadas > 0 else 0.0, 2),
+            "tasa_respuesta_porcentaje": round(
+                (completadas / enviadas * 100) if enviadas > 0 else 0.0, 2),
+            "respuestas_satisfactorias": int(
+                conteos["respuestas_satisfactorias"]),
+        }
+
+    finally:
+
+        conexion.close()
+
+
+def obtener_metrica_reportes():
+    """
+    Métrica base del KPI-05: reportes gerenciales (Bloque 4).
+
+    Solo cuentan las SOLICITUDES REALES de generación registradas en
+    ``reportes_solicitudes`` (visitar el panel no genera reportes). El
+    registro del resultado sucede al terminar de construir el archivo,
+    por lo que nunca genera otro reporte (sin recursión).
+    """
+
+    import os
+    import re
+
+    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
+        raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
+
+    conexion = conexion_operaciones()
+
+    try:
+
+        with conexion.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'reportes_solicitudes'
+                """,
+                (operaciones,),
+            )
+
+            if cursor.fetchone()["total"] == 0:
+                return {
+                    "disponible": False,
+                    "total_solicitudes": None,
+                    "solicitudes_exitosas": None,
+                }
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_solicitudes,
+                    COALESCE(SUM(CASE WHEN resultado = 'EXITO'
+                                      THEN 1 ELSE 0 END), 0)
+                        AS solicitudes_exitosas
+                FROM {operaciones}.reportes_solicitudes
+                """
+            )
+
+            conteos = cursor.fetchone()
+
+        return {
+            "disponible": True,
+            "total_solicitudes": conteos["total_solicitudes"],
+            "solicitudes_exitosas": conteos["solicitudes_exitosas"],
         }
 
     finally:

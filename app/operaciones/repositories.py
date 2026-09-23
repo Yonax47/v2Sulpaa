@@ -1903,7 +1903,7 @@ def bloquear_entrega_operativa(conexion, esquemas, entrega_id):
 
         cursor.execute(
             f"""
-            SELECT id, numero_pedido, estado
+            SELECT id, numero_pedido, estado, usuario_id
             FROM {comercio}.pedidos
             WHERE id = %s LIMIT 1 FOR UPDATE
             """,
@@ -1913,7 +1913,8 @@ def bloquear_entrega_operativa(conexion, esquemas, entrega_id):
 
         cursor.execute(
             f"""
-            SELECT id, modalidad, estado, monto, pagado_en
+            SELECT id, pedido_id, modalidad, estado, monto, moneda,
+                   metodo_pago_id, pagado_en
             FROM {operaciones}.pagos
             WHERE pedido_id = %s
             ORDER BY creado_en DESC LIMIT 1 FOR UPDATE
@@ -2084,6 +2085,38 @@ def confirmar_pago_operativo(conexion, esquemas, pago_id, estado_anterior,
             (pago_id, estado_anterior, actor_id, observacion),
         )
         return True
+
+
+def insertar_ingreso_caja_desde_pago(conexion, esquemas, pago):
+    """Registra el ingreso de caja de un pago PAGADO (idempotente).
+
+    Regla de caja autorizada en el Bloque 4: un pago se convierte en
+    ingreso ÚNICAMENTE cuando su estado es ``PAGADO`` y existe
+    ``pagado_en``. La categoría ``COBRO_PEDIDO`` (catálogo) clasifica
+    el ingreso; el método de pago y el monto provienen de la fila real.
+
+    ``UNIQUE(pago_id)`` en ``caja_movimientos`` hace idempotente la
+    escritura: un retry o doble POST nunca duplica ingresos.
+    """
+    operaciones = esquemas["operaciones"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT IGNORE INTO {operaciones}.caja_movimientos
+                (categoria_id, tipo, origen, concepto, monto, moneda,
+                 metodo_pago_id, pago_id, pedido_id, fecha_movimiento)
+            SELECT c.id, 'INGRESO', 'PAGO', 'Cobro de pedido',
+                   p.monto, p.moneda, p.metodo_pago_id, p.id, p.pedido_id,
+                   COALESCE(p.pagado_en, NOW())
+            FROM {operaciones}.pagos AS p
+            INNER JOIN {operaciones}.caja_categorias AS c
+                ON c.codigo = 'COBRO_PEDIDO' AND c.tipo = 'INGRESO'
+            WHERE p.id = %s AND p.estado = 'PAGADO'
+              AND p.pagado_en IS NOT NULL
+            """,
+            (pago["id"],),
+        )
+        return cursor.rowcount > 0
 
 
 def crear_asignacion_repartidor(conexion, esquemas, asignacion_id,

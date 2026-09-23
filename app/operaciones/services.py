@@ -2341,9 +2341,15 @@ def _gestionar_cobro(unidad, pago, modalidad_esperada, tipo_entrega,
             raise ReglaOperativaError(
                 "El pago anticipado debe estar pagado antes de cerrar la entrega."
             )
+        _repos.insertar_ingreso_caja_desde_pago(
+            unidad.conexion, unidad.esquemas, pago
+        )
         return
     if modalidad == modalidad_esperada:
         if estado == "PAGADO":
+            _repos.insertar_ingreso_caja_desde_pago(
+                unidad.conexion, unidad.esquemas, pago
+            )
             return
         if estado != "PENDIENTE":
             raise ReglaOperativaError(
@@ -2356,6 +2362,9 @@ def _gestionar_cobro(unidad, pago, modalidad_esperada, tipo_entrega,
             raise ReglaOperativaError(
                 "El pago cambió mientras se confirmaba la entrega."
             )
+        _repos.insertar_ingreso_caja_desde_pago(
+            unidad.conexion, unidad.esquemas, pago
+        )
         return
     raise ReglaOperativaError(
         "La modalidad de pago no es aplicable a esta forma de entrega."
@@ -2428,6 +2437,13 @@ def _evaluar_finalizacion_pedido(unidad, pedido_id, actor_id, motivo):
         raise ReglaOperativaError(
             "El pedido cambió mientras se finalizaba; reintenta la operación."
         )
+
+    # Bloque 4: al cerrar el pedido se crea la encuesta de satisfacción
+    # PENDIENTE (idempotente). El enlace solo cuenta como invitación
+    # efectiva cuando el cliente abre su pedido (service de Comercio).
+    from app.encuestas.services import crear_encuesta_tras_completar
+    crear_encuesta_tras_completar(unidad, pedido_id)
+
     return True
 
 
@@ -2451,7 +2467,8 @@ def confirmar_pago_anticipado(actor_id, roles, pedido_id):
         with unidad.conexion.cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT id, modalidad, estado
+                SELECT id, pedido_id, modalidad, estado, monto, moneda,
+                       metodo_pago_id, pagado_en
                 FROM {operaciones}.pagos
                 WHERE pedido_id = %s
                 ORDER BY creado_en DESC LIMIT 1 FOR UPDATE
@@ -2466,6 +2483,10 @@ def confirmar_pago_anticipado(actor_id, roles, pedido_id):
                 "Solo los pagos anticipados se confirman con esta acción."
             )
         if pago["estado"] == "PAGADO":
+            _repos.insertar_ingreso_caja_desde_pago(
+                unidad.conexion, unidad.esquemas, pago
+            )
+            unidad.confirmar()
             return {"ok": True, "estado": "PAGADO"}
         if pago["estado"] != "PENDIENTE":
             raise ReglaOperativaError(
@@ -2478,6 +2499,9 @@ def confirmar_pago_anticipado(actor_id, roles, pedido_id):
             raise ReglaOperativaError(
                 "El pago cambió mientras se confirmaba."
             )
+        _repos.insertar_ingreso_caja_desde_pago(
+            unidad.conexion, unidad.esquemas, pago
+        )
         unidad.confirmar()
     return {"ok": True, "estado": "PAGADO"}
 

@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Flujo de caja | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "caja" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Flujo de caja</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Control financiero</span>
+                    <h1>Flujo de caja</h1>
+                    <p>Ingresos automáticos por pagos cobrados y egresos manuales trazables con su actor responsable.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ resumen.total_movimientos }} movimientos
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="admin-summary" aria-labelledby="resumen-caja">
+                <div class="admin-summary-grid">
+                    <article class="admin-summary-card is-success">
+                        <span>Ingresos</span>
+                        <strong>S/ {{ "%.2f"|format(resumen.ingresos) }}</strong>
+                        <small>movimientos ACTIVOS</small>
+                    </article>
+                    <article class="admin-summary-card is-danger">
+                        <span>Egresos</span>
+                        <strong>S/ {{ "%.2f"|format(resumen.egresos) }}</strong>
+                        <small>movimientos ACTIVOS</small>
+                    </article>
+                    <article class="admin-summary-card is-info">
+                        <span>Flujo neto del período</span>
+                        <strong>S/ {{ "%.2f"|format(resumen.flujo_neto) }}</strong>
+                        <small>Ingresos − Egresos</small>
+                    </article>
+                </div>
+            </section>
+
+            <div class="admin-filter-row">
+                <a href="{{ url_for('admin_caja.nuevo_egreso') }}" class="admin-button is-primary">
+                    + Registrar egreso manual
+                </a>
+            </div>
+
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de caja">
+                <label class="admin-filter-field">
+                    <span>Desde</span>
+                    <input type="date" name="desde" value="{{ filtros.desde }}">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Hasta</span>
+                    <input type="date" name="hasta" value="{{ filtros.hasta }}">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Tipo</span>
+                    <select name="tipo">
+                        <option value="">Todos</option>
+                        <option value="INGRESO"{% if filtros.tipo == "INGRESO" %} selected{% endif %}>Ingreso</option>
+                        <option value="EGRESO"{% if filtros.tipo == "EGRESO" %} selected{% endif %}>Egreso</option>
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Origen</span>
+                    <select name="origen">
+                        <option value="">Todos</option>
+                        <option value="PAGO"{% if filtros.origen == "PAGO" %} selected{% endif %}>Cobro de pedido</option>
+                        <option value="MANUAL"{% if filtros.origen == "MANUAL" %} selected{% endif %}>Manual</option>
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Categoría</span>
+                    <select name="categoria_id">
+                        <option value="">Todas</option>
+                        {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}"{% if filtros.categoria_id == categoria.id|string %} selected{% endif %}>{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar filtros</button>
+                    <a href="{{ url_for('admin_caja.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if movimientos %}
+                <section class="admin-order-table-card" aria-labelledby="movimientos-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Registros</span>
+                            <h2 id="movimientos-titulo">Movimientos de caja</h2>
+                        </div>
+                    </div>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Origen</th>
+                                    <th>Categoría</th>
+                                    <th>Concepto</th>
+                                    <th>Monto</th>
+                                    <th>Método</th>
+                                    <th>Estado</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mov in movimientos %}
+                                    <tr>
+                                        <td data-label="Fecha">
+                                            {{ mov.fecha_movimiento.strftime("%d/%m/%Y %H:%M") if mov.fecha_movimiento else "—" }}
+                                        </td>
+                                        <td data-label="Tipo">
+                                            {% if mov.tipo == "INGRESO" %}
+                                                <span class="admin-badge is-success">Ingreso</span>
+                                            {% else %}
+                                                <span class="admin-badge is-danger">Egreso</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Origen">
+                                            {% if mov.origen == "PAGO" %}Cobro de pedido{% else %}Manual{% endif %}
+                                        </td>
+                                        <td data-label="Categoría">
+                                            <strong>{{ mov.categoria_nombre }}</strong>
+                                        </td>
+                                        <td data-label="Concepto">
+                                            <small>{{ mov.concepto }}</small>
+                                        </td>
+                                        <td data-label="Monto">
+                                            <strong>S/ {{ "%.2f"|format(mov.monto) }}</strong>
+                                        </td>
+                                        <td data-label="Método">
+                                            {{ mov.metodo_nombre or "—" }}
+                                        </td>
+                                        <td data-label="Estado">
+                                            {% if mov.estado == "ACTIVO" %}
+                                                <span class="admin-badge is-success">Activo</span>
+                                            {% else %}
+                                                <span class="admin-badge is-pending">Anulado</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="">
+                                            {% if mov.estado == "ACTIVO" %}
+                                                <form
+                                                    method="POST"
+                                                    action="{{ url_for('admin_caja.anular', movimiento_id=mov.id) }}"
+                                                    class="admin-inline-form"
+                                                    onsubmit="var m=this.querySelector('input[name=motivo]'); if(!m.value){m.value='Corrección manual registrada por el equipo.';}"
+                                                >
+                                                    <input type="text" name="motivo" placeholder="Motivo de anulación" required>
+                                                    <button type="submit" class="admin-table-link is-danger">Anular</button>
+                                                </form>
+                                            {% else %}
+                                                <small>{{ mov.anulado_motivo }}</small>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% else %}
+                <div class="admin-empty-state">
+                    <span aria-hidden="true">◫</span>
+                    <h2>Sin movimientos</h2>
+                    <p>No se encontraron movimientos con los filtros aplicados.</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

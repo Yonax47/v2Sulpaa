@@ -1,0 +1,19 @@
+<header class="repartidor-topbar">
+        <div class="repartidor-topbar-inner">
+            <span class="repartidor-brand">
+                <span class="repartidor-brand-caja">
+                    <img src="{{ url_for('static', filename='img/logo-sulpaa.png') }}" alt="SULPAA" class="repartidor-logo">
+                </span>
+                <span class="repartidor-brand-texto">
+                    <strong>SULPAA</strong>
+                    <small>Panel del repartidor</small>
+                </span>
+            </span>
+            <span class="repartidor-sesion">
+                <span class="repartidor-usuario">{{ session.get("correo", "") }}</span>
+                <form method="POST" action="{{ url_for('identidad.logout') }}" class="repartidor-logout-form">
+                    <button type="submit" class="repartidor-logout-button">Cerrar sesión</button>
+                </form>
+            </span>
+        </div>
+    </header>

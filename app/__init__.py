@@ -56,8 +56,13 @@ from app.admin.pedidos.commands import registrar_comandos_pedidos
 from app.admin.entregas.routes import admin_entregas_bp
 from app.admin.inventario.routes import admin_inventario_bp
 from app.admin.contenido.routes import admin_contenido_bp
+from app.admin.caja.commands import registrar_comandos_caja
+from app.admin.caja.routes import admin_caja_bp
+from app.admin.reportes.routes import admin_reportes_bp
+from app.admin.encuestas.routes import admin_encuestas_bp
 from app.aprende.routes import aprende_bp
 from app.repartidor.routes import repartidor_bp
+from app.encuestas.routes import encuesta_bp
 
 
 # ============================================================
@@ -232,6 +237,22 @@ def create_app():
     )
 
     app.register_blueprint(
+        admin_caja_bp
+    )
+
+    app.register_blueprint(
+        admin_reportes_bp
+    )
+
+    app.register_blueprint(
+        admin_encuestas_bp
+    )
+
+    app.register_blueprint(
+        encuesta_bp
+    )
+
+    app.register_blueprint(
         aprende_bp
     )
 
@@ -242,6 +263,7 @@ def create_app():
     # El backfill queda disponible como comando Flask repetible y verificable;
     # no se deja SQL manual aislado que pueda ejecutarse sin sus controles.
     registrar_comandos_pedidos(app)
+    registrar_comandos_caja(app)
 
 
     # ========================================================

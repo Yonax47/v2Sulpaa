@@ -379,9 +379,6 @@ class KPIDashboardBloque3Test(unittest.TestCase):
             return_value={"total_pedidos_historial": 0,
                           "estados_consistentes": 0},
         ), patch(
-            "app.admin.services.obtener_metrica_programacion_entregas",
-            return_value={"total_entregas": 0, "entregas_programadas": 0},
-        ), patch(
             "app.admin.services.obtener_metrica_satisfaccion",
             return_value={"disponible": False},
         ):
@@ -434,9 +431,6 @@ class KPIDashboardBloque3Test(unittest.TestCase):
             "app.admin.services.obtener_metrica_consistencia_estados",
             return_value={"total_pedidos_historial": 100,
                           "estados_consistentes": 98},
-        ), patch(
-            "app.admin.services.obtener_metrica_programacion_entregas",
-            return_value={"total_entregas": 100, "entregas_programadas": 96},
         ), patch(
             "app.admin.services.obtener_metrica_satisfaccion",
             return_value={"disponible": False},

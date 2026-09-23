@@ -5,9 +5,11 @@
 {% block page_css %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/repartidor.css') }}">
 {% endblock %}
 
 {% block content %}
+{% include "repartidor/components/cabecera.html" %}
 <div class="admin-content-lite">
     <a href="{{ url_for('repartidor.repartos') }}" class="admin-back-link">← Volver a mis repartos</a>
 

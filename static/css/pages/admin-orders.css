@@ -103,3 +103,56 @@
     .admin-detail-list dd { text-align: left; }
     .admin-product-row { align-items: flex-start; flex-direction: column; }
 }
+
+/* ============================================================
+   BLOQUE 4 — Flujo de caja, Reportes, Encuestas
+   ============================================================ */
+
+.admin-filter-row { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+.admin-inline-form { display: flex; align-items: center; gap: .4rem; }
+.admin-inline-form input { width: 150px; height: 36px; padding: 0 .6rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; font-size: .72rem; }
+.admin-table-link.is-danger { background: #fff1f1; color: #923b3b; }
+
+.admin-button.is-warning { background: #fff3d6; color: #8a6110; }
+.admin-button.is-danger { background: #ffeded; color: #923b3b; }
+
+.admin-form-card, .admin-report-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.admin-form-card { padding: 1.4rem 1.5rem; max-width: 860px; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.admin-form-field { display: grid; gap: .35rem; min-width: 0; }
+.admin-form-field.is-full { grid-column: 1 / -1; }
+.admin-form-field span { color: var(--color-text-secondary); font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.admin-form-field input, .admin-form-field select, .admin-form-field textarea { width: 100%; padding: .6rem .75rem; border: 1px solid var(--color-border); border-radius: 10px; background: #fff; color: var(--color-text); font: inherit; font-size: .84rem; }
+.admin-form-field input:focus, .admin-form-field select:focus, .admin-form-field textarea:focus { outline: 2px solid rgba(43, 130, 76, .18); border-color: var(--sulpaa-green-700); }
+.admin-form-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; }
+
+.admin-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; align-items: start; }
+.admin-report-card { display: grid; gap: .9rem; padding: 1.3rem 1.4rem; }
+.admin-report-card h2 { margin: .1rem 0 0; font-size: 1.05rem; }
+.admin-report-card p { margin: 0; color: var(--color-text-secondary); font-size: .8rem; }
+.admin-report-fields { display: grid; gap: .8rem; }
+.admin-report-card .admin-button { width: 100%; }
+
+.admin-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.1rem 1.2rem 1.3rem; }
+.admin-detail-item span { display: block; color: var(--color-text-secondary); font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.admin-detail-item strong { display: block; margin-top: .3rem; font-size: .9rem; overflow-wrap: anywhere; }
+.admin-detail-comment { margin: 0 1.2rem 1.2rem; padding: .9rem 1rem; border-left: 3px solid var(--sulpaa-green-700); background: #f7faf6; color: var(--color-text); font-style: italic; }
+
+.admin-charts, .admin-chart-grid { margin-top: 1.6rem; }
+.admin-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; }
+.admin-chart-card { min-height: 260px; padding: 1.2rem 1.3rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.admin-chart-card h3 { margin: 0 0 1rem; font-size: .92rem; color: var(--color-text); }
+.admin-chart-card canvas { position: relative; width: 100% !important; height: 210px !important; }
+.admin-chart-empty { color: var(--color-text-secondary); font-size: .85rem; text-align: center; padding: 2.5rem 1rem; }
+.admin-kpi-fraccion { display: block; margin-top: .25rem; color: var(--color-text-secondary); font-size: .72rem; font-weight: 750; }
+.admin-chart-caption { margin: .85rem 0 0; color: var(--color-text-secondary); font-size: .72rem; line-height: 1.5; }
+.admin-chart-card.is-wide { grid-column: 1 / -1; min-height: 0; }
+.admin-chart-card.is-wide .admin-detail-item { padding: .6rem .5rem; }
+.admin-chart-card.is-wide .admin-detail-item span { color: var(--color-text-secondary); }
+
+@media (max-width: 640px) {
+    .admin-form-grid, .admin-report-grid { grid-template-columns: 1fr; }
+    .admin-form-field.is-full { grid-column: auto; }
+    .admin-inline-form { flex-wrap: wrap; width: 100%; }
+    .admin-inline-form input { flex: 1 1 100%; }
+}

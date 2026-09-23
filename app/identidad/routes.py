@@ -205,9 +205,15 @@ def login():
 
     if session.get("autenticado"):
 
-        return redirect(
-            url_for("inicio")
-        )
+        # Ya hay una sesión válida: el formulario no se vuelve a
+        # mostrar y el usuario continua en su panel según sus roles
+        # ACTIVOS (misma prioridad que el POST de autenticación).
+        roles_actuales = session.get("roles", []) or []
+        if {"GERENTE", "ADMINISTRADOR"}.intersection(roles_actuales):
+            return redirect(url_for("admin.dashboard"))
+        if "REPARTIDOR" in roles_actuales:
+            return redirect(url_for("repartidor.repartos"))
+        return redirect(url_for("inicio"))
 
     correo = ""
 
@@ -319,16 +325,21 @@ def login():
                 "success",
             )
 
-            # ------------------------------------------------
+# ------------------------------------------------
             # Destino posterior al inicio de sesión
             # ------------------------------------------------
             #
-            # Los roles administrativos ingresan directamente
-            # al panel protegido. Los demás usuarios conservan
-            # el flujo normal del cliente hacia Inicio.
+            # Prioridad de redirección (roles ACTIVOS reales):
+            #
+            #  1. GERENTE/ADMINISTRADOR  -> panel administrativo.
+            #  2. REPARTIDOR (sin rol    -> su panel de repartos.
+            #     administrativo)
+            #  3. Resto de usuarios      -> Inicio (cliente).
             #
             # La decisión usa los códigos ACTIVOS recuperados de
             # la BD; no asigna privilegios ni hardcodea una URL.
+            # Si el usuario tiene varios roles, gana el panel de
+            # mayor jerarquía (admin > repartidor > cliente).
             # ------------------------------------------------
 
             roles_administrativos = {
@@ -341,6 +352,11 @@ def login():
             ):
                 return redirect(
                     url_for("admin.dashboard")
+                )
+
+            if "REPARTIDOR" in session["roles"]:
+                return redirect(
+                    url_for("repartidor.repartos")
                 )
 
             return redirect(

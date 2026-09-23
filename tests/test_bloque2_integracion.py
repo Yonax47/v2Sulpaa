@@ -194,13 +194,31 @@ class KPIsDashboardIntegracionTest(unittest.TestCase):
             for kpi in self.resumen["kpis_funcionales"]
             if kpi["valor"] is not None
         }
-        for codigo in ("KPI-01", "KPI-04", "KPI-07", "KPI-08"):
+        for codigo in ("KPI-01", "KPI-04", "KPI-07"):
             self.assertIn(codigo, instrumentados)
             self.assertGreaterEqual(instrumentados[codigo], 0.0)
 
+    def test_kpi_08_queda_pendiente_sin_solicitudes(self):
+        # KPI-08 no tiene "solicitudes de programación" trazables en el
+        # modelo: queda PENDIENTE hasta instrumentar ese denominador.
+        kpi_08 = next(
+            k for k in self.resumen["kpis_funcionales"] if k["codigo"] == "KPI-08"
+        )
+        self.assertIsNone(kpi_08["valor"])
+        self.assertEqual(kpi_08["estado"], "pendiente")
+
     def test_kpi_09_hook_permanece_seguro_sin_tabla(self):
+        # El hook del KPI-09 es defensivo: sin fuent present no inventa
+        # porcentajes y la solución queda pendiente de datos.
+        from unittest.mock import patch
+        with patch("app.admin.services.obtener_metrica_kpi09",
+                   return_value={"disponible": False}), patch(
+            "app.admin.services.obtener_metrica_satisfaccion",
+            return_value={"disponible": False},):
+            from app.admin.services import resumen_dashboard
+            resumen = resumen_dashboard()
         kpi_09 = next(
-            k for k in self.resumen["kpis_funcionales"] if k["codigo"] == "KPI-09"
+            k for k in resumen["kpis_funcionales"] if k["codigo"] == "KPI-09"
         )
         self.assertIsNone(kpi_09["valor"])
         self.assertEqual(kpi_09["estado"], "pendiente")

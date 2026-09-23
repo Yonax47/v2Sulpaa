@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Encuestas | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "encuestas" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Encuestas</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Satisfacción</span>
+                    <h1>Encuestas de satisfacción</h1>
+                    <p>Una encuesta por pedido entregado. La invitación solo cuenta cuando el enlace quedó disponible para el cliente.</p>
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de encuestas">
+                <label class="admin-filter-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        <option value="PENDIENTE"{% if filtros.estado == "PENDIENTE" %} selected{% endif %}>Pendiente</option>
+                        <option value="ENVIADA"{% if filtros.estado == "ENVIADA" %} selected{% endif %}>Enviada</option>
+                        <option value="RESPONDIDA"{% if filtros.estado == "RESPONDIDA" %} selected{% endif %}>Respondida</option>
+                        <option value="ERROR_ENVIO"{% if filtros.estado == "ERROR_ENVIO" %} selected{% endif %}>Error de envío</option>
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Desde</span>
+                    <input type="date" name="desde" value="{{ filtros.desde }}">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Hasta</span>
+                    <input type="date" name="hasta" value="{{ filtros.hasta }}">
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar filtros</button>
+                    <a href="{{ url_for('admin_encuestas.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if encuestas %}
+                <section class="admin-order-table-card" aria-labelledby="encuestas-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Registros</span>
+                            <h2 id="encuestas-titulo">Encuestas registradas</h2>
+                        </div>
+                    </div>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th>
+                                    <th>Estado</th>
+                                    <th>Canal</th>
+                                    <th>Calif. gral.</th>
+                                    <th>Recomienda</th>
+                                    <th>Creada</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for encuesta in encuestas %}
+                                    <tr>
+                                        <td data-label="Pedido">
+                                            <strong>{{ encuesta.numero_pedido or "—" }}</strong>
+                                            <small>{{ encuesta.usuario_id }}</small>
+                                        </td>
+                                        <td data-label="Estado">
+                                            {% if encuesta.estado == "RESPONDIDA" %}
+                                                <span class="admin-badge is-success">Respondida</span>
+                                            {% elif encuesta.estado == "ENVIADA" %}
+                                                <span class="admin-badge is-pending">Enviada</span>
+                                            {% elif encuesta.estado == "ERROR_ENVIO" %}
+                                                <span class="admin-badge is-danger">Error</span>
+                                            {% else %}
+                                                <span class="admin-badge is-pending">Pendiente</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Canal">{{ encuesta.canal }}</td>
+                                        <td data-label="Calif. gral.">
+                                            {{ encuesta.calificacion_general if encuesta.calificacion_general is not none else "—" }}
+                                        </td>
+                                        <td data-label="Recomienda">{{ encuesta.recomendaria or "—" }}</td>
+                                        <td data-label="Creada">
+                                            {{ encuesta.creado_en.strftime("%d/%m/%Y %H:%M") if encuesta.creado_en else "—" }}
+                                        </td>
+                                        <td data-label="">
+                                            <a
+                                                href="{{ url_for('admin_encuestas.detalle', encuesta_id=encuesta.id) }}"
+                                                class="admin-table-link"
+                                            >Ver detalle</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% else %}
+                <div class="admin-empty-state">
+                    <span aria-hidden="true">✉</span>
+                    <h2>Sin encuestas</h2>
+                    <p>No se encontraron encuestas con los filtros aplicados.</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

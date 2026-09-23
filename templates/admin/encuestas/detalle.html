@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de encuesta | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "encuestas" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Encuesta</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Satisfacción</span>
+                    <h1>Encuesta del pedido {{ encuesta.numero_pedido or encuesta.pedido_id }}</h1>
+                    <p>Detalle de la encuesta, sus calificaciones y los eventos de invitación registrados.</p>
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="admin-order-table-card" aria-labelledby="cabecera-titulo">
+                <div class="admin-section-heading admin-order-heading">
+                    <div>
+                        <span class="admin-section-kicker">Cabecera</span>
+                        <h2 id="cabecera-titulo">Estado de la encuesta</h2>
+                    </div>
+                </div>
+                <div class="admin-detail-grid">
+                    <div class="admin-detail-item"><span>Estado</span><strong>{{ encuesta.estado }}</strong></div>
+                    <div class="admin-detail-item"><span>Canal</span><strong>{{ encuesta.canal }}</strong></div>
+                    <div class="admin-detail-item"><span>Creada</span><strong>{{ encuesta.creado_en.strftime("%d/%m/%Y %H:%M") if encuesta.creado_en else "—" }}</strong></div>
+                    <div class="admin-detail-item"><span>Enviada</span><strong>{{ encuesta.enviado_en.strftime("%d/%m/%Y %H:%M") if encuesta.enviado_en else "—" }}</strong></div>
+                    <div class="admin-detail-item"><span>Respondida</span><strong>{{ encuesta.respondido_en.strftime("%d/%m/%Y %H:%M") if encuesta.respondido_en else "—" }}</strong></div>
+                    <div class="admin-detail-item"><span>Pedido</span><strong>{{ encuesta.numero_pedido or encuesta.pedido_id }}</strong></div>
+                </div>
+            </section>
+
+            {% if encuesta.calificacion_general is not none %}
+                <section class="admin-order-table-card" aria-labelledby="respuesta-titulo">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Respuesta</span>
+                            <h2 id="respuesta-titulo">Calificaciones (1 a 5)</h2>
+                        </div>
+                    </div>
+                    <div class="admin-detail-grid">
+                        <div class="admin-detail-item"><span>General</span><strong>{{ encuesta.calificacion_general }}</strong></div>
+                        <div class="admin-detail-item"><span>Producto</span><strong>{{ encuesta.calificacion_producto }}</strong></div>
+                        <div class="admin-detail-item"><span>Entrega</span><strong>{{ encuesta.calificacion_entrega }}</strong></div>
+                        <div class="admin-detail-item"><span>Atención</span><strong>{{ encuesta.calificacion_atencion }}</strong></div>
+                        <div class="admin-detail-item"><span>Recomienda</span><strong>{{ encuesta.recomendaria }}</strong></div>
+                    </div>
+                    {% if encuesta.comentario %}
+                        <p class="admin-detail-comment">{{ encuesta.comentario }}</p>
+                    {% endif %}
+                </section>
+            {% endif %}
+
+            <section class="admin-order-table-card" aria-labelledby="eventos-titulo">
+                <div class="admin-section-heading admin-order-heading">
+                    <div>
+                        <span class="admin-section-kicker">Auditoría</span>
+                        <h2 id="eventos-titulo">Eventos de la encuesta</h2>
+                    </div>
+                </div>
+                {% if encuesta.eventos %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Evento</th>
+                                    <th>Detalle</th>
+                                    <th>Responsable</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for evento in encuesta.eventos %}
+                                    <tr>
+                                        <td data-label="Evento"><strong>{{ evento.tipo }}</strong></td>
+                                        <td data-label="Detalle"><small>{{ evento.detalle or "—" }}</small></td>
+                                        <td data-label="Responsable">{{ evento.usuario_responsable_id or "automático" }}</td>
+                                        <td data-label="Fecha">{{ evento.creado_en.strftime("%d/%m/%Y %H:%M") if evento.creado_en else "—" }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="admin-empty-state">
+                        <p>Sin eventos registrados para esta encuesta.</p>
+                    </div>
+                {% endif %}
+            </section>
+
+            {% if encuesta.estado != "RESPONDIDA" %}
+                <div class="admin-filter-row">
+                    <form method="POST" action="{{ url_for('admin_encuestas.regenerar', encuesta_id=encuesta.id) }}">
+                        <button type="submit" class="admin-button is-warning">Rehabilitar invitación PORTAL</button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

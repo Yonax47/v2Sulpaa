@@ -3312,6 +3312,34 @@ def obtener_detalle_pedido_usuario(
         pedido["estado"], "default"
     )
 
+    # --------------------------------------------------------
+    # Encuesta de satisfacción (Bloque 4)
+    # --------------------------------------------------------
+    #
+    # Solo un pedido COMPLETADO ofrece la encuesta. Al construir este
+    # detalle, el CTA se habilita de verdad y el dominio registra el
+    # evento INVITACION_OK (KPI-09 sin falsear envíos). Si la
+    # habilitación falla, el detalle del pedido NO se bloquea.
+    # --------------------------------------------------------
+
+    pedido["encuesta"] = None
+
+    if pedido["estado"] == "COMPLETADO":
+
+        try:
+
+            from app.encuestas.services import (
+                publicar_invitacion_lectura,
+            )
+
+            pedido["encuesta"] = publicar_invitacion_lectura(
+                pedido_id, usuario_id
+            )
+
+        except Exception:
+
+            pedido["encuesta"] = None
+
     return {
         "ok": True,
         "pedido": pedido,

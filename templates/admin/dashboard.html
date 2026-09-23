@@ -7,16 +7,23 @@
         rel="stylesheet"
         href="{{ url_for('static', filename='css/pages/admin.css') }}"
     >
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/pages/admin-orders.css') }}"
+    >
 {% endblock %}
 
 {% block content %}
 
     <!-- ========================================================
-         PANEL ADMINISTRATIVO
+         PANEL ADMINISTRATIVO — RESUMEN EJECUTIVO
          ========================================================
-         La vista presenta únicamente datos calculados por la capa
-         Service. El template no inventa cifras ni decide si un KPI
-         cumple su meta; solo representa el estado recibido.
+         El resumen es una vista ejecutiva: resume los KPI, muestra
+         el contexto operativo real (pedidos, entregas, inventario,
+         caja, encuestas) cuando existe evidencia, y enlaza a la
+         página analítica "Indicadores KPI" para el detalle de los
+         diez indicadores. El template nunca inventa cifras: solo
+         representa lo que la capa Service entregó.
          ======================================================== -->
 
     <input
@@ -28,119 +35,8 @@
 
     <div class="admin-layout">
 
-        <!-- ====================================================
-             SIDEBAR ADMINISTRATIVA
-             ====================================================
-             En escritorio permanece visible. En tablet y móvil
-             funciona como panel lateral mediante el control CSS.
-             Las secciones sin ruta real se muestran deshabilitadas.
-             ==================================================== -->
-
-        <aside class="admin-sidebar" aria-label="Navegación administrativa">
-
-            <div class="admin-brand">
-                <img
-                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
-                    alt="SULPAA"
-                    class="admin-brand-logo"
-                >
-                <div>
-                    <span class="admin-brand-area">Administración</span>
-                    <span class="admin-brand-subtitle">Control general</span>
-                </div>
-            </div>
-
-            <nav class="admin-nav">
-                <span class="admin-nav-heading">Principal</span>
-
-                <a
-                    href="{{ url_for('admin.dashboard') }}"
-                    class="admin-nav-link is-active"
-                    aria-current="page"
-                >
-                    <span class="admin-nav-icon" aria-hidden="true">▦</span>
-                    <span>Dashboard</span>
-                </a>
-
-                <a href="#indicadores" class="admin-nav-link">
-                    <span class="admin-nav-icon" aria-hidden="true">↗</span>
-                    <span>Indicadores KPI</span>
-                </a>
-
-                <span class="admin-nav-heading">Operación</span>
-
-                <a href="{{ url_for('admin_pedidos.listado') }}" class="admin-nav-link">
-                    <span class="admin-nav-icon" aria-hidden="true">□</span>
-                    <span>Pedidos</span>
-                </a>
-
-                <a href="{{ url_for('admin_entregas.listado') }}" class="admin-nav-link">
-                    <span class="admin-nav-icon" aria-hidden="true">▷</span>
-                    <span>Entregas</span>
-                </a>
-
-                {% if
-                    "GERENTE" in (session.get("roles") or [])
-                    or "ADMINISTRADOR" in (session.get("roles") or [])
-                    or "INVENTARIO" in (session.get("roles") or [])
-                %}
-                    <a href="{{ url_for('admin_inventario.listado') }}" class="admin-nav-link">
-                        <span class="admin-nav-icon" aria-hidden="true">▣</span>
-                        <span>Inventario</span>
-                    </a>
-                {% endif %}
-
-                {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
-                    <a href="{{ url_for('admin_contenido.listado') }}" class="admin-nav-link">
-                        <span class="admin-nav-icon" aria-hidden="true">◈</span>
-                        <span>Contenido</span>
-                    </a>
-                {% endif %}
-
-                {% for modulo in ["Reportes"] %}
-                    <span
-                        class="admin-nav-link is-disabled"
-                        aria-disabled="true"
-                    >
-                        <span class="admin-nav-icon" aria-hidden="true">•</span>
-                        <span>{{ modulo }}</span>
-                        <small>Próximamente</small>
-                    </span>
-                {% endfor %}
-            </nav>
-
-            <div class="admin-sidebar-footer">
-                <span>Sesión activa</span>
-                <strong>{{ session.get("correo", "") }}</strong>
-
-                <!-- ============================================
-                     ACCIONES DE SESIÓN ADMINISTRATIVA
-                     ============================================
-                     El cierre reutiliza el endpoint POST existente
-                     de Identidad. Esa ruta ejecuta session.clear(),
-                     por lo que no duplicamos lógica de seguridad.
-                     ============================================ -->
-                <div class="admin-session-actions">
-                    <a
-                        href="{{ url_for('inicio') }}"
-                        class="admin-return-link"
-                    >
-                        Volver al sitio
-                    </a>
-
-                    <form
-                        method="POST"
-                        action="{{ url_for('identidad.logout') }}"
-                        class="admin-logout-form"
-                    >
-                        <button type="submit" class="admin-logout-button">
-                            Cerrar sesión
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-        </aside>
+        {% set admin_activo = "dashboard" %}
+        {% include "admin/components/sidebar.html" %}
 
         <label
             for="admin-menu-control"
@@ -150,8 +46,6 @@
 
         <main class="admin-main">
 
-            <!-- Barra móvil: mantiene el menú fuera del contenido
-                 hasta que el usuario lo solicita. -->
             <div class="admin-mobile-bar">
                 <label
                     for="admin-menu-control"
@@ -173,8 +67,8 @@
                         <span class="admin-eyebrow">SULPAA · Etapa 1</span>
                         <h1>Panel administrativo</h1>
                         <p>
-                            Resumen general de los indicadores funcionales
-                            con evidencia disponible en el sistema.
+                            Resumen ejecutivo de los indicadores funcionales
+                            con la evidencia disponible en el sistema.
                         </p>
                     </div>
 
@@ -185,10 +79,13 @@
                 </header>
 
                 <!-- ================================================
-                     RESUMEN DE INDICADORES FUNCIONALES
+                     A. RESUMEN KPI
                      ================================================
-                     Todos los totales provienen de resumen_dashboard().
-                     Se calculan exclusivamente sobre KPI-01 a KPI-10.
+                     Distingue lo INSTRUMENTADO (los diez KPI cuentan
+                     con consulta real definida) de lo que tiene
+                     EVIDENCIA en base de datos. La diferencia son
+                     "pendientes de datos": PENDIENTE, que NUNCA se
+                     cuenta como incumplimiento.
                      ================================================ -->
 
                 <section class="admin-summary" aria-labelledby="resumen-titulo">
@@ -197,14 +94,20 @@
                             <span class="admin-section-kicker">Vista general</span>
                             <h2 id="resumen-titulo">Resumen de indicadores</h2>
                         </div>
-                        <span class="admin-section-note">KPI funcionales · RF-01 a RF-10</span>
+                        <a
+                            href="{{ url_for('admin.indicadores') }}"
+                            class="admin-button is-primary"
+                        >
+                            Ver todos los indicadores
+                        </a>
                     </div>
 
                     <div class="admin-summary-grid">
                         {% set tarjetas_resumen = [
                             ("KPI funcionales", resumen.total, "neutral"),
                             ("Instrumentados", resumen.instrumentados, "info"),
-                            ("Pendientes", resumen.pendientes, "warning"),
+                            ("Con evidencia", resumen.con_evidencia, "success"),
+                            ("Pendientes de datos", resumen.pendientes_de_datos, "warning"),
                             ("Cumplen meta", resumen.cumplen, "success"),
                             ("No cumplen", resumen.no_cumplen, "danger")
                         ] %}
@@ -220,25 +123,226 @@
                 </section>
 
                 <!-- ================================================
-                     KPI-01 A KPI-10
+                     B. RESUMEN OPERATIVO
                      ================================================
-                     KPI-01 y KPI-04 reciben valores reales. Los demás
-                     permanecen pendientes hasta contar con evidencia.
+                     Conteos reales de Comercio, Operaciones, Inventario
+                     y Caja. Cuando la fuente no tiene registros la
+                     tarjeta muestra el estado neutro "sin datos"; no
+                     se inventa ningún número.
                      ================================================ -->
 
                 <section
-                    id="indicadores"
+                    id="operativo"
+                    class="admin-summary"
+                    aria-labelledby="operativo-titulo"
+                >
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Contexto operativo</span>
+                            <h2 id="operativo-titulo">Actividad del sistema</h2>
+                        </div>
+                        <span class="admin-section-note">
+                            Con evidencia real registrada
+                        </span>
+                    </div>
+
+                    <div class="admin-summary-grid">
+                        <article class="admin-summary-card is-neutral">
+                            <span>Pedidos iniciados</span>
+                            <strong>{{ operativo.pedidos_iniciados }}</strong>
+                            <small>EN_PREPARACION o COMPLETADO</small>
+                        </article>
+
+                        <article class="admin-summary-card is-neutral">
+                            <span>Pedidos completados</span>
+                            <strong>{{ operativo.pedidos_completados }}</strong>
+                            <small>flujo cerrado extremo a extremo</small>
+                        </article>
+
+                        <article class="admin-summary-card is-neutral">
+                            <span>Entregas registradas</span>
+                            <strong>{{ operativo.entregas }}</strong>
+                            <small>en Operaciones</small>
+                        </article>
+
+                        <article class="admin-summary-card is-warning">
+                            <span>Variantes con stock bajo</span>
+                            <strong>{{ operativo.productos_con_stock_bajo }}</strong>
+                            <small>por debajo del mínimo real</small>
+                        </article>
+
+                        <article class="admin-summary-card is-success">
+                            <span>Ingresos de caja</span>
+                            <strong>S/ {{ "%.2f"|format(operativo.ingresos) }}</strong>
+                            <small>movimientos ACTIVOS</small>
+                        </article>
+
+                        <article class="admin-summary-card is-danger">
+                            <span>Egresos de caja</span>
+                            <strong>S/ {{ "%.2f"|format(operativo.egresos) }}</strong>
+                            <small>movimientos ACTIVOS</small>
+                        </article>
+
+                        <article class="admin-summary-card is-info">
+                            <span>Flujo neto</span>
+                            <strong>S/ {{ "%.2f"|format(operativo.flujo_neto) }}</strong>
+                            <small>Ingresos − Egresos</small>
+                        </article>
+
+                        <article class="admin-summary-card is-neutral">
+                            <span>Encuestas completadas</span>
+                            <strong>{{ operativo.encuestas_completadas }}</strong>
+                            <small>
+                                {% if operativo.satisfaccion_promedio is not none %}
+                                    satisfacción promedio
+                                    {{ "%.2f"|format(operativo.satisfaccion_promedio) }} / 5
+                                {% else %}
+                                    sin satisfacción registrada
+                                {% endif %}
+                            </small>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- ================================================
+                     C. GRÁFICOS DE GESTIÓN (Chart.js LOCAL)
+                     ================================================
+                     Se muestran únicamente cuando existe evidencia;
+                     Chart.js se sirve desde static/vendor (sin CDN).
+                     ================================================ -->
+
+                <section
+                    id="analitica"
+                    class="admin-charts"
+                    aria-labelledby="analitica-titulo"
+                >
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Analítica</span>
+                            <h2 id="analitica-titulo">Gráficos de gestión</h2>
+                        </div>
+                        <span class="admin-section-note">
+                            Flujo de caja, invitaciones y satisfacción
+                        </span>
+                    </div>
+
+                    <div class="admin-chart-grid">
+                        <article class="admin-chart-card">
+                            <h3>Flujo de caja mensual</h3>
+                            {% if graficos.flujo_caja %}
+                                <canvas id="chart-flujo-caja" aria-label="Flujo de caja mensual"></canvas>
+                            {% else %}
+                                <p class="admin-chart-empty">
+                                    Sin movimientos de caja registrados.
+                                </p>
+                            {% endif %}
+                        </article>
+
+                        <article class="admin-chart-card">
+                            <h3>KPI-09 — Invitaciones PORTAL</h3>
+                            {% if graficos.kpi09 %}
+                                <canvas id="chart-kpi09" aria-label="Invitaciones KPI-09"></canvas>
+                                <p class="admin-chart-caption">
+                                    Numerador: pedidos con INVITACION_OK ·
+                                    Denominador: pedidos entregados
+                                </p>
+                            {% else %}
+                                <p class="admin-chart-empty">
+                                    Sin invitaciones registradas todavía.
+                                </p>
+                            {% endif %}
+                        </article>
+
+                        <article class="admin-chart-card is-wide">
+                            <h3>Satisfacción complementaria</h3>
+                            {% if graficos.satisfaccion %}
+                                <div class="admin-detail-grid"
+                                     style="padding:0">
+                                    <div class="admin-detail-item">
+                                        <span>Promedio general</span>
+                                        <strong>
+                                            {{ "%.2f"|format(graficos.satisfaccion.satisfaccion_promedio) }} / 5
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Promedio producto</span>
+                                        <strong>
+                                            {{ "%.2f"|format(graficos.satisfaccion.promedio_producto) }} / 5
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Promedio entrega</span>
+                                        <strong>
+                                            {{ "%.2f"|format(graficos.satisfaccion.promedio_entrega) }} / 5
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Promedio atención</span>
+                                        <strong>
+                                            {{ "%.2f"|format(graficos.satisfaccion.promedio_atencion) }} / 5
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Recomendarían</span>
+                                        <strong>
+                                            {{ "%.2f"|format(graficos.satisfaccion.recomendacion_porcentaje) }} %
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Tasa de respuesta</span>
+                                        <strong>
+                                            {{ "%.2f"|format(graficos.satisfaccion.tasa_respuesta_porcentaje) }} %
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Respondidas</span>
+                                        <strong>
+                                            {{ graficos.satisfaccion.encuestas_completadas }}
+                                        </strong>
+                                    </div>
+                                    <div class="admin-detail-item">
+                                        <span>Respuestas satisfactorias</span>
+                                        <strong>
+                                            {{ graficos.satisfaccion.respuestas_satisfactorias }}
+                                        </strong>
+                                    </div>
+                                </div>
+                                <p class="admin-chart-caption">
+                                    Métricas gerenciales complementarias;
+                                    no sustituyen la fórmula del KPI-09.
+                                </p>
+                            {% else %}
+                                <p class="admin-chart-empty">
+                                    Sin encuestas respondidas todavía.
+                                </p>
+                            {% endif %}
+                        </article>
+                    </div>
+                </section>
+
+                <!-- ================================================
+                     D. ACCESO AL DETALLE ANALÍTICO
+                     ================================================
+                     La página Indicadores KPI muestra los diez
+                     indicadores con numerador, denominador, fórmula,
+                     meta, estado, fuente y evidencia requerida.
+                     ================================================ -->
+
+                <section
                     class="admin-indicators"
-                    aria-labelledby="indicadores-titulo"
+                    aria-labelledby="detalle-titulo"
                 >
                     <div class="admin-section-heading">
                         <div>
                             <span class="admin-section-kicker">Seguimiento funcional</span>
-                            <h2 id="indicadores-titulo">Indicadores KPI</h2>
+                            <h2 id="detalle-titulo">Estado de los diez KPI</h2>
                         </div>
-                        <span class="admin-section-note">
-                            Actualizados al consultar esta página
-                        </span>
+                        <a
+                            href="{{ url_for('admin.indicadores') }}"
+                            class="admin-button is-secondary"
+                        >
+                            Ver detalle analítico
+                        </a>
                     </div>
 
                     <div class="admin-kpi-grid">
@@ -265,9 +369,17 @@
                                     <span>Valor actual</span>
                                     {% if kpi.valor is not none %}
                                         <strong>{{ "%.2f"|format(kpi.valor) }} %</strong>
+                                        {% if kpi.numerador is defined %}
+                                            <small class="admin-kpi-fraccion">
+                                                {{ kpi.numerador }} / {{ kpi.denominador }}
+                                                {% if kpi.unidad %}
+                                                    ({{ kpi.unidad }})
+                                                {% endif %}
+                                            </small>
+                                        {% endif %}
                                     {% else %}
                                         <strong class="is-pending-value">
-                                            Pendiente de instrumentación
+                                            Sin evidencia suficiente
                                         </strong>
                                     {% endif %}
                                 </div>
@@ -288,14 +400,13 @@
 
                 <footer class="admin-data-note">
                     <strong>Panel de solo lectura.</strong>
-                    KPI-01, KPI-04, KPI-07 y KPI-08 se calculan con datos
-                    reales de Comercio y Operaciones. KPI-02 usa la
-                    evidencia de verificaciones físicas de Inventario;
-                    KPI-03, KPI-06 y KPI-10 usan la evidencia real de
-                    consultas, favoritos y accesos de contenido. KPI-09
-                    está listo como gancho para la tabla de encuestas.
-                    Un indicador queda "Pendiente" solo cuando aún no
-                    existe evidencia registrada.
+                    Los diez KPI funcionales están instrumentados en el
+                    sistema. Un indicador queda "Sin evidencia
+                    suficiente" (PENDIENTE) cuando su fuente aún no
+                    registra actividad real; ese estado no se cuenta
+                    como incumplimiento. El detalle de cada indicador y
+                    la evidencia requerida se encuentran en la página
+                    Indicadores KPI.
                 </footer>
 
             </div>
@@ -304,4 +415,78 @@
 
     </div>
 
+{% endblock %}
+
+{% block page_js %}
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+    <script>
+        (function () {
+
+            var flujoDiv = "{{ graficos.flujo_caja | tojson }}";
+            var flujo = [];
+            try { flujo = JSON.parse(flujoDiv) || []; } catch (e) { flujo = []; }
+
+            var flujoCanvas = document.getElementById("chart-flujo-caja");
+            if (flujoCanvas && flujo.length && window.Chart) {
+                new Chart(flujoCanvas, {
+                    type: "bar",
+                    data: {
+                        labels: flujo.map(function (f) { return f.periodo; }),
+                        datasets: [
+                            {
+                                label: "Ingresos (S/)",
+                                data: flujo.map(function (f) { return f.ingresos; }),
+                                backgroundColor: "rgba(34,139,34,0.75)"
+                            },
+                            {
+                                label: "Egresos (S/)",
+                                data: flujo.map(function (f) { return f.egresos; }),
+                                backgroundColor: "rgba(178,34,34,0.75)"
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: "bottom" }
+                        }
+                    }
+                });
+            }
+
+            var kpi09Div = "{{ graficos.kpi09 | tojson }}";
+            var kpi09 = null;
+            try { kpi09 = JSON.parse(kpi09Div) || null; } catch (e) { kpi09 = null; }
+
+            var kpi09Canvas = document.getElementById("chart-kpi09");
+            if (kpi09Canvas && kpi09 && window.Chart) {
+                new Chart(kpi09Canvas, {
+                    type: "bar",
+                    data: {
+                        labels: [
+                            "Invitaciones PORTAL (INVITACION_OK)",
+                            "Pedidos entregados (ENTREGADO)"
+                        ],
+                        datasets: [{
+                            label: "Cantidad por pedido (COUNT DISTINCT)",
+                            data: [
+                                kpi09.invitaciones_ok || 0,
+                                kpi09.pedidos_entregados || 0
+                            ],
+                            backgroundColor: "rgba(70,130,180,0.75)"
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+
+        })();
+    </script>
 {% endblock %}

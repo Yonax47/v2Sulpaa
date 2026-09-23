@@ -26,6 +26,28 @@
         gap: 0.75rem;
     }
 
+    .order-detail-encuesta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        padding: 0.9rem 1.1rem;
+        border: 1px solid rgba(74, 108, 61, 0.25);
+        border-radius: 14px;
+        background: #f4f8f1;
+    }
+
+    .order-detail-encuesta strong {
+        color: #2f5233;
+        font-size: 0.95rem;
+    }
+
+    .order-detail-encuesta span {
+        color: #4a684a;
+        font-size: 0.9rem;
+    }
+
     .order-detail-summary {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -224,6 +246,23 @@
                     </a>
 
                 </div>
+
+                {% if pedido.encuesta and pedido.encuesta.disponible %}
+                    <div class="order-detail-encuesta" aria-label="Encuesta de satisfacción">
+                        {% if pedido.encuesta.estado == "RESPONDIDA" %}
+                            <strong>¡Gracias!</strong>
+                            <span>Ya respondiste la encuesta de satisfacción de este pedido.</span>
+                        {% elif pedido.encuesta.url %}
+                            <strong>¿Nos ayudas a mejorar?</strong>
+                            <a
+                                href="{{ pedido.encuesta.url }}"
+                                class="orders-btn orders-btn-primary"
+                            >
+                                Responder encuesta de satisfacción
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
 
             </div>
 

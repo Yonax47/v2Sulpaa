@@ -73,17 +73,47 @@ def indice():
 @admin_required
 def dashboard():
     """
-    Muestra el panel administrativo con los KPI de la Etapa 1.
+    Muestra el panel administrativo (resumen ejecutivo).
 
-    - KPI-04 se calcula en vivo (pedido_historial / pedidos).
-    - El resto de KPI quedan como "pendiente de
-      instrumentaci\u00f3n" (NO se inventan valores).
+    Consume la MISMA fuente que los indicadores KPI y el reporte
+    KPI: resumen_dashboard(). El template solo representa los
+    estados recibidos; no inventa cifras ni decide cumplimiento.
     """
 
     resumen = resumen_dashboard()
 
     return render_template(
         "admin/dashboard.html",
+        kpis=resumen["kpis_funcionales"],
+        resumen=resumen["resumen"],
+        operativo=resumen["operativo"],
+        graficos=resumen["graficos"],
+    )
+
+
+@admin_bp.route(
+    "/kpi/",
+    methods=["GET"],
+)
+@login_required
+@admin_required
+def indicadores():
+    """
+    Página analítica de los diez KPI funcionales (RF-01 a RF-10).
+
+    Vista dedicada: cada indicador muestra numerador, denominador,
+    fórmula, meta, estado y fuente real, y en caso de "PENDIENTE"
+    indica qué evidencia concreta necesita el indicador (sin
+    instrucciones técnicas).
+
+    Reutiliza resumen_dashboard() como fuente única para que el
+    dashboard, esta página y el reporte KPI nunca se contradigan.
+    """
+
+    resumen = resumen_dashboard()
+
+    return render_template(
+        "admin/kpi.html",
         kpis=resumen["kpis_funcionales"],
         resumen=resumen["resumen"],
     )

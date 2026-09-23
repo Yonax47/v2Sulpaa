@@ -1,0 +1,155 @@
+/*
+============================================================
+SULPAA V2 - MÓDULO REPARTIDOR
+============================================================
+
+Cabecera profesional del panel del repartidor. Reutiliza las
+variables e identidad visual global de SULPAA y NO replica
+elementos del panel administrativo (sin enlaces de admin).
+
+El botón "Cerrar sesión" usa el endpoint real de identidad
+(POST /identidad/logout), conservando la protección CSRF/POST.
+============================================================
+*/
+
+.repartidor-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: linear-gradient(180deg, #075d3e 0%, var(--sulpaa-green-900) 100%);
+    color: var(--color-text-inverse);
+    box-shadow: 14px 0 40px rgba(1, 76, 48, 0.12);
+}
+
+.repartidor-topbar-inner {
+    width: min(100% - 3rem, 1480px);
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    min-height: 76px;
+    padding: 0.8rem 0;
+}
+
+.repartidor-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.repartidor-brand-caja {
+    width: 64px;
+    height: 64px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.96);
+    padding: 0.35rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.repartidor-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.repartidor-brand-texto {
+    display: block;
+    line-height: 1.22;
+}
+
+.repartidor-brand-texto strong {
+    display: block;
+    font-size: 1.28rem;
+    font-weight: 850;
+    letter-spacing: 0.02em;
+}
+
+.repartidor-brand-texto small {
+    display: block;
+    margin-top: 0.15rem;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.74rem;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.repartidor-sesion {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.repartidor-usuario {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+.repartidor-logout-form {
+    margin: 0;
+}
+
+.repartidor-logout-button {
+    min-height: 40px;
+    padding: 0.55rem 1.05rem;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-inverse);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.repartidor-logout-button:hover {
+    border-color: rgba(255, 255, 255, 0.48);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+.admin-content-lite {
+    width: min(100% - 3.5rem, 1480px);
+    margin-inline: auto;
+    padding: 2.4rem 0 3rem;
+}
+
+@media (max-width: 640px) {
+    .admin-content-lite {
+        width: min(100% - 2rem, 1480px);
+        padding: 1.6rem 0 2.4rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .repartidor-topbar-inner {
+        width: min(100% - 2rem, 1480px);
+        min-height: 64px;
+        padding: 0.55rem 0;
+    }
+
+    .repartidor-brand-caja {
+        width: 48px;
+        height: 48px;
+        border-radius: 11px;
+    }
+
+    .repartidor-brand-texto strong {
+        font-size: 1.05rem;
+    }
+
+    .repartidor-brand-texto small {
+        font-size: 0.64rem;
+    }
+
+    .repartidor-usuario {
+        display: none;
+    }
+}

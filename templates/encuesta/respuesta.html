@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Encuesta de satisfacción | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/pages/encuesta.css') }}"
+    >
+{% endblock %}
+
+{% block content %}
+<div class="encuesta-shell">
+
+    <div class="encuesta-card">
+
+        <div class="encuesta-header">
+            <div class="encuesta-logo-wrap">
+                <img
+                    src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                    alt="SULPAA"
+                    class="encuesta-logo"
+                >
+            </div>
+            <span class="encuesta-eyebrow">Encuesta de satisfacción</span>
+            <h1>¿Cómo fue tu experiencia?</h1>
+            {% if numero_pedido %}
+                <p>Pedido <strong>{{ numero_pedido }}</strong></p>
+            {% endif %}
+        </div>
+
+        {% with mensajes = get_flashed_messages(with_categories=true) %}
+            {% if mensajes %}
+                <div class="encuesta-alerts">
+                    {% for categoria, mensaje in mensajes %}
+                        <div class="encuesta-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% if ya_respondida %}
+            <div class="encuesta-gracias">
+                <span class="encuesta-gracias-icon" aria-hidden="true">✓</span>
+                <h2>¡Gracias por responder!</h2>
+                <p>Tu opinión nos ayuda a mejorar cada entrega.</p>
+                <a href="{{ url_for('inicio') }}" class="encuesta-boton">Volver al inicio</a>
+            </div>
+        {% else %}
+
+            {% set campos = [
+                ("calificacion_general", "Calificación general"),
+                ("calificacion_producto", "Calificación del producto"),
+                ("calificacion_entrega", "Calificación de la entrega"),
+                ("calificacion_atencion", "Calificación de la atención")
+            ] %}
+
+            <form method="POST" action="{{ url_for('encuesta.procesar', token=token) }}" class="encuesta-form">
+
+                {% for campo, etiqueta in campos %}
+                    <fieldset class="encuesta-campo">
+                        <legend>{{ etiqueta }}</legend>
+                        <div class="encuesta-puntajes">
+                            {% for valor in range(1, 6) %}
+                                <label class="encuesta-puntaje">
+                                    <input
+                                        type="radio"
+                                        name="{{ campo }}"
+                                        value="{{ valor }}"
+                                        required
+                                    >
+                                    <span>{{ valor }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </fieldset>
+                {% endfor %}
+
+                <fieldset class="encuesta-campo">
+                    <legend>¿Recomendarías SULPAA a un amigo?</legend>
+                    <div class="encuesta-si-no">
+                        <label class="encuesta-puntaje is-si-no">
+                            <input type="radio" name="recomendaria" value="SI" required>
+                            <span>Sí</span>
+                        </label>
+                        <label class="encuesta-puntaje is-si-no">
+                            <input type="radio" name="recomendaria" value="NO" required>
+                            <span>No</span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <label class="encuesta-comentario">
+                    <span>Comentario (opcional)</span>
+                    <textarea name="comentario" rows="4" maxlength="500" placeholder="Cuéntanos qué podemos mejorar"></textarea>
+                </label>
+
+                <button type="submit" class="encuesta-boton is-solid">Enviar mi respuesta</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

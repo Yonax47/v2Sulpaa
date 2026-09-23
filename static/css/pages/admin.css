@@ -496,6 +496,29 @@ body {
     overflow-wrap: anywhere;
 }
 
+.admin-kpi-pendiente {
+    margin: 0 0 0.9rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius-md);
+    background: #fbf6e9;
+    border: 1px solid #ead9a8;
+}
+
+.admin-kpi-pendiente span {
+    display: block;
+    color: #8a6110;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.admin-kpi-pendiente p {
+    margin: 0.3rem 0 0;
+    color: #6d5a20;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
 .admin-data-note {
     margin-top: 1.5rem;
     padding: 1rem 1.15rem;

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes gerenciales | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "reportes" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Reportes</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Gerencia</span>
+                    <h1>Reportes gerenciales</h1>
+                    <p>Cada generación se audita y alimenta el KPI-05 (solo cuentan solicitudes reales, no visitas).</p>
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="admin-report-grid">
+                {% for tipo in tipos %}
+                    <form
+                        method="POST"
+                        action="{{ url_for('admin_reportes.generar') }}"
+                        class="admin-report-card"
+                    >
+                        <input type="hidden" name="tipo" value="{{ tipo.codigo }}">
+                        <span class="admin-section-kicker">{{ tipo.codigo }}</span>
+                        <h2>{{ tipo.nombre }}</h2>
+                        <p>{{ tipo.descripcion }}</p>
+
+                        <div class="admin-report-fields">
+                            <label class="admin-form-field">
+                                <span>Formato</span>
+                                <select name="formato" required>
+                                    {% for formato in formatos %}
+                                        <option value="{{ formato }}">{{ formato }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label class="admin-form-field">
+                                <span>Desde</span>
+                                <input type="date" name="desde">
+                            </label>
+                            <label class="admin-form-field">
+                                <span>Hasta</span>
+                                <input type="date" name="hasta">
+                            </label>
+                        </div>
+                        <button type="submit" class="admin-button is-primary">Descargar reporte</button>
+                    </form>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

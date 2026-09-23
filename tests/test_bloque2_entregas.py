@@ -225,5 +225,243 @@ class PermisosHTTPRepartidorTest(unittest.TestCase):
                 )
 
 
+class RedireccionesLoginYConfirmacionTest(unittest.TestCase):
+    """Tareas 1-2 del ajuste final: destino del login y del confirmar."""
+
+    def setUp(self):
+        self.app = create_app()
+        self.app.config.update(TESTING=True)
+
+    def _cliente_con_sesion(self, roles, correo="actor@example.test"):
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion.update({
+                "autenticado": True,
+                "usuario_id": "actor",
+                "correo": correo,
+                "roles": roles,
+            })
+        return cliente
+
+    # --------------------------------------------------------
+    # Tarea 1: el login redirige según ROLES ACTIVOS
+    # --------------------------------------------------------
+
+    def _login_post(self, roles_recibidos):
+        from unittest.mock import patch
+        with patch(
+            "app.identidad.routes.autenticar_usuario",
+            return_value={
+                "ok": True,
+                "usuario": {
+                    "id": "actor",
+                    "correo": "actor@example.test",
+                },
+            },
+        ), patch(
+            "app.identidad.routes.obtener_roles_usuario",
+            return_value=roles_recibidos,
+        ):
+            return self.app.test_client().post(
+                "/identidad/login",
+                data={"correo": "actor@example.test",
+                      "password": "clave"},
+            )
+
+    def test_login_repartidor_va_a_su_panel(self):
+        respuesta = self._login_post(["REPARTIDOR"])
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn("/repartidor/", respuesta.headers["Location"])
+
+    def test_login_repartidor_con_rol_admin_va_al_admin(self):
+        # Prioridad multirol: admin gana sobre repartidor.
+        respuesta = self._login_post(["REPARTIDOR", "GERENTE"])
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn("/admin/", respuesta.headers["Location"])
+
+    def test_login_cliente_va_al_inicio(self):
+        for roles in ([], ["CLIENTE"]):
+            with self.subTest(roles=roles):
+                respuesta = self._login_post(roles)
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertIn("/", respuesta.headers["Location"])
+                self.assertNotIn("/repartidor/",
+                                 respuesta.headers["Location"])
+                self.assertNotIn("/admin/",
+                                 respuesta.headers["Location"])
+
+    def test_get_login_con_sesion_de_repartidor_redirige_a_repartos(self):
+        cliente = self._cliente_con_sesion(["REPARTIDOR"])
+        respuesta = cliente.get("/identidad/login")
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn("/repartidor/", respuesta.headers["Location"])
+
+    def test_get_login_con_sesion_cliente_redirige_a_inicio(self):
+        cliente = self._cliente_con_sesion(["CLIENTE"])
+        respuesta = cliente.get("/identidad/login")
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn("/", respuesta.headers["Location"])
+        self.assertNotIn("/repartidor/", respuesta.headers["Location"])
+
+    # --------------------------------------------------------
+    # Tarea 2: tras confirmar la entrega no debe haber 404.
+    # --------------------------------------------------------
+
+    def test_confirmar_entrega_ok_redirige_a_repartos(self):
+        from unittest.mock import patch
+        from app.repartidor.routes import confirmar_entrega
+        with patch(
+            "app.repartidor.routes.confirmar_entrega",
+            return_value={"ok": True, "mensaje": "correcta"},
+        ):
+            cliente = self._cliente_con_sesion(["REPARTIDOR"])
+            respuesta = cliente.post(
+                "/repartidor/e-1/confirmar",
+                data={"codigo_cliente": "1234"},
+            )
+            self.assertEqual(respuesta.status_code, 302)
+            self.assertIn("/repartidor/", respuesta.headers["Location"])
+
+    def test_confirmar_entrega_error_vuelve_al_detalle(self):
+        from unittest.mock import patch
+        from app.repartidor.routes import ReglaOperativaError
+        with patch(
+            "app.repartidor.routes.confirmar_entrega",
+            side_effect=ReglaOperativaError("código no coincide"),
+        ):
+            cliente = self._cliente_con_sesion(["REPARTIDOR"])
+            respuesta = cliente.post(
+                "/repartidor/e-1/confirmar",
+                data={"codigo_cliente": "0000"},
+            )
+            self.assertIn(respuesta.status_code, (200, 302))
+            # Nunca un 404: la entrega sigue activa y el detalle existe.
+            self.assertNotEqual(respuesta.status_code, 404)
+
+    def test_confirmar_entrega_ok_conserva_flash(self):
+        from unittest.mock import patch
+        from app.repartidor.routes import confirmar_entrega
+        with patch(
+            "app.repartidor.routes.confirmar_entrega",
+            return_value={"ok": True, "mensaje": "correcta"},
+        ):
+            cliente = self._cliente_con_sesion(["REPARTIDOR"])
+            respuesta = cliente.post(
+                "/repartidor/e-1/confirmar",
+                data={"codigo_cliente": "1234"},
+                follow_redirects=True,
+            )
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertIn(
+                "Entrega confirmada correctamente.".encode("utf-8"),
+                respuesta.data,
+            )
+
+
+class CabeceraRepartidorLogoutTest(unittest.TestCase):
+    """Tarea A del ajuste visual final: cabecera profesional del repartidor.
+
+    Reutiliza el logout REAL de identidad (POST /identidad/logout) y no
+    debe exponer enlaces del panel administrativo.
+    """
+
+    def setUp(self):
+        self.app = create_app()
+        self.app.config.update(TESTING=True)
+
+    def _cliente_con_sesion(self, correo="repartidor@example.test"):
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion.update({
+                "autenticado": True,
+                "usuario_id": "r-1",
+                "correo": correo,
+                "roles": ["REPARTIDOR"],
+            })
+        return cliente
+
+    def _listado(self):
+        with patch(
+            "app.repartidor.routes.listar_repartos_repartidor",
+            return_value={
+                "activas": [{
+                    "numero_pedido": "P-100",
+                    "cliente_nombre": "Cliente Uno",
+                    "cliente_correo": "",
+                    "entrega_estado": "PROGRAMADO",
+                    "entrega_estado_label": "Programado",
+                    "asignacion_estado_label": "Asignada",
+                    "fecha_programada": None,
+                    "entrega_id": "e-1",
+                }],
+                "historial": [],
+            },
+        ):
+            return self._cliente_con_sesion().get("/repartidor/")
+
+    def test_listado_renderiza_cabecera_y_boton_cerrar_sesion(self):
+        respuesta = self._listado()
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.data.decode("utf-8")
+        self.assertIn("Panel del repartidor", html)
+        self.assertIn("Cerrar sesión", html)
+        self.assertIn('action="/identidad/logout"', html)
+        self.assertIn('method="POST"', html)
+        self.assertIn("repartidor@example.test", html)
+
+    def test_listado_sin_enlaces_administrativos(self):
+        respuesta = self._listado()
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.data.decode("utf-8")
+        self.assertNotIn("href=\"/admin", html)
+        self.assertNotIn("href=\"/admin/", html)
+        self.assertNotIn("/admin/", html)
+
+    def test_detalle_renderiza_cabecera_y_cerrar_sesion(self):
+        with patch(
+            "app.repartidor.routes.obtener_detalle_reparto_repartidor",
+            return_value={
+                "numero_pedido": "P-100",
+                "entrega_id": "e-1",
+                "cliente_nombre": "Cliente Uno",
+                "cliente_correo": "",
+                "cliente_telefono": "999",
+                "pedido_total": 25,
+                "entrega_estado": "PROGRAMADO",
+                "entrega_estado_label": "Programado",
+                "asignacion_estado": "ASIGNADA",
+                "asignacion_estado_label": "Asignada",
+                "fecha_programada": None,
+                "asignado_en": None,
+                "aceptado_en": None,
+                "costo_cobrado_cliente": 3,
+                "delivery": None,
+                "tipo_entrega": "DELIVERY_LOCAL",
+            },
+        ):
+            respuesta = self._cliente_con_sesion().get("/repartidor/e-1")
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.data.decode("utf-8")
+        self.assertIn("Panel del repartidor", html)
+        self.assertIn("Cerrar sesión", html)
+        self.assertIn('action="/identidad/logout"', html)
+        self.assertNotIn("href=\"/admin", html)
+
+    def test_logout_posteado_cierra_sesion_y_redirige_al_login(self):
+        cliente = self._cliente_con_sesion()
+        with cliente.session_transaction() as sesion:
+            self.assertTrue(sesion.get("autenticado"))
+        respuesta = cliente.post("/identidad/logout")
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn("/identidad/login", respuesta.headers["Location"])
+        with cliente.session_transaction() as sesion:
+            self.assertFalse(sesion.get("autenticado", False))
+
+    def test_logout_no_acepta_get(self):
+        cliente = self._cliente_con_sesion()
+        respuesta = cliente.get("/identidad/logout")
+        self.assertEqual(respuesta.status_code, 405)
+
+
 if __name__ == "__main__":
     unittest.main()

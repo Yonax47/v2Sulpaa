@@ -24,7 +24,7 @@
                 <span class="admin-nav-icon" aria-hidden="true">▦</span>
                 <span>Dashboard</span>
             </a>
-            <a href="{{ url_for('admin.dashboard') }}#indicadores" class="admin-nav-link">
+            <a href="{{ url_for('admin.indicadores') }}" class="admin-nav-link{% if admin_activo == 'kpi' %} is-active{% endif %}"{% if admin_activo == 'kpi' %} aria-current="page"{% endif %}>
                 <span class="admin-nav-icon" aria-hidden="true">↗</span>
                 <span>Indicadores KPI</span>
             </a>
@@ -89,11 +89,38 @@
                 <span>Contenido</span>
             </span>
         {% endif %}
-        <span class="admin-nav-link is-disabled" aria-disabled="true">
-            <span class="admin-nav-icon" aria-hidden="true">•</span>
-            <span>Reportes</span>
-            <small>Próximamente</small>
-        </span>
+        {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
+            <a
+                href="{{ url_for('admin_caja.listado') }}"
+                class="admin-nav-link{% if admin_activo == 'caja' %} is-active{% endif %}"
+                {% if admin_activo == 'caja' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">◫</span>
+                <span>Flujo de caja</span>
+            </a>
+            <a
+                href="{{ url_for('admin_encuestas.listado') }}"
+                class="admin-nav-link{% if admin_activo == 'encuestas' %} is-active{% endif %}"
+                {% if admin_activo == 'encuestas' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">✉</span>
+                <span>Encuestas</span>
+            </a>
+            <a
+                href="{{ url_for('admin_reportes.panel') }}"
+                class="admin-nav-link{% if admin_activo == 'reportes' %} is-active{% endif %}"
+                {% if admin_activo == 'reportes' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">▤</span>
+                <span>Reportes</span>
+            </a>
+        {% else %}
+            <span class="admin-nav-link is-disabled" aria-disabled="true">
+                <span class="admin-nav-icon" aria-hidden="true">•</span>
+                <span>Reportes</span>
+                <small>Solo gerencia</small>
+            </span>
+        {% endif %}
     </nav>
 
     <div class="admin-sidebar-footer">

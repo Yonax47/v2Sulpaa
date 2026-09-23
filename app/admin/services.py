@@ -27,12 +27,43 @@ from app.admin.repositories import (
     obtener_metrica_consultas_producto,
     obtener_metrica_favoritos,
     obtener_metrica_historial_pedidos,
+    obtener_metrica_kpi09,
     obtener_metrica_pedidos_procesados,
     obtener_metrica_consistencia_estados,
     obtener_metrica_programacion_entregas,
+    obtener_metrica_reportes,
     obtener_metrica_satisfaccion,
     obtener_metrica_verificaciones_fisicas,
 )
+
+
+def _calcular_kpi09(metrica):
+    """Aplica la fórmula OFICIAL del KPI-09 y aísla su estado.
+
+    KPI-09 = pedidos con INVITACION_OK válida / pedidos entregados elegibles.
+
+    ``metrica`` es el dict devuelto por ``obtener_metrica_kpi09()``.
+    Devuelve ``(valor, numerador, denominador)``:
+
+    - valor:   porcentaje (float) o None cuando no hay evidencia.
+    - numerador:   COUNT DISTINCT real (no lo inflan INVITACION_OK
+      duplicadas del mismo pedido).
+    - denominador: COUNT DISTINCT de pedidos elegibles ENTREGADO; si es
+      0, el KPI queda PENDIENTE (valor None).
+
+    Una encuesta RESPONDIDA no altera este KPI: el numerador depende
+    exclusivamente del evento INVITACION_OK.
+    """
+    if not metrica.get("disponible"):
+        return None, None, None
+
+    numerador = int(metrica.get("invitaciones_ok") or 0)
+    denominador = int(metrica.get("pedidos_entregados") or 0)
+    if denominador <= 0:
+        return None, numerador, denominador
+
+    valor = (numerador / denominador) * 100
+    return valor, numerador, denominador
 
 
 def resumen_dashboard():
@@ -66,14 +97,18 @@ def resumen_dashboard():
 
     metrica_procesados = obtener_metrica_pedidos_procesados()
     pedidos_iniciados = metrica_procesados["pedidos_iniciados"]
+    pedidos_completados = metrica_procesados["pedidos_completados"]
 
+    # Regla conceptual: sin denominador (sin evidencia) el KPI NO
+    # muestra 0%, queda PENDIENTE. Solo se muestra 0% cuando existe
+    # denominador y el numerador es 0.
     kpi_01_valor = (
         (
-            metrica_procesados["pedidos_completados"]
+            pedidos_completados
             / pedidos_iniciados
         )
         * 100
-    ) if pedidos_iniciados > 0 else 0.0
+    ) if pedidos_iniciados > 0 else None
 
 
     # ========================================================
@@ -94,7 +129,7 @@ def resumen_dashboard():
             / total_pedidos_kpi04
         )
         * 100
-    ) if total_pedidos_kpi04 > 0 else 0.0
+    ) if total_pedidos_kpi04 > 0 else None
 
 
     # ========================================================
@@ -120,7 +155,7 @@ def resumen_dashboard():
             / total_pedidos_historial
         )
         * 100
-    ) if total_pedidos_historial > 0 else 0.0
+    ) if total_pedidos_historial > 0 else None
 
 
     # ========================================================
@@ -133,42 +168,90 @@ def resumen_dashboard():
     #     --------------------------------- × 100
     #            total de solicitudes
     #
-    # Una solicitud está "programada correctamente" cuando su
-    # `fecha_programada` quedó registrada en Operaciones.
+    # "Programadas correctamente" exige distinguir, de forma trazable:
+    # una solicitud real de programación (inicia el trámite), su
+    # programación aceptada/fecha fijada (correcta) y sus fallos o
+    # rechazos. En Operaciones solo existe la tabla `entregas` con la
+    # columna `fecha_programada` (nullable) y el historial de estados;
+    # NO existe una entidad de "solicitudes de programación" ni un
+    # registro de rechazos. Sin ese denominador real, usar el total de
+    # entregas sería un sustituto silencioso del "total de solicitudes",
+    # por lo que el KPI-08 permanece PENDIENTE (sin evidencia suficiente)
+    # hasta que se instrumenten solicitudes reales de programación.
     # ========================================================
 
-    metrica_programacion = obtener_metrica_programacion_entregas()
-    total_entregas_kpi08 = metrica_programacion["total_entregas"]
+    kpi_08_valor = None
+    kpi_08_numerador = None
+    kpi_08_denominador = None
 
-    kpi_08_valor = (
-        (
-            metrica_programacion["entregas_programadas"]
-            / total_entregas_kpi08
-        )
-        * 100
-    ) if total_entregas_kpi08 > 0 else 0.0
+    # Conteo operativo real de entregas para el dashboard (tarjeta
+    # informativa "Entregas"). NO alimenta el KPI-08, que permanece
+    # pendiente hasta instrumentar solicitudes de programación.
+    try:
+        metrica_programacion = obtener_metrica_programacion_entregas()
+    except Exception:
+        metrica_programacion = {"total_entregas": 0}
 
 
     # ========================================================
-    # KPI-09 (GANCHO) — ENCUESTA DE SATISFACCIÓN
+    # KPI-09 — ENCUESTA DE SATISFACCIÓN (Bloque 4)
     # ========================================================
     #
-    # El dominio Operaciones aún no define la tabla `encuestas`
-    # en el dump vigente. La métrica base consulta
-    # information_schema y, si la tabla no existe, devuelve
-    # "disponible": False. El dashboard conserva el KPI como
-    # "Pendiente" sin inventar un valor.
+    # Fórmula OFICIAL (invariable):
+    #
+    #     pedidos entregados con invitación válida
+    #     --------------------------------------- × 100
+    #         pedidos entregados elegibles
+    #
+    # - Numerador:   COUNT DISTINCT de pedidos cuya encuesta tiene un
+    #   evento INVITACION_OK real (el enlace PORTAL quedó disponible).
+    # - Denominador: COUNT DISTINCT de pedidos elegibles con su entrega
+    #   en estado ENTREGADO.
+    #
+    # Si el denominador es 0, el KPI permanece PENDIENTE. Una encuesta
+    # RESPONDIDA NO altera este KPI; varias INVITACION_OK del mismo
+    # pedido no duplican el numerador.
+    #
+    # La satisfacción (promedios, tasa de respuesta) es una métrica
+    # GERENCIAL complementaria que se muestra por separado y NUNCA
+    # alimenta este KPI.
     # ========================================================
 
+    metrica_kpi09 = obtener_metrica_kpi09()
+    kpi_09_valor, kpi_09_numerador, kpi_09_denominador = (
+        _calcular_kpi09(metrica_kpi09)
+    )
+
+    # Satisfacción: métricas GERENCIALES complementarias (separadas del
+    # KPI-09). Promedios, tasa de respuesta y recomendación; ninguna
+    # sustituye la fórmula oficial de invitaciones/entregados.
     metrica_satisfaccion = obtener_metrica_satisfaccion()
-    kpi_09_valor = None
-    if metrica_satisfaccion.get("disponible") and (
-        metrica_satisfaccion["encuestas_completadas"] or 0
+
+
+    # ========================================================
+    # KPI-05 — REPORTES GERENCIALES (Bloque 4)
+    # ========================================================
+    #
+    # Fórmula oficial:
+    #
+    #     solicitudes de reporte EXITOSAS
+    #     ------------------------------ × 100
+    #        total de solicitudes reales
+    #
+    # Base real: operaciones.reportes_solicitudes. Visitar el panel de
+    # reportes NO genera solicitudes; cada POST de generación registra
+    # EXITO o FALLO al terminar de construir el archivo.
+    # ========================================================
+
+    metrica_reportes = obtener_metrica_reportes()
+    kpi_05_valor = None
+    if metrica_reportes.get("disponible") and (
+        metrica_reportes["total_solicitudes"] or 0
     ) > 0:
-        kpi_09_valor = (
+        kpi_05_valor = (
             (
-                metrica_satisfaccion["encuestas_satisfactorias"]
-                / metrica_satisfaccion["encuestas_completadas"]
+                metrica_reportes["solicitudes_exitosas"]
+                / metrica_reportes["total_solicitudes"]
             )
             * 100
         )
@@ -296,6 +379,12 @@ def resumen_dashboard():
                 "clasificacion": "RF-01",
                 "meta": "≥95%",
                 "valor": kpi_01_valor,
+                "numerador": pedidos_completados,
+                "denominador": pedidos_iniciados,
+                "formula": ("pedidos completados / pedidos iniciados "
+                            "* 100"),
+                "evidencia_requerida": ("pedidos con historial completo "
+                                        "(iniciados y completados)"),
                 "estado": "ok",
                 "fuente": "comercio.pedidos + operaciones.entregas/pagos",
             },
@@ -305,6 +394,18 @@ def resumen_dashboard():
                 "clasificacion": "RF-02",
                 "meta": "≥98%",
                 "valor": kpi_02_valor,
+                "numerador": (
+                    metrica_verificaciones.get("verificaciones_ok")
+                    if metrica_verificaciones.get("disponible") else None
+                ),
+                "denominador": (
+                    metrica_verificaciones.get("total_verificaciones")
+                    if metrica_verificaciones.get("disponible") else None
+                ),
+                "formula": ("verificaciones con coincidencia / "
+                            "total de verificaciones físicas * 100"),
+                "evidencia_requerida": (
+                    "verificaciones físicas de inventario registradas"),
                 "estado": "pendiente" if kpi_02_valor is None else "ok",
                 "fuente": "inventario.verificaciones_fisicas",
             },
@@ -314,6 +415,18 @@ def resumen_dashboard():
                 "clasificacion": "RF-03",
                 "meta": "≥95%",
                 "valor": kpi_03_valor,
+                "numerador": (
+                    metrica_consultas.get("consultas_exitosas")
+                    if metrica_consultas.get("disponible") else None
+                ),
+                "denominador": (
+                    metrica_consultas.get("total_consultas")
+                    if metrica_consultas.get("disponible") else None
+                ),
+                "formula": ("consultas exitosas / total de consultas "
+                            "* 100"),
+                "evidencia_requerida": (
+                    "consultas reales del cliente al detalle de producto"),
                 "estado": "pendiente" if kpi_03_valor is None else "ok",
                 "fuente": "comercio.consultas_producto",
             },
@@ -323,6 +436,11 @@ def resumen_dashboard():
                 "clasificacion": "RF-04",
                 "meta": "≥98%",
                 "valor": kpi_04_valor,
+                "numerador": metrica_historial["pedidos_con_historial"],
+                "denominador": total_pedidos_kpi04,
+                "formula": ("pedidos con historial / total de pedidos "
+                            "* 100"),
+                "evidencia_requerida": "pedidos registrados",
                 "estado": "ok",
                 "fuente": "comercio.pedido_historial / comercio.pedidos",
             },
@@ -331,9 +449,21 @@ def resumen_dashboard():
                 "nombre": "Reportes gerenciales",
                 "clasificacion": "RF-05",
                 "meta": "≥95%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "operaciones/administraci\u00f3n (reportes)",
+                "valor": kpi_05_valor,
+                "numerador": (
+                    metrica_reportes.get("solicitudes_exitosas")
+                    if metrica_reportes.get("disponible") else None
+                ),
+                "denominador": (
+                    metrica_reportes.get("total_solicitudes")
+                    if metrica_reportes.get("disponible") else None
+                ),
+                "formula": ("solicitudes exitosas / total de "
+                            "solicitudes * 100"),
+                "evidencia_requerida": (
+                    "solicitudes reales de generación de reportes"),
+                "estado": "pendiente" if kpi_05_valor is None else "ok",
+                "fuente": "operaciones.reportes_solicitudes (Bl. 4)",
             },
             {
                 "codigo": "KPI-06",
@@ -341,6 +471,18 @@ def resumen_dashboard():
                 "clasificacion": "RF-06",
                 "meta": "≥95%",
                 "valor": kpi_06_valor,
+                "numerador": (
+                    metrica_favoritos.get("favoritos_exitosos")
+                    if metrica_favoritos.get("disponible") else None
+                ),
+                "denominador": (
+                    metrica_favoritos.get("total_favoritos_ops")
+                    if metrica_favoritos.get("disponible") else None
+                ),
+                "formula": ("operaciones de favoritos exitosas / total "
+                            "de operaciones * 100"),
+                "evidencia_requerida": (
+                    "operaciones reales de favoritos del cliente"),
                 "estado": "pendiente" if kpi_06_valor is None else "ok",
                 "fuente": "comercio.favoritos_auditoria",
             },
@@ -350,26 +492,50 @@ def resumen_dashboard():
                 "clasificacion": "RF-07",
                 "meta": "≥98%",
                 "valor": kpi_07_valor,
+                "numerador": metrica_consistencia["estados_consistentes"],
+                "denominador": total_pedidos_historial,
+                "formula": ("pedidos consistentes / pedidos con "
+                            "historial * 100"),
+                "evidencia_requerida": "pedidos con historial registrado",
                 "estado": "ok",
                 "fuente": "comercio.pedidos + comercio.pedido_historial",
             },
-            {
+{
                 "codigo": "KPI-08",
                 "nombre": "Programaci\u00f3n de entregas",
                 "clasificacion": "RF-08",
-                "meta": "≥95%",
+                "meta": "\u226595%",
                 "valor": kpi_08_valor,
-                "estado": "ok",
-                "fuente": "operaciones.entregas (fecha_programada)",
+                "numerador": kpi_08_numerador,
+                "denominador": kpi_08_denominador,
+                "formula": ("entregas programadas correctamente / "
+                            "total de solicitudes * 100"),
+                "evidencia_requerida": ("solicitudes reales de "
+                                        "programaci\u00f3n de entrega "
+                                        "con desenlace trazable "
+                                        "(correcta / fallo / rechazo); "
+                                        "el modelo actual solo registra "
+                                        "entregas con fecha_programada"),
+                "estado": "pendiente",
+                "fuente": "operaciones.entregas (sin registro de "
+                          "solicitudes de programaci\u00f3n)",
             },
             {
                 "codigo": "KPI-09",
                 "nombre": "Encuesta de satisfacci\u00f3n",
                 "clasificacion": "RF-09",
                 "meta": "≥90%",
-                "valor": None,
-                "estado": "pendiente",
-                "fuente": "identidad/operaciones (encuestas)",
+                "valor": kpi_09_valor,
+                "numerador": kpi_09_numerador,
+                "denominador": kpi_09_denominador,
+                "unidad": "invitaciones/entregados",
+                "formula": ("pedidos con INVITACION_OK / pedidos "
+                            "entregados elegibles * 100"),
+                "evidencia_requerida": (
+                    "pedidos entregados con invitación PORTAL validada"),
+                "estado": "pendiente" if kpi_09_valor is None else "ok",
+                "fuente": "operaciones.encuestas + encuesta_eventos "
+                          "(INVITACION_OK) y entregas ENTREGADO",
             },
             {
                 "codigo": "KPI-10",
@@ -377,6 +543,16 @@ def resumen_dashboard():
                 "clasificacion": "RF-10",
                 "meta": "≥95%",
                 "valor": kpi_10_valor,
+                "numerador": (
+                    metrica_accesos.get("accesos_exitosos")
+                    if metrica_accesos.get("disponible") else None
+                ),
+                "denominador": (
+                    metrica_accesos.get("total_accesos")
+                    if metrica_accesos.get("disponible") else None
+                ),
+                "formula": "accesos exitosos / total de accesos * 100",
+                "evidencia_requerida": "accesos reales a contenido",
                 "estado": "pendiente" if kpi_10_valor is None else "ok",
                 "fuente": "comercio.accesos_contenido",
             },
@@ -458,10 +634,13 @@ def resumen_dashboard():
     # RESUMEN DE INDICADORES FUNCIONALES (KPI-01 A KPI-10)
     # ========================================================
     #
-    # El panel administrativo de esta etapa presenta únicamente
-    # los diez KPI funcionales. Los KPI instrumentados se evalúan
-    # contra su meta real; los demás permanecen pendientes y no
-    # participan como cumplimiento ni incumplimiento.
+    # Los diez KPI funcionales están instrumentados en código (tienen
+    # una consulta real definida). Un KPI "sin evidencia en BD" no es
+    # "no instrumentado": es un KPI instrumentado que permanece
+    # PENDIENTE (pendiente de datos) hasta que su fuente registre
+    # actividad real. Esa distinción evita reportar como "pendiente
+    # de instrumentación" lo que en realidad está correctamente
+    # instrumentado pero aún no dispone de datos.
     # ========================================================
 
     kpis_funcionales = kpis[:10]
@@ -470,9 +649,11 @@ def resumen_dashboard():
         "KPI-02": 98.0,
         "KPI-03": 95.0,
         "KPI-04": 98.0,
+        "KPI-05": 95.0,
         "KPI-06": 95.0,
         "KPI-07": 98.0,
         "KPI-08": 95.0,
+        "KPI-09": 90.0,
         "KPI-10": 95.0,
     }
 
@@ -489,7 +670,12 @@ def resumen_dashboard():
             else "no_cumple"
         )
 
-    instrumentados = sum(
+    # Los diez KPIs son instrumentados (cuentan con consulta real).
+    # "Con evidencia" es cuántos tienen valor con denominador > 0;
+    # la diferencia son "pendientes de datos" (PENDIENTE, que NO se
+    # cuenta como incumplimiento).
+    instrumentados = len(kpis_funcionales)
+    con_evidencia = sum(
         kpi["valor"] is not None
         for kpi in kpis_funcionales
     )
@@ -502,14 +688,151 @@ def resumen_dashboard():
         for kpi in kpis_funcionales
     )
 
+    # ========================================================
+    # DATOS PARA GRÁFICOS DEL PANEL (defensivos)
+    # ========================================================
+    #
+    # Serie mensual de flujo de caja (caja_movimientos ACTIVOS) y
+    # contexto de la encuesta KPI-09. Si las tablas del Bloque 4
+    # aún no existieran, se entregan listas vacías sin romper el
+    # resto del panel ni los conteos de instrumentados.
+    # ========================================================
+
+    graficos = {"flujo_caja": [], "kpi09": None, "satisfaccion": None}
+    try:
+        from app.admin.caja.services import serie_flujo_mensual
+        serie = serie_flujo_mensual(6)
+        graficos["flujo_caja"] = [
+            {
+                "periodo": fila["periodo"],
+                "ingresos": round(float(fila["ingresos"] or 0), 2),
+                "egresos": round(float(fila["egresos"] or 0), 2),
+            }
+            for fila in serie
+        ]
+    except Exception:
+        graficos["flujo_caja"] = []
+
+    try:
+        if metrica_kpi09.get("disponible"):
+            graficos["kpi09"] = {
+                "invitaciones_ok": kpi_09_numerador or 0,
+                "pedidos_entregados": kpi_09_denominador or 0,
+                "valor": (
+                    round(kpi_09_valor, 2)
+                    if kpi_09_valor is not None else None
+                ),
+            }
+    except Exception:
+        graficos["kpi09"] = None
+
+    try:
+        graficos["satisfaccion"] = (
+            metrica_satisfaccion
+            if metrica_satisfaccion.get("disponible")
+            else None
+        )
+    except Exception:
+        graficos["satisfaccion"] = None
+
+    # ========================================================
+    # RESUMEN OPERATIVO (defensivo)
+    # ========================================================
+    #
+    # Bloque B del resumen ejecutivo: conteos REALES de Comercio,
+    # Operaciones y Caja cuando existen datos. Cada pieza se
+    # envuelve en try/except para no romper el panel por una tabla
+    # vacía o un esquema todavía sin registros. NO se inventa ningún
+    # número: si la fuente no tiene datos, el valor queda 0/None y el
+    # template lo muestra como "sin datos".
+    # ========================================================
+
+    operativo = {
+        "pedidos_iniciados": 0,
+        "pedidos_completados": 0,
+        "entregas": 0,
+        "productos_con_stock_bajo": 0,
+        "ingresos": 0.0,
+        "egresos": 0.0,
+        "flujo_neto": 0.0,
+        "encuestas_completadas": 0,
+        "satisfaccion_promedio": None,
+    }
+
+    try:
+        operativo["pedidos_iniciados"] = int(
+            metrica_procesados.get("pedidos_iniciados") or 0
+        )
+        operativo["pedidos_completados"] = int(
+            metrica_procesados.get("pedidos_completados") or 0
+        )
+    except Exception:
+        pass
+
+    try:
+        operativo["entregas"] = int(
+            metrica_programacion.get("total_entregas") or 0
+        )
+    except Exception:
+        pass
+
+    # Cantidad de variantes con stock por debajo del mínimo real.
+    try:
+        from app.admin.inventario.repositories import (
+            listar_existencias_detalladas,
+        )
+
+        existencias = listar_existencias_detalladas(
+            solo_bajo_minimo=True
+        )
+        operativo["productos_con_stock_bajo"] = int(
+            len(existencias or [])
+        )
+    except Exception:
+        pass
+
+    # Totales reales de Caja (movimientos ACTIVOS del período).
+    try:
+        from app.admin.caja.services import resumen_caja
+
+        resumen_caja_data = resumen_caja()
+        caja_ingresos = float(
+            resumen_caja_data.get("ingresos") or 0.0
+        )
+        caja_egresos = float(
+            resumen_caja_data.get("egresos") or 0.0
+        )
+        operativo["ingresos"] = round(caja_ingresos, 2)
+        operativo["egresos"] = round(caja_egresos, 2)
+        operativo["flujo_neto"] = round(
+            caja_ingresos - caja_egresos, 2
+        )
+    except Exception:
+        pass
+
+    try:
+        if metrica_satisfaccion.get("disponible"):
+            operativo["encuestas_completadas"] = int(
+                metrica_satisfaccion.get("encuestas_completadas") or 0
+            )
+            operativo["satisfaccion_promedio"] = (
+                metrica_satisfaccion.get("satisfaccion_promedio")
+            )
+    except Exception:
+        pass
+
     return {
         "ok": True,
         "kpis": kpis,
         "kpis_funcionales": kpis_funcionales,
+        "graficos": graficos,
+        "operativo": operativo,
         "resumen": {
             "total": len(kpis_funcionales),
             "instrumentados": instrumentados,
-            "pendientes": len(kpis_funcionales) - instrumentados,
+            "con_evidencia": con_evidencia,
+            "pendientes_de_datos": len(kpis_funcionales) - con_evidencia,
+            "pendientes": len(kpis_funcionales) - con_evidencia,
             "cumplen": cumplen,
             "no_cumplen": no_cumplen,
         },

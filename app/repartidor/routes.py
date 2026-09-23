@@ -129,7 +129,15 @@ def iniciar(entrega_id):
 @login_required
 @role_required(*ROLES_REPARTIDOR)
 def confirmar(entrega_id):
-    """Confirma la entrega contra el código presentado por el cliente."""
+    """Confirma la entrega contra el código presentado por el cliente.
+
+    Al confirmar la entrega la asignación deja de estar activa, por lo
+    que el detalle individual ya no existe para el repartidor: redirigir
+    ahí produciría un 404 aunque la operación se ejecutó correctamente.
+    Por eso tras el éxito volvemos al listado de repartos conservando el
+    flash de confirmación. En caso de error, la entrega sigue activa y sí
+    puede regresarse al detalle.
+    """
     try:
         resultado = confirmar_entrega(
             session.get("usuario_id"),
@@ -138,6 +146,7 @@ def confirmar(entrega_id):
             codigo_cliente=request.form.get("codigo_cliente"),
         )
         flash("Entrega confirmada correctamente.", "success")
+        return redirect(url_for("repartidor.repartos"))
     except ReglaOperativaError as error:
         flash(str(error), "danger")
     except Exception:
