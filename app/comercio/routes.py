@@ -71,12 +71,18 @@ def tienda():
     - packs;
     - packs personalizados;
     - carrito actual del usuario.
+    - estado de favoritos obtenido mediante el Service de Comercio.
     """
 
+    usuario_id = session["usuario_id"]
     datos = obtener_datos_tienda()
 
     carrito = obtener_carrito_usuario(
-        session["usuario_id"]
+        usuario_id
+    )
+
+    favoritos = listar_favoritos_del_usuario(
+        usuario_id
     )
 
     return render_template(
@@ -95,6 +101,11 @@ def tienda():
         ],
 
         carrito=carrito,
+
+        favorito_ids=[
+            item["variante_id"]
+            for item in favoritos
+        ],
     )
 
 

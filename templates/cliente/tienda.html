@@ -37,6 +37,7 @@ La información comercial real llega desde Flask.
     {
         "nombre": "Café",
         "slug": "cafe",
+        "sabor_bd": "Café",
         "sabor": "Tostado · intenso · aromático",
         "perfil": "INTENSO",
         "imagen": "img/BotellaCafe.png",
@@ -51,6 +52,7 @@ La información comercial real llega desde Flask.
     {
         "nombre": "Flor de Jamaica",
         "slug": "jamaica",
+        "sabor_bd": "Jamaica",
         "sabor": "Frutal · vibrante · refrescante",
         "perfil": "FRUTAL",
         "imagen": "img/Botellaflordejamaica.png",
@@ -65,6 +67,7 @@ La información comercial real llega desde Flask.
     {
         "nombre": "Limón",
         "slug": "limon",
+        "sabor_bd": "Limón",
         "sabor": "Cítrico · ligero · fresco",
         "perfil": "REFRESCANTE",
         "imagen": "img/Botellalimon.png",
@@ -79,6 +82,7 @@ La información comercial real llega desde Flask.
     {
         "nombre": "Kion",
         "slug": "kion",
+        "sabor_bd": "Kion",
         "sabor": "Especiado · aromático · diferente",
         "perfil": "ESPECIADO",
         "imagen": "img/Botellakion.png",
@@ -440,6 +444,15 @@ La información comercial real llega desde Flask.
             >
 
                 {% for producto in productos %}
+
+                    {# El SKU y UUID provienen del catálogo real de 330 ml. #}
+                    {% set ns = namespace(variante=None) %}
+                    {% for variante in variantes_330 %}
+                        {% if variante.sabor == producto.sabor_bd %}
+                            {% set ns.variante = variante %}
+                        {% endif %}
+                    {% endfor %}
+                    {% set variante_detalle = ns.variante %}
 
                     <div
                         class="reveal"
@@ -1805,6 +1818,11 @@ La información comercial real llega desde Flask.
 
 <script
     src="{{ url_for('static', filename='js/modules/navbar.js') }}"
+    defer
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/modules/favoritos.js') }}"
     defer
 ></script>
 

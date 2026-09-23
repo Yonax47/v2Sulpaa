@@ -8,7 +8,8 @@ Estrategia (patrón de la casa):
 """
 
 import unittest
-from unittest.mock import patch
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 from app import create_app
 
@@ -194,6 +195,79 @@ class RutasClienteFavoritosProductoTest(unittest.TestCase):
                 404,
             )
 
+    def test_ficha_producto_existente_muestra_estado_favorito(self):
+        ficha = {
+            "variante_id": "v-cafe",
+            "sku": "KOM-01-01",
+            "nombre_comercial": "Kombucha SULPAA - Café - Botella 330 ml",
+            "sabor": "Café",
+            "presentacion": "Botella 330 ml",
+            "precio": None,
+            "moneda": "PEN",
+            "peso_gramos": 380,
+            "articulo_venta_id": None,
+            "stock_disponible": 10,
+            "disponible": True,
+            "presentaciones": [],
+            "es_favorito": True,
+        }
+        with patch(
+            "app.comercio.routes.obtener_ficha_producto",
+            return_value=ficha,
+        ):
+            respuesta = cliente_con_sesion(
+                self.app, ["CLIENTE"]
+            ).get("/producto/KOM-01-01")
+
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("KOM-01-01", cuerpo)
+        self.assertIn("data-active=\"true\"", cuerpo)
+        self.assertIn("♥", cuerpo)
+
+    def test_tienda_muestra_detalle_real_y_favorito(self):
+        datos = {
+            "catalogo": [],
+            "variantes_330": [{
+                "variante_id": "v-cafe",
+                "sku": "KOM-01-01",
+                "nombre_comercial": "Kombucha Café 330 ml",
+                "sabor": "Café",
+                "presentacion": "Botella 330 ml",
+                "stock_disponible": 10,
+                "disponible": True,
+            }],
+            "packs": [],
+            "packs_personalizados": [],
+        }
+        carrito = {
+            "items": [],
+            "cantidad_items": 0,
+            "subtotal": 0.0,
+        }
+        favoritos = [{"variante_id": "v-cafe"}]
+
+        with patch(
+            "app.comercio.routes.obtener_datos_tienda",
+            return_value=datos,
+        ), patch(
+            "app.comercio.routes.obtener_carrito_usuario",
+            return_value=carrito,
+        ), patch(
+            "app.comercio.routes.listar_favoritos_del_usuario",
+            return_value=favoritos,
+        ):
+            respuesta = cliente_con_sesion(
+                self.app, ["CLIENTE"]
+            ).get("/tienda")
+
+        cuerpo = respuesta.get_data(as_text=True)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("/producto/KOM-01-01", cuerpo)
+        self.assertIn("Ver detalles", cuerpo)
+        self.assertIn("data-variante-id=\"v-cafe\"", cuerpo)
+        self.assertIn("data-active=\"true\"", cuerpo)
+
     def test_api_agregar_favorito_valida_entrada(self):
         cliente = cliente_con_sesion(self.app, ["CLIENTE"])
         respuesta = cliente.post(
@@ -201,6 +275,23 @@ class RutasClienteFavoritosProductoTest(unittest.TestCase):
             json={},
         )
         self.assertEqual(respuesta.status_code, 400)
+
+    def test_apis_favoritos_requieren_autenticacion(self):
+        cliente = self.app.test_client()
+        for ruta in (
+            "/api/favoritos/agregar",
+            "/api/favoritos/quitar",
+        ):
+            with self.subTest(ruta=ruta):
+                respuesta = cliente.post(
+                    ruta,
+                    json={"variante_id": "v-cafe"},
+                )
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertIn(
+                    "/identidad/login",
+                    respuesta.headers["Location"],
+                )
 
 
 # ============================================================
@@ -278,6 +369,286 @@ class ServicioContenidoTest(unittest.TestCase):
         self.assertIsInstance(etiqueta_tipo(None), str)
 
 
+class FragmentoPublicadoContenidoTest(unittest.TestCase):
+    """
+    Regresión del bug al editar contenido ya publicado.
+
+    Cuando un contenido ya tenía fecha de publicación (objeto datetime
+    que devuelve DictCursor), la regresión anterior interpolaba ese
+    valor directamente en el SQL generando sintaxis inválida. Este test
+    garantiza que el sello viaje como parámetro seguro.
+    """
+
+    def _fragmento(self, estado, publicado_en_actual):
+        from app.admin.contenido.repositories import (
+            _fragmento_publicado_en,
+        )
+        return _fragmento_publicado_en(
+            estado,
+            publicado_en_actual,
+        )
+
+    def test_primera_publicacion_usa_now(self):
+        fragmento = self._fragmento("PUBLICADO", None)
+        self.assertEqual(fragmento["fragmento"], "NOW()")
+
+    def test_ya_publicado_conserva_sello_como_parametro(self):
+        publicado = datetime(2026, 9, 20, 15, 30, 0)
+        fragmento = self._fragmento("PUBLICADO", publicado)
+        self.assertEqual(fragmento["fragmento"], "%s")
+
+    def test_borrador_sin_publicar_limpia_null(self):
+        fragmento = self._fragmento("BORRADOR", None)
+        self.assertEqual(fragmento["fragmento"], "%s")
+
+    def test_borrador_ya_publicado_conserva_sello(self):
+        publicado = datetime(2026, 9, 20, 15, 30, 0)
+        fragmento = self._fragmento("BORRADOR", publicado)
+        self.assertEqual(fragmento["fragmento"], "%s")
+
+    def _ejecutar_actualizacion(self, publicado_en, titulo):
+        from app.admin.contenido.repositories import actualizar_contenido
+
+        conexion = MagicMock()
+        cursor = MagicMock()
+        conexion.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchone.return_value = {
+            "id": "contenido-1",
+            "estado": "PUBLICADO",
+            "publicado_en": publicado_en,
+        }
+
+        with patch(
+            "app.admin.contenido.repositories._esquema",
+            return_value="comercio_prueba",
+        ), patch(
+            "app.admin.contenido.repositories.conexion_comercio",
+            return_value=conexion,
+        ):
+            resultado = actualizar_contenido(
+                contenido_id="contenido-1",
+                titulo=titulo,
+                slug="que-es-la-kombucha",
+                resumen="Resumen",
+                contenido="Contenido educativo",
+                tipo="QUE_ES",
+                imagen_ruta="img/QueesKombucha.jpg",
+                estado="PUBLICADO",
+                orden=1,
+            )
+
+        consulta_update, parametros = cursor.execute.call_args_list[1].args
+        return resultado, consulta_update, parametros, conexion
+
+    def test_update_modificado_parametriza_datetime_y_confirma(self):
+        publicado = datetime(2026, 9, 20, 15, 30, 0)
+        resultado, consulta, parametros, conexion = (
+            self._ejecutar_actualizacion(publicado, "Título modificado")
+        )
+
+        self.assertTrue(resultado["ok"])
+        self.assertIn("publicado_en = %s", consulta)
+        self.assertNotIn(str(publicado), consulta)
+        self.assertEqual(parametros[-2], publicado)
+        conexion.commit.assert_called_once_with()
+        conexion.rollback.assert_not_called()
+
+    def test_update_sin_cambios_tambien_es_exitoso(self):
+        publicado = datetime(2026, 9, 20, 15, 30, 0)
+        resultado, consulta, parametros, conexion = (
+            self._ejecutar_actualizacion(publicado, "¿Qué es la kombucha?")
+        )
+
+        self.assertTrue(resultado["ok"])
+        self.assertIn("publicado_en = %s", consulta)
+        self.assertEqual(parametros[-2], publicado)
+        conexion.commit.assert_called_once_with()
+
+    def test_primera_publicacion_update_conserva_now(self):
+        resultado, consulta, parametros, conexion = (
+            self._ejecutar_actualizacion(None, "Contenido publicado")
+        )
+
+        self.assertTrue(resultado["ok"])
+        self.assertIn("publicado_en = NOW()", consulta)
+        self.assertEqual(parametros[-1], "contenido-1")
+        self.assertEqual(len(parametros), 9)
+        conexion.commit.assert_called_once_with()
+
+
+class VisibilidadContenidoPublicadoTest(unittest.TestCase):
+    """El repositorio público excluye borradores sin generar accesos KPI-10."""
+
+    def test_listado_publico_filtra_publicado_con_fecha(self):
+        from app.aprende.repositories import listar_contenido_publicado
+
+        conexion = MagicMock()
+        cursor = MagicMock()
+        conexion.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchall.return_value = []
+
+        with patch(
+            "app.aprende.repositories._esquema",
+            return_value="comercio_prueba",
+        ), patch(
+            "app.aprende.repositories.conexion_comercio",
+            return_value=conexion,
+        ):
+            listar_contenido_publicado()
+
+        consulta = cursor.execute.call_args.args[0]
+        self.assertIn("ce.estado = 'PUBLICADO'", consulta)
+        self.assertIn("ce.publicado_en IS NOT NULL", consulta)
+        self.assertNotIn("accesos_contenido", consulta)
+
+    def test_detalle_publico_no_admite_borrador(self):
+        from app.aprende.repositories import obtener_contenido_publicado
+
+        conexion = MagicMock()
+        cursor = MagicMock()
+        conexion.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchone.return_value = None
+
+        with patch(
+            "app.aprende.repositories._esquema",
+            return_value="comercio_prueba",
+        ), patch(
+            "app.aprende.repositories.conexion_comercio",
+            return_value=conexion,
+        ):
+            resultado = obtener_contenido_publicado("borrador")
+
+        consulta = cursor.execute.call_args.args[0]
+        self.assertIsNone(resultado)
+        self.assertIn("ce.estado = 'PUBLICADO'", consulta)
+        self.assertIn("ce.publicado_en IS NOT NULL", consulta)
+
+
+# ============================================================
+# REGLAS DE NEGOCIO — DETALLE DE PRODUCTO (KPI-03)
+# ============================================================
+
+class ServicioFichaProductoTest(unittest.TestCase):
+    """Cada navegación registra una sola evidencia lógica KPI-03."""
+
+    def test_detalle_existente_registra_exito_una_vez(self):
+        from app.comercio.services import obtener_ficha_producto
+
+        variante = {
+            "variante_id": "v-cafe",
+            "sku": "KOM-01-01",
+            "nombre_comercial": "Kombucha Café 330 ml",
+            "sabor": "Café",
+            "presentacion": "Botella 330 ml",
+            "precio": None,
+            "moneda": None,
+            "peso_gramos": 380,
+            "articulo_venta_id": None,
+        }
+        stock = {
+            "v-cafe": {
+                "stock_fisico": 12,
+                "stock_reservado": 2,
+                "stock_disponible": 10,
+                "disponible": True,
+            },
+        }
+
+        with patch(
+            "app.comercio.services.obtener_variante_por_sku",
+            return_value=variante,
+        ), patch(
+            "app.comercio.services.obtener_disponibilidad_variantes",
+            return_value=stock,
+        ), patch(
+            "app.comercio.services._presentaciones_del_sabor",
+            return_value=[],
+        ), patch(
+            "app.comercio.services.listar_favoritos_usuario",
+            return_value=[{"variante_id": "v-cafe"}],
+        ), patch(
+            "app.comercio.services.registrar_consulta_producto",
+        ) as registrar:
+            resultado = obtener_ficha_producto(
+                "KOM-01-01",
+                usuario_id="usuario-1",
+            )
+
+        self.assertEqual(resultado["sku"], "KOM-01-01")
+        self.assertTrue(resultado["es_favorito"])
+        self.assertEqual(resultado["stock_disponible"], 10)
+        registrar.assert_called_once_with(
+            sku="KOM-01-01",
+            variante_id="v-cafe",
+            usuario_id="usuario-1",
+            resultado="EXITO",
+        )
+
+    def test_detalle_inexistente_registra_fallo_una_vez(self):
+        from app.comercio.services import obtener_ficha_producto
+
+        with patch(
+            "app.comercio.services.obtener_variante_por_sku",
+            return_value=None,
+        ), patch(
+            "app.comercio.services.registrar_consulta_producto",
+        ) as registrar:
+            resultado = obtener_ficha_producto(
+                "SKU-INEXISTENTE",
+                usuario_id="usuario-1",
+            )
+
+        self.assertIsNone(resultado)
+        registrar.assert_called_once_with(
+            sku="SKU-INEXISTENTE",
+            variante_id=None,
+            usuario_id="usuario-1",
+            resultado="FALLO",
+        )
+
+    def test_presentaciones_provienen_de_catalogos_reales(self):
+        from app.comercio.services import _presentaciones_del_sabor
+
+        botella = {
+            "variante_id": "v-330",
+            "sku": "KOM-01-01",
+            "sabor": "Café",
+            "presentacion": "Botella 330 ml",
+            "stock_disponible": 8,
+            "disponible": True,
+        }
+        litro = {
+            "variante_id": "v-1l",
+            "sku": "KOM-01-02",
+            "sabor": "Café",
+            "presentacion": "Botella 1 L",
+            "precio": 30,
+            "moneda": "PEN",
+            "articulo_venta_id": "av-1l",
+            "stock_disponible": 4,
+            "disponible": True,
+        }
+
+        with patch(
+            "app.comercio.services.obtener_variantes_330ml_con_stock",
+            return_value=[botella],
+        ), patch(
+            "app.comercio.services.obtener_catalogo_tienda",
+            return_value=[litro],
+        ):
+            resultado = _presentaciones_del_sabor(
+                "Café",
+                "KOM-01-01",
+            )
+
+        self.assertEqual(
+            [item["sku"] for item in resultado],
+            ["KOM-01-01", "KOM-01-02"],
+        )
+        self.assertTrue(resultado[0]["es_actual"])
+        self.assertEqual(resultado[1]["precio"], 30.0)
+
+
 # ============================================================
 # REGLAS DE NEGOCIO — FAVORITOS
 # ============================================================
@@ -342,6 +713,60 @@ class ServicioFavoritosTest(unittest.TestCase):
             auditoria.assert_called_once()
             self.assertEqual(auditoria.call_args[0][2], "QUITAR")
             self.assertEqual(auditoria.call_args[0][3], "FALLO")
+
+    def test_agregar_favorito_repetido_es_idempotente(self):
+        from app.comercio.services import agregar_variante_a_favoritos
+
+        with patch(
+            "app.comercio.services.obtener_variante_por_id",
+            return_value={"variante_id": "v-real"},
+        ), patch(
+            "app.comercio.services.agregar_favorito",
+            return_value=True,
+        ) as guardar, patch(
+            "app.comercio.services.registrar_auditoria_favorito",
+        ) as auditoria, patch(
+            "app.comercio.services.listar_favoritos_del_usuario",
+            return_value=[{"variante_id": "v-real"}],
+        ):
+            primero = agregar_variante_a_favoritos("usuario-1", "v-real")
+            segundo = agregar_variante_a_favoritos("usuario-1", "v-real")
+
+        self.assertTrue(primero["ok"])
+        self.assertTrue(segundo["ok"])
+        self.assertEqual(guardar.call_count, 2)
+        self.assertEqual(auditoria.call_count, 2)
+        for llamada in auditoria.call_args_list:
+            self.assertEqual(llamada.args[2], "AGREGAR")
+            self.assertEqual(llamada.args[3], "EXITO")
+
+    def test_quitar_favorito_exitoso_registra_exito(self):
+        from app.comercio.services import quitar_variante_de_favoritos
+
+        with patch(
+            "app.comercio.services.obtener_variante_por_id",
+            return_value={"variante_id": "v-real"},
+        ), patch(
+            "app.comercio.services.quitar_favorito",
+            return_value=True,
+        ), patch(
+            "app.comercio.services.registrar_auditoria_favorito",
+        ) as auditoria, patch(
+            "app.comercio.services.listar_favoritos_del_usuario",
+            return_value=[],
+        ):
+            resultado = quitar_variante_de_favoritos(
+                "usuario-1",
+                "v-real",
+            )
+
+        self.assertTrue(resultado["ok"])
+        auditoria.assert_called_once_with(
+            "usuario-1",
+            "v-real",
+            "QUITAR",
+            "EXITO",
+        )
 
 
 # ============================================================

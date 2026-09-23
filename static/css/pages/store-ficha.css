@@ -113,6 +113,59 @@
     margin-bottom: 1.5rem;
 }
 
+.ficha-sku {
+    display: block;
+    margin-top: .7rem;
+    color: #8ba093;
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+}
+
+.ficha-presentations {
+    margin-bottom: 1.5rem;
+}
+
+.ficha-presentations > span {
+    display: block;
+    margin-bottom: .6rem;
+    color: #53695c;
+    font-size: .78rem;
+    font-weight: 800;
+}
+
+.ficha-presentations > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+}
+
+.ficha-presentations a {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    min-height: 42px;
+    padding: .55rem .8rem;
+    border: 1px solid #dfe8e1;
+    border-radius: 12px;
+    background: #fff;
+    color: #53695c;
+    font-size: .76rem;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.ficha-presentations a.is-active {
+    border-color: #3f7d55;
+    background: #eaf4ec;
+    color: #27593a;
+}
+
+.ficha-presentations small {
+    color: #819086;
+    font-size: .68rem;
+}
+
 .ficha-price-row {
     display: flex;
     align-items: center;
@@ -130,6 +183,11 @@
     font-size: .85rem;
     color: #8ba093;
     font-weight: 600;
+}
+
+.ficha-price-note {
+    font-size: 1rem;
+    color: #3f7d55;
 }
 
 .ficha-stock {
@@ -181,6 +239,11 @@
 
 .ficha-favorite-button.is-active span {
     color: #e04f5a;
+}
+
+.ficha-favorite-button:disabled {
+    cursor: wait;
+    opacity: .65;
 }
 
 .ficha-learn-link {

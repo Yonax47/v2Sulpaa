@@ -44,6 +44,8 @@ Variables esperadas:
 - producto.clase
 - producto.descripcion
 - producto.atributos
+- variante_detalle (SKU y UUID reales de la variante 330 ml)
+- favorito_ids (favoritos reales del usuario autenticado)
 
 ============================================================
 #}
@@ -60,6 +62,27 @@ Variables esperadas:
          ====================================================== -->
 
     <div class="store-product-visual">
+
+        {% if variante_detalle %}
+            {% set esta_en_favoritos = variante_detalle.variante_id in favorito_ids %}
+            <button
+                type="button"
+                class="store-favorite-button{% if esta_en_favoritos %} is-active{% endif %}"
+                data-favorite-toggle
+                data-variante-id="{{ variante_detalle.variante_id }}"
+                data-product-name="{{ producto.nombre }}"
+                data-active="{{ 'true' if esta_en_favoritos else 'false' }}"
+                data-add-url="{{ url_for('comercio.api_agregar_favorito') }}"
+                data-remove-url="{{ url_for('comercio.api_quitar_favorito') }}"
+                aria-pressed="{{ 'true' if esta_en_favoritos else 'false' }}"
+                aria-label="{{ 'Quitar' if esta_en_favoritos else 'Agregar' }} {{ producto.nombre }} {{ 'de' if esta_en_favoritos else 'a' }} favoritos"
+                title="{{ 'Quitar de favoritos' if esta_en_favoritos else 'Agregar a favoritos' }}"
+            >
+                <span aria-hidden="true" data-favorite-icon>
+                    {{ '♥' if esta_en_favoritos else '♡' }}
+                </span>
+            </button>
+        {% endif %}
 
         <!-- Elemento decorativo -->
         <div
@@ -147,27 +170,27 @@ Variables esperadas:
 
 
 
-        <!-- ==================================================
-             ACCIÓN
+        <div class="store-product-actions">
 
-             Por ahora dirige al cliente hacia los packs,
-             que es donde se comercializa la presentación
-             de 330 ml.
-             ================================================== -->
+            {% if variante_detalle %}
+                <a
+                    href="{{ url_for('comercio.ficha_producto', sku=variante_detalle.sku) }}"
+                    class="store-product-detail"
+                >
+                    Ver detalles
+                    <span aria-hidden="true">→</span>
+                </a>
+            {% endif %}
 
-        <a
-            href="#packs"
-            class="store-product-detail"
-            data-flavor-cta="{{ producto.slug }}"
-        >
+            <a
+                href="#packs"
+                class="store-product-pack-link"
+                data-flavor-cta="{{ producto.slug }}"
+            >
+                Elegir en pack
+            </a>
 
-            Elegir este sabor
-
-            <span aria-hidden="true">
-                →
-            </span>
-
-        </a>
+        </div>
 
     </div>
 

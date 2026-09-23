@@ -22,6 +22,20 @@
 
 {% include "components/navbar.html" %}
 
+{% set imagenes_sabor = {
+    "Café": "img/BotellaCafe.png",
+    "Jamaica": "img/Botellaflordejamaica.png",
+    "Limón": "img/Botellalimon.png",
+    "Kion": "img/Botellakion.png"
+} %}
+
+{% set descripciones_sabor = {
+    "Café": "Una kombucha con carácter, notas tostadas y una experiencia aromática.",
+    "Jamaica": "Un perfil frutal, vibrante y refrescante para disfrutar bien frío.",
+    "Limón": "Una experiencia cítrica, ligera y refrescante.",
+    "Kion": "Una kombucha aromática y especiada con la personalidad del kion."
+} %}
+
 
 <main class="store-page ficha-page">
 
@@ -35,13 +49,13 @@
 
     <section class="ficha-hero container">
 
-        <div class="ficha-visual" aria-hidden="true">
+        <div class="ficha-visual">
 
-            <span class="ficha-orbit"></span>
+            <span class="ficha-orbit" aria-hidden="true"></span>
 
             <img
-                src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
-                alt=""
+                src="{{ url_for('static', filename=imagenes_sabor.get(producto.sabor, 'img/BotellaCafe.png')) }}"
+                alt="Kombucha SULPAA sabor {{ producto.sabor }}"
                 class="ficha-bottle"
             >
 
@@ -55,6 +69,8 @@
 
             <span class="store-kicker">SULPAA · {{ producto.sabor }}</span>
 
+            <span class="ficha-sku">SKU {{ producto.sku }}</span>
+
             <h1>{{ producto.nombre_comercial }}</h1>
 
             <p class="ficha-profile">
@@ -65,11 +81,31 @@
             </p>
 
             <p class="ficha-description">
-                Kombucha SULPAA en su perfil de sabor
-                <strong>{{ producto.sabor }}</strong>, presentación
-                <strong>{{ producto.presentacion }}</strong>.
-                Disfrútala fría, directa de la botella.
+                {{ descripciones_sabor.get(
+                    producto.sabor,
+                    "Kombucha SULPAA disponible en el catálogo comercial."
+                ) }}
             </p>
+
+            {% if producto.presentaciones %}
+                <div class="ficha-presentations">
+                    <span>Presentaciones disponibles</span>
+                    <div>
+                        {% for item in producto.presentaciones %}
+                            <a
+                                href="{{ url_for('comercio.ficha_producto', sku=item.sku) }}"
+                                class="{% if item.es_actual %}is-active{% endif %}"
+                                {% if item.es_actual %}aria-current="page"{% endif %}
+                            >
+                                {{ item.presentacion }}
+                                {% if item.precio is not none %}
+                                    <small>S/ {{ "%.2f"|format(item.precio) }}</small>
+                                {% endif %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
 
             <div class="ficha-price-row">
 
@@ -78,7 +114,7 @@
                         S/ {{ "%.2f"|format(producto.precio) }}
                         <small>{{ producto.moneda }}</small>
                     {% else %}
-                        —
+                        <span class="ficha-price-note">Disponible en packs</span>
                     {% endif %}
                 </strong>
 
@@ -96,7 +132,7 @@
 
             <div class="ficha-actions">
 
-                {% if producto.articulo_venta_id %}
+                {% if producto.articulo_venta_id and producto.precio is not none and producto.disponible %}
                     <button
                         type="button"
                         class="store-btn store-btn-primary"
@@ -104,17 +140,34 @@
                     >
                         Agregar al carrito
                     </button>
+                {% elif producto.precio is none %}
+                    <a
+                        href="{{ url_for('comercio.tienda') }}#packs"
+                        class="store-btn store-btn-primary"
+                    >
+                        Ver packs disponibles
+                    </a>
                 {% endif %}
 
                 <button
                     type="button"
-                    class="ficha-favorite-button"
-                    id="ficha-favorite"
+                    class="ficha-favorite-button{% if producto.es_favorito %} is-active{% endif %}"
+                    data-favorite-toggle
                     data-variante-id="{{ producto.variante_id }}"
-                    aria-label="Agregar a favoritos"
+                    data-product-name="{{ producto.nombre_comercial }}"
+                    data-active="{{ 'true' if producto.es_favorito else 'false' }}"
+                    data-add-url="{{ url_for('comercio.api_agregar_favorito') }}"
+                    data-remove-url="{{ url_for('comercio.api_quitar_favorito') }}"
+                    aria-pressed="{{ 'true' if producto.es_favorito else 'false' }}"
+                    aria-label="{{ 'Quitar' if producto.es_favorito else 'Agregar' }} {{ producto.nombre_comercial }} {{ 'de' if producto.es_favorito else 'a' }} favoritos"
+                    title="{{ 'Quitar de favoritos' if producto.es_favorito else 'Agregar a favoritos' }}"
                 >
-                    <span aria-hidden="true">♡</span>
-                    <small>Guardar</small>
+                    <span aria-hidden="true" data-favorite-icon>
+                        {{ '♥' if producto.es_favorito else '♡' }}
+                    </span>
+                    <small data-favorite-label>
+                        {{ 'Guardado' if producto.es_favorito else 'Guardar' }}
+                    </small>
                 </button>
 
             </div>
@@ -194,57 +247,18 @@
 
     };
 
-    document.addEventListener("DOMContentLoaded", () => {
-
-        const boton = document.getElementById("ficha-favorite");
-
-        if (!boton) return;
-
-        boton.addEventListener("click", async () => {
-
-            boton.disabled = true;
-
-            try {
-
-                const respuesta = await fetch(
-                    "{{ url_for('comercio.api_agregar_favorito') }}",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            "variante_id": boton.dataset.varianteId,
-                        }),
-                    }
-                );
-
-                const datos = await respuesta.json();
-
-                if (datos.ok) {
-
-                    boton.classList.add("is-active");
-                    boton.querySelector("span").textContent = "♥";
-
-                } else {
-
-                    alert(datos.mensaje || "No se pudo guardar.");
-
-                }
-
-            } catch (error) {
-
-                alert("Ocurrió un error de conexión. Inténtalo de nuevo.");
-
-            } finally {
-
-                boton.disabled = false;
-
-            }
-
-        });
-
-    });
 </script>
 
+{% endblock %}
+
+
+{% block page_js %}
+<script
+    src="{{ url_for('static', filename='js/modules/navbar.js') }}"
+    defer
+></script>
+<script
+    src="{{ url_for('static', filename='js/modules/favoritos.js') }}"
+    defer
+></script>
 {% endblock %}

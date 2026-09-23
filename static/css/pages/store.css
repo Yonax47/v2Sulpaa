@@ -683,8 +683,8 @@ Objetivo:
     z-index: 5;
     top: 0.9rem;
     right: 0.9rem;
-    width: 35px;
-    height: 35px;
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
     border: 1px solid rgba(255, 255, 255, 0.22);
@@ -700,6 +700,16 @@ Objetivo:
 .store-favorite-button.is-active {
     background: #ffffff;
     color: #dd4c6c;
+}
+
+.store-favorite-button:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.72);
+    outline-offset: 2px;
+}
+
+.store-favorite-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
 }
 
 
@@ -914,14 +924,29 @@ Objetivo:
     transform: translateY(-1px);
 }
 
-.store-product-detail {
+.store-product-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-top: auto;
+    padding-top: 0.8rem;
+}
+
+.store-product-detail,
+.store-product-pack-link {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    margin-top: 0.8rem;
     color: #45835c;
     font-size: 0.69rem;
     font-weight: 800;
+}
+
+.store-product-pack-link {
+    color: #788a80;
+    text-decoration: underline;
+    text-underline-offset: 0.2rem;
 }
 
 

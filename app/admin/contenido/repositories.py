@@ -313,6 +313,24 @@ def crear_contenido(
         conexion.close()
 
 
+def _fragmento_publicado_en(estado, publicado_en_actual):
+    """
+    Decide cómo escribir el sello ``publicado_en`` en el UPDATE.
+
+    - Primera publicación: MySQL calcula la fecha (NOW()).
+    - Ya publicada o reeditada a BORRADOR: se conserva el sello
+      existente como parámetro ``%s`` (nunca se interpola en SQL).
+
+    Devuelve un dict con la clave ``fragmento`` que identifica
+    el fragmento SQL seguro a utilizar.
+    """
+
+    if estado == "PUBLICADO" and not publicado_en_actual:
+        return {"fragmento": "NOW()"}
+
+    return {"fragmento": "%s"}
+
+
 def actualizar_contenido(
     contenido_id,
     titulo,
@@ -354,14 +372,28 @@ def actualizar_contenido(
             if not actual:
                 raise ValueError("El contenido indicado no existe.")
 
-            nuevo_publicado_en = actual["publicado_en"]
-            if estado == "PUBLICADO" and not actual["publicado_en"]:
-                # Primera publicación: sella la fecha actual.
-                nuevo_publicado_en = "NOW()"
-            if actual["publicado_en"]:
-                # Si ya estuvo publicado, se conserva la fecha inicial
-                # aunque se edite mientras sigue visible (sello estable).
-                nuevo_publicado_en = actual["publicado_en"]
+            fragmento_publicado = _fragmento_publicado_en(
+                estado,
+                actual["publicado_en"],
+            )
+
+            parametros = [
+                titulo,
+                slug,
+                resumen,
+                contenido,
+                tipo,
+                imagen_ruta,
+                estado,
+                orden,
+            ]
+
+            if fragmento_publicado["fragmento"] == "%s":
+                # Conserva el sello real como parámetro. NUNCA se
+                # interpola un datetime directamente en el SQL.
+                parametros.append(actual["publicado_en"])
+
+            parametros.append(contenido_id)
 
             try:
                 cursor.execute(
@@ -376,21 +408,11 @@ def actualizar_contenido(
                         imagen_ruta = %s,
                         estado = %s,
                         orden = %s,
-                        publicado_en = {nuevo_publicado_en or "NULL"},
+                        publicado_en = {fragmento_publicado["fragmento"]},
                         actualizado_en = NOW()
                     WHERE id = %s
                     """,
-                    (
-                        titulo,
-                        slug,
-                        resumen,
-                        contenido,
-                        tipo,
-                        imagen_ruta,
-                        estado,
-                        orden,
-                        contenido_id,
-                    ),
+                    tuple(parametros),
                 )
             except Exception as error:
                 if "slug" in str(error).lower() or "duplicate" in str(error).lower():

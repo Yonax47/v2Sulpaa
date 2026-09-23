@@ -3583,6 +3583,61 @@ def quitar_variante_de_favoritos(usuario_id, variante_id):
 # 33. FICHA DE PRODUCTO (KPI-03)
 # ============================================================
 
+def _presentaciones_del_sabor(sabor, sku_actual):
+    """
+    Reúne las presentaciones comerciales REALES de un mismo sabor.
+
+    La botella de 330 ml se obtiene del catálogo de variantes para
+    packs; las presentaciones con venta individual se obtienen del
+    catálogo comercial. No se crean precios ni disponibilidades en
+    memoria: todos los valores provienen de Repository + Inventario.
+    """
+
+    productos = [
+        *obtener_variantes_330ml_con_stock(),
+        *obtener_catalogo_tienda(),
+    ]
+
+    orden_presentaciones = {
+        "Botella 330 ml": 1,
+        "Botella 1 L": 2,
+        "Barril 30 L": 3,
+        "Barril 50 L": 4,
+    }
+    presentaciones = []
+    skus_incluidos = set()
+
+    for item in productos:
+        if item.get("sabor") != sabor or item.get("sku") in skus_incluidos:
+            continue
+
+        sku = item.get("sku")
+        skus_incluidos.add(sku)
+        presentaciones.append({
+            "sku": sku,
+            "presentacion": item.get("presentacion"),
+            "precio": (
+                float(item["precio"])
+                if item.get("precio") is not None
+                else None
+            ),
+            "moneda": item.get("moneda") or "PEN",
+            "stock_disponible": int(item.get("stock_disponible") or 0),
+            "disponible": bool(item.get("disponible")),
+            "articulo_venta_id": item.get("articulo_venta_id"),
+            "es_actual": sku == sku_actual,
+        })
+
+    presentaciones.sort(
+        key=lambda item: orden_presentaciones.get(
+            item.get("presentacion"),
+            99,
+        )
+    )
+
+    return presentaciones
+
+
 def obtener_ficha_producto(sku, usuario_id=None):
     """
     Resuelve la ficha pública de un producto por SKU y
@@ -3618,6 +3673,21 @@ def obtener_ficha_producto(sku, usuario_id=None):
         _stock_vacio(),
     )
 
+    presentaciones = _presentaciones_del_sabor(
+        variante["sabor"],
+        variante["sku"],
+    )
+
+    favoritos_ids = set()
+    if usuario_id:
+        favoritos_ids = {
+            str(item["variante_id"])
+            for item in listar_favoritos_usuario(usuario_id)
+            if item.get("variante_id")
+        }
+
+    # Cada navegación lógica deja exactamente una evidencia KPI-03.
+    # Los recursos estáticos no atraviesan este Service y no se cuentan.
     registrar_consulta_producto(
         sku=sku,
         variante_id=variante["variante_id"],
@@ -3668,4 +3738,10 @@ def obtener_ficha_producto(sku, usuario_id=None):
 
         "disponible":
             stock["disponible"],
+
+        "presentaciones":
+            presentaciones,
+
+        "es_favorito":
+            str(variante["variante_id"]) in favoritos_ids,
     }

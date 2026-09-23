@@ -121,7 +121,7 @@ def crear_para_admin(
     Reglas:
     - Permiso real obligatorio.
     - Título obligatorio; slug automático y único.
-    - Estado PUBLCIADO exige contenido mínimo (título + texto).
+    - Estado PUBLICADO exige contenido mínimo (título + texto).
     """
     _validar_acceso(roles)
 
