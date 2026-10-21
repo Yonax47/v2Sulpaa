@@ -104,10 +104,79 @@ def create_app():
     # CONFIGURACIÓN GENERAL
     # ========================================================
 
-    app.config["SECRET_KEY"] = os.getenv(
-        "SECRET_KEY",
-        "clave-desarrollo-no-segura",
-    )
+    # El entorno se resuelve UNA sola vez aquí y se guarda en
+    # la app para no repetir getenv() por todo el sistema.
+    entorno = os.getenv(
+        "FLASK_ENV", ""
+    ).strip().lower()
+
+    app.config["ENTORNO"] = entorno
+
+    es_produccion = entorno == "production"
+
+    app.config["ES_PRODUCCION"] = es_produccion
+
+
+    # ========================================================
+    # DETRÁS DE UN PROXY INVERSO (RAILWAY)
+    # ========================================================
+    #
+    # Railway (u otro PaaS) termina el TLS y llega al
+    # contenedor por HTTP. Sin este middleware Flask creería
+    # que la petición NO es segura y no distinguiría el
+    # esquema real usado por el navegador.
+    #
+    # Se confía UN solo salto (el propio PaaS); los valores
+    # reales de estas cabeceras los fija el proxy y no el
+    # cliente.
+    #
+    # IMPORTANTE: el contenedor NUNCA se expone directamente
+    # a Internet; sólo el proxy lo hace.
+    # ========================================================
+
+    if es_produccion:
+
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=1,
+            x_proto=1,
+            x_host=1,
+            x_port=1,
+        )
+
+
+    # ========================================================
+    # CLAVE SECRETA DE LA APLICACIÓN
+    # ========================================================
+    #
+    # Flask la usa para firmar las cookies de sesión; sin una
+    # clave propia, cualquier usuario podría forjar una sesión.
+    #
+    # Regla de seguridad:
+    # - En PRODUCCIÓN es OBLIGATORIO definirla en el entorno.
+    #   Si falta, la aplicación NO arranca (mejor un fallo
+    #   claro en el despliegue que una clave por defecto).
+    # - En desarrollo se usa un respaldo local para no
+    #   complicar el arranque del equipo.
+    # ========================================================
+
+    clave_secreta = os.getenv("SECRET_KEY", "").strip()
+
+    if not clave_secreta:
+
+        if es_produccion:
+
+            raise RuntimeError(
+                "Falta la variable de entorno SECRET_KEY. "
+                "En producción es obligatoria; define una clave "
+                "aleatoria larga en la configuración de Railway."
+            )
+
+        clave_secreta = "clave-desarrollo-no-segura"
+
+    app.config["SECRET_KEY"] = clave_secreta
 
 
     # ========================================================
@@ -134,15 +203,25 @@ def create_app():
     app.config["SESSION_COOKIE_HTTPONLY"] = True
 
 
-    # En desarrollo usamos:
+    # La cookie de sesión sólo viaja por HTTPS.
     #
-    # http://127.0.0.1:5000
+    # En producción (Railway termina TLS) es True.
     #
-    # Por eso permanece en False.
+    # En desarrollo local con http://127.0.0.1:5000 debe ser
+    # False, o el navegador descartaría la cookie y el login
+    # no funcionaría.
     #
-    # Cuando el sistema esté en producción con HTTPS,
-    # deberá cambiarse a True.
-    app.config["SESSION_COOKIE_SECURE"] = False
+    # Se puede forzar con SESSION_COOKIE_SECURE=0/1 en el
+    # entorno sin tocar código.
+    valor_secure = os.getenv("SESSION_COOKIE_SECURE")
+
+    if valor_secure is None:
+        app.config["SESSION_COOKIE_SECURE"] = es_produccion
+    else:
+        app.config["SESSION_COOKIE_SECURE"] = (
+            valor_secure.strip().lower()
+            in ("1", "true", "yes", "on")
+        )
 
 
     # Ayuda a reducir el envío de cookies
