@@ -1,0 +1,26 @@
+# ============================================================
+# Configuración de despliegue de SULPAA V2 en Railway
+# ============================================================
+#
+# Archivo leído por Railway (Config as Code). Fija el arranque
+# en el repositorio para no depender de la detección automática.
+#
+# Relación con el Procfile:
+# El Procfile sigue existiendo y declara exactamente el mismo
+# comando. Este archivo tiene PRIORIDAD sobre el Procfile en
+# Railpack, así que si alguien cambia uno de los dos, el que
+# manda es este. Ambos apuntan a Gunicorn sobre run:app.
+#
+# Referencia: https://docs.railway.com/config-as-code
+# ============================================================
+
+[build]
+# Railpack detecta Python por requirements.txt y compila con un
+# binario precompilado. No se fija versión: Railpack usa 3.13.2
+# por defecto, que es compatible con todas las dependencias.
+builder = "RAILPACK"
+
+[deploy]
+# Gunicorn lee el puerto de la variable PORT mediante
+# gunicorn.conf.py. NO se fija un puerto concreto aquí.
+startCommand = "gunicorn -c gunicorn.conf.py run:app"

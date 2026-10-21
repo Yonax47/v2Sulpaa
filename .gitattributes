@@ -1,0 +1,46 @@
+# ============================================================
+# Normalización de textos para SULPAA V2
+# ============================================================
+#
+# Objetivo: evitar que Git altere el fin de línea ni la
+# codificación de los archivos que el sistema de despliegue
+# necesita leer de forma exacta.
+#
+# Historia: requirements.txt se creó en el commit inicial
+# (e46d429) como UTF-16 LE, porque PowerShell 5.1 escribe en
+# UTF-16 por defecto. Un archivo ASCII puro sin BOM es ambiguo
+# y los editores pueden interpretarlo como UTF-16, mostrando
+# caracteres como "换祲瑰" en lugar de "bcrypt".
+#
+# Reglas:
+# - Los archivos de configuración y texto se guardan en LF,
+#   que es el fin de línea de Linux (Railway).
+# - Los binarios jamás se convierten.
+# ============================================================
+
+# Archivos críticos para el despliegue: siempre LF, sin conversiones.
+Procfile          text eol=lf
+railway.toml      text eol=lf
+gunicorn.conf.py  text eol=lf
+requirements.txt  text eol=lf
+*.toml            text eol=lf
+
+# Código fuente y plantillas.
+*.py              text eol=lf
+*.html            text eol=lf
+*.js              text eol=lf
+*.css             text eol=lf
+*.md              text eol=lf
+
+# Binarios: nunca se modifican.
+*.png             binary
+*.jpg             binary
+*.jpeg            binary
+*.gif             binary
+*.ico             binary
+*.woff            binary
+*.woff2           binary
+*.ttf             binary
+*.pdf             binary
+*.xlsx            binary
+*.zip             binary
