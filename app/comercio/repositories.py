@@ -534,6 +534,12 @@ def obtener_detalles_carrito_usuario(usuario_id):
                     v.nombre_comercial,
                     v.sku,
 
+                    -- Sabor y presentación de la variante.
+                    -- Se muestran en el carrito lateral y permiten
+                    -- elegir la imagen real del producto.
+                    s.nombre AS sabor,
+                    p.nombre AS presentacion,
+
                     pk.nombre AS pack_nombre,
                     pk.tipo AS pack_tipo,
                     pk.cantidad_unidades,
@@ -592,6 +598,12 @@ def obtener_detalles_carrito_usuario(usuario_id):
 
                 LEFT JOIN variantes AS v
                     ON v.id = av.variante_id
+
+                LEFT JOIN sabores AS s
+                    ON s.id = v.sabor_id
+
+                LEFT JOIN presentaciones AS p
+                    ON p.id = v.presentacion_id
 
                 LEFT JOIN packs AS pk
                     ON pk.id = av.pack_id
@@ -1129,6 +1141,7 @@ def crear_pedido(
     items,
     costo_entrega,
     moneda="PEN",
+    conexion=None,
 ):
     """
     Crea la cabecera, detalles y composiciones de un pedido.
@@ -1184,7 +1197,13 @@ def crear_pedido(
             "El costo de entrega no es válido."
         )
 
-    conexion = conexion_comercio()
+    # Conexión compartida cuando el checkout coordina una transacción
+    # única entre esquemas; en caso contrario el repositorio es dueño
+    # de su propia transacción y la confirma por sí mismo.
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_comercio()
 
     try:
 
@@ -1536,7 +1555,8 @@ def crear_pedido(
                         ],
                 })
 
-            conexion.commit()
+            if propia:
+                conexion.commit()
 
             return {
                 "ok": True,
@@ -1570,12 +1590,14 @@ def crear_pedido(
 
     except Exception:
 
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
 
     finally:
 
-        conexion.close()
+        if propia:
+            conexion.close()
 
 
 # ============================================================
@@ -1693,6 +1715,7 @@ def actualizar_estado_pedido(
 
 def cerrar_carrito_usuario(
     usuario_id,
+    conexion=None,
 ):
     """
     Cierra el carrito ACTIVO únicamente cuando todo el proceso
@@ -1705,7 +1728,10 @@ def cerrar_carrito_usuario(
     if not usuario_id:
         return False
 
-    conexion = conexion_comercio()
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_comercio()
 
     try:
 
@@ -1730,18 +1756,21 @@ def cerrar_carrito_usuario(
                 cursor.rowcount > 0
             )
 
-            conexion.commit()
+            if propia:
+                conexion.commit()
 
             return actualizado
 
     except Exception:
 
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
 
     finally:
 
-        conexion.close()
+        if propia:
+            conexion.close()
 
 def reabrir_carrito_usuario(
     usuario_id,

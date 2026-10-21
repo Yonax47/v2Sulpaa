@@ -187,6 +187,50 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
   }
 
   /* =========================================================
+       RESUMEN DEL DESTINO SELECCIONADO
+       ========================================================= */
+
+  /*
+        Caja que muestra, en lenguaje claro, el destino que el
+        cliente eligió según la modalidad del paso 02.
+    */
+
+  .checkout-destination {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    margin: 4px 0 18px;
+
+    padding: 14px 18px;
+
+    background: linear-gradient(145deg, #eef7f1, #e7f4ec);
+
+    border: 1px solid #cfe6d9;
+    border-left: 4px solid #1f9d55;
+    border-radius: 14px;
+  }
+
+  .checkout-destination-label {
+    color: #5d7a6c;
+
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .checkout-destination strong {
+    color: #17402d;
+
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.45;
+
+    overflow-wrap: anywhere;
+  }
+
+  /* =========================================================
        DATOS DEL CLIENTE
        ========================================================= */
 
@@ -937,16 +981,71 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
         </section>
 
         <!-- =============================================
-                     02. DIRECCIÓN DE ENTREGA
+                     02. MODALIDAD DE ENTREGA
                      ============================================= -->
 
-        <section class="checkout-card">
+        <!--
+                    Primero el cliente elige CÓMO recibir el pedido.
+                    Recién en el paso 03 se completará el destino
+                    (dirección, punto de recojo o agencia) según
+                    la modalidad elegida.
+                -->
+
+        <section class="checkout-card" id="checkout-delivery-section">
           <span class="checkout-step"> 02 </span>
 
-          <h2>Dirección de entrega</h2>
+          <h2>¿Cómo quieres recibir tu pedido?</h2>
 
-          <div class="checkout-field" role="status" aria-live="polite">
-            <strong id="checkout-destination-summary">Selecciona una modalidad de entrega.</strong>
+          <p class="checkout-section-description">
+            Elige la modalidad. Luego completaremos el punto de entrega que
+            corresponda.
+          </p>
+
+          <!--
+                        Las opciones reales se obtendrán desde:
+
+                        GET
+                        /operaciones/api/entregas/opciones
+                    -->
+
+          <div id="checkout-delivery-options" class="checkout-document-options">
+            <p>Cargando opciones de entrega...</p>
+          </div>
+
+          <div
+            id="checkout-delivery-message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </section>
+
+        <!-- =============================================
+                     03. DIRECCIÓN O PUNTO DE ENTREGA
+                     ============================================= -->
+
+        <!--
+                    Este paso muestra únicamente lo que corresponde a la
+                    modalidad elegida: el punto de recojo, la dirección de
+                    delivery o la agencia del transportista.
+                -->
+
+        <section class="checkout-card" id="checkout-destination-section">
+          <span class="checkout-step"> 03 </span>
+
+          <h2>Dirección o punto de entrega</h2>
+
+          <p class="checkout-section-description">
+            Completa el destino según la modalidad elegida.
+          </p>
+
+          <!-- Resumen legible del destino elegido. -->
+
+          <div class="checkout-destination" role="status" aria-live="polite">
+            <span class="checkout-destination-label"> Destino seleccionado </span>
+
+            <strong id="checkout-destination-summary">
+              Selecciona una modalidad de entrega.
+            </strong>
           </div>
           <div class="checkout-form-group" id="checkout-saved-selector-group" hidden>
             <label for="checkout-saved-selector">Direcciones guardadas</label>
@@ -1125,38 +1224,6 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
             </button>
           </form>
 
-        </section>
-
-        <!-- =============================================
-                     03. TIPO DE ENTREGA
-                     ============================================= -->
-
-        <section class="checkout-card" id="checkout-delivery-section">
-          <span class="checkout-step"> 03 </span>
-
-          <h2>¿Cómo quieres recibir tu pedido?</h2>
-
-          <p class="checkout-section-description">
-            Selecciona la modalidad disponible para tu compra.
-          </p>
-
-          <!--
-                        Las opciones reales se obtendrán desde:
-
-                        GET
-                        /operaciones/api/entregas/opciones
-                    -->
-
-          <div id="checkout-delivery-options" class="checkout-document-options">
-            <p>Cargando opciones de entrega...</p>
-          </div>
-
-          <div
-            id="checkout-delivery-message"
-            role="status"
-            aria-live="polite"
-          ></div>
-
           <!-- =========================================
                          RECOJO EN LOCAL
                          ========================================= -->
@@ -1311,6 +1378,25 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
               </select>
             </div>
 
+            <!--
+                            Distrito de destino del cliente.
+                            Se llena con los distritos que cubre el
+                            servicio. Es distinto del distrito físico
+                            donde está la agencia.
+                        -->
+
+            <div
+              class="checkout-form-group"
+              id="checkout-carrier-district-group"
+              hidden
+            >
+              <label for="checkout-carrier-district"> Distrito de destino </label>
+
+              <select id="checkout-carrier-district" disabled>
+                <option value="">Selecciona un distrito</option>
+              </select>
+            </div>
+
             <!-- AGENCIA -->
 
             <div class="checkout-form-group">
@@ -1319,6 +1405,26 @@ endblock %} {% block content %} {% include "components/navbar.html" %}
               <select id="checkout-carrier-agency" disabled>
                 <option value="">Selecciona una agencia</option>
               </select>
+            </div>
+
+            <!--
+                            Muestra el nombre y la dirección real de la
+                            agencia elegida, para que el cliente confirme
+                            dónde recogerá su pedido.
+                        -->
+
+            <div
+              class="checkout-destination"
+              id="checkout-carrier-agency-summary"
+              role="status"
+              aria-live="polite"
+              hidden
+            >
+              <span class="checkout-destination-label">
+                Agencia seleccionada
+              </span>
+
+              <strong id="checkout-carrier-agency-detail"> </strong>
             </div>
 
             <button type="button" id="checkout-quote-carrier" class="checkout-primary-button">Calcular envío</button>

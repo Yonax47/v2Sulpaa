@@ -1,0 +1,145 @@
+<!--
+============================================================
+SULPAA V2 - CARRITO LATERAL (COMPONENTE REUTILIZABLE)
+============================================================
+
+Este componente muestra el carrito del usuario como un panel
+lateral que se desliza desde la derecha.
+
+IMPORTANTE:
+
+- Se incluye UNA sola vez (desde el navbar) y funciona en
+  todas las páginas. Sus estilos viven en
+  css/components/cart.css, que se carga de forma global.
+- NO contiene productos escritos a mano: todo lo llena
+  JavaScript desde el endpoint real /api/carrito.
+- El atributo data-cart-static guarda la ruta base de los
+  archivos estáticos para que JavaScript pueda armar la ruta
+  de las imágenes reales de cada producto.
+============================================================
+-->
+
+<div
+    class="store-cart-overlay"
+    data-cart-overlay
+    hidden
+></div>
+
+
+<aside
+    class="store-cart-drawer"
+    data-cart-drawer
+    data-cart-static="{{ url_for('static', filename='') }}"
+    data-cart-store-url="{{ url_for('comercio.tienda') }}"
+    aria-hidden="true"
+    aria-label="Carrito de compras"
+>
+
+    <!-- =================================================
+         ENCABEZADO DEL CARRITO
+         ================================================= -->
+
+    <header class="store-cart-header">
+
+        <div class="store-cart-heading">
+
+            <span>
+                TU CARRITO
+            </span>
+
+            <strong>
+                Selección SULPAA
+            </strong>
+
+        </div>
+
+
+        <button
+            type="button"
+            class="store-cart-close"
+            data-cart-close
+            aria-label="Cerrar carrito"
+        >
+            ×
+        </button>
+
+    </header>
+
+
+    <!-- =================================================
+         LISTA DE PRODUCTOS
+         (JavaScript reemplaza este contenido)
+         ================================================= -->
+
+    <div
+        class="store-cart-preview"
+        data-cart-content
+    >
+
+        <div
+            class="store-cart-loading"
+            data-cart-loading
+        >
+
+            <span
+                class="store-cart-spinner"
+                aria-hidden="true"
+            ></span>
+
+            <p>
+                Cargando tu carrito…
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         PIE DEL CARRITO: SUBTOTAL Y ACCIONES
+         ================================================= -->
+
+    <footer class="store-cart-footer">
+
+        <div class="store-cart-summary">
+
+            <span>
+                Subtotal
+            </span>
+
+            <strong data-cart-subtotal>
+                S/ 0.00
+            </strong>
+
+        </div>
+
+
+        <p class="store-cart-hint">
+            El costo de envío se calcula en el siguiente paso.
+        </p>
+
+
+        <div class="store-cart-actions">
+
+            <button
+                type="button"
+                class="store-cart-btn store-cart-btn-secondary"
+                data-cart-continue
+            >
+                Seguir comprando
+            </button>
+
+
+            <a
+                href="{{ url_for('comercio.checkout') }}"
+                class="store-cart-btn store-cart-btn-primary"
+                data-cart-checkout
+            >
+                Continuar pedido
+            </a>
+
+        </div>
+
+    </footer>
+
+</aside>

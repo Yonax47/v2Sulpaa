@@ -36,9 +36,11 @@ from app.operaciones.repositories import (
     listar_transportistas_activos,
     listar_servicios_transportista_activos,
     listar_sucursales_destino_activas,
+    listar_coberturas_servicio,
     obtener_transportista_activo,
     obtener_servicio_transportista_activo,
     obtener_sucursal_destino_activa,
+    obtener_cobertura_servicio_distrito,
     obtener_tarifa_delivery_activa,
     obtener_tarifario_activo_transportista,
     obtener_regla_tarifa_transportista,
@@ -390,6 +392,113 @@ def obtener_opciones_entrega_checkout():
 # DELIVERY LOCAL
 # ============================================================
 
+def calcular_costo_delivery_local(tarifa, distancia_km, peso_kg, subtotal):
+    """
+    Fórmula PURA y única del delivery local.
+
+    Se usa tanto en el checkout como en la configuración
+    administrativa, para no duplicar la regla de negocio.
+
+    Reglas (idénticas a las del checkout):
+
+    - Fuera de la distancia máxima => no se puede cotizar.
+    - Sobre el peso máximo => no se puede cotizar.
+    - subtotal >= monto de envío gratis => costo 0.
+    - costo = tarifa base + km adicionales + peso adicional.
+
+    Devuelve:
+        {
+            "ok": bool,
+            "costo_entrega": float | None,
+            "envio_gratis": bool,
+            "mensaje": str,
+            "fuera_cobertura": bool,
+            "distancia_maxima_km": float | None,
+        }
+    """
+
+    distancia = _decimal(distancia_km)
+    peso = _decimal(peso_kg)
+    subtotal = _decimal(subtotal)
+
+    # 1. Cobertura máxima.
+    distancia_maxima = _decimal(
+        tarifa.get("distancia_maxima_km")
+    )
+
+    if (
+        distancia_maxima > 0
+        and distancia > distancia_maxima
+    ):
+
+        return {
+            "ok": False,
+            "envio_gratis": False,
+            "mensaje":
+                (
+                    "La dirección está fuera "
+                    "de la cobertura del "
+                    "delivery local."
+                ),
+            "fuera_cobertura": True,
+            "distancia_maxima_km": float(distancia_maxima),
+        }
+
+    # Peso máximo.
+    peso_maximo = _decimal(tarifa.get("peso_maximo_kg"))
+
+    if peso_maximo > 0 and peso > peso_maximo:
+
+        return {
+            "ok": False,
+            "envio_gratis": False,
+            "mensaje":
+                "El pedido supera el peso máximo del delivery local.",
+        }
+
+    # Envío gratis.
+    monto_envio_gratis = tarifa.get("monto_envio_gratis")
+
+    if (
+        monto_envio_gratis is not None
+        and _decimal(monto_envio_gratis) > 0
+        and subtotal >= _decimal(monto_envio_gratis)
+    ):
+
+        return {
+            "ok": True,
+            "costo_entrega": 0.0,
+            "envio_gratis": True,
+            "mensaje": "",
+        }
+
+    # Tarifa base.
+    costo = _decimal(tarifa["tarifa_base"])
+
+    # Kilómetros adicionales.
+    km_incluidos = _decimal(tarifa["km_incluidos"])
+
+    if distancia > km_incluidos:
+        costo += (
+            distancia - km_incluidos
+        ) * _decimal(tarifa["precio_km_adicional"])
+
+    # Peso adicional.
+    peso_incluido = _decimal(tarifa["peso_incluido_kg"])
+
+    if peso > peso_incluido:
+        costo += (
+            peso - peso_incluido
+        ) * _decimal(tarifa["precio_kg_adicional"])
+
+    return {
+        "ok": True,
+        "costo_entrega": float(_dinero(costo)),
+        "envio_gratis": False,
+        "mensaje": "",
+    }
+
+
 def cotizar_delivery_local(
     usuario_id,
     distancia_km,
@@ -480,176 +589,24 @@ def cotizar_delivery_local(
         }
 
     # --------------------------------------------------------
-    # 4. Validar cobertura máxima
+    # 4. Aplicar la fórmula ÚNICA del delivery local
     # --------------------------------------------------------
 
-    distancia_maxima = _decimal(
-        tarifa.get(
-            "distancia_maxima_km"
-        )
+    resultado = calcular_costo_delivery_local(
+        tarifa,
+        distancia,
+        peso,
+        subtotal,
     )
 
-    if (
-        distancia_maxima > 0
-        and distancia > distancia_maxima
-    ):
-
-        return {
-            "ok": False,
-            "tipo":
-                "DELIVERY_LOCAL",
-
-            "mensaje":
-                (
-                    "La dirección está fuera "
-                    "de la cobertura del "
-                    "delivery local."
-                ),
-
-            "distancia_km":
-                float(distancia),
-
-            "distancia_maxima_km":
-                float(
-                    distancia_maxima
-                ),
-        }
-
-    # --------------------------------------------------------
-    # 5. Validar peso máximo
-    # --------------------------------------------------------
-    peso_maximo = _decimal(tarifa.get("peso_maximo_kg"))
-    if peso_maximo > 0 and peso > peso_maximo:
-        return {"ok": False, "mensaje": "El pedido supera el peso máximo del delivery local."}
-   
-
-    # --------------------------------------------------------
-    # 6. Envío gratis
-    # --------------------------------------------------------
-
-    monto_envio_gratis = (
-        tarifa.get(
-            "monto_envio_gratis"
-        )
-    )
-
-    if monto_envio_gratis is not None:
-
-        minimo_gratis = _decimal(
-            monto_envio_gratis
-        )
-
-        if (
-            minimo_gratis > 0
-            and subtotal >= minimo_gratis
-        ):
-
-            return {
-                "ok": True,
-                "tipo":
-                    "DELIVERY_LOCAL",
-
-                "tarifa_delivery_id":
-                    tarifa["id"],
-                "tarifa_snapshot": tarifa,
-
-                "distancia_km":
-                    float(distancia),
-
-                "peso_kg":
-                    float(peso),
-
-                "subtotal_productos":
-                    float(subtotal),
-
-                "costo_entrega":
-                    0.0,
-
-                "envio_gratis":
-                    True,
-            }
-
-    # --------------------------------------------------------
-    # 7. Tarifa base
-    # --------------------------------------------------------
-
-    costo = _decimal(
-        tarifa["tarifa_base"]
-    )
-
-    # --------------------------------------------------------
-    # 8. Kilómetros adicionales
-    # --------------------------------------------------------
-
-    km_incluidos = _decimal(
-        tarifa["km_incluidos"]
-    )
-
-    precio_km_adicional = _decimal(
-        tarifa[
-            "precio_km_adicional"
-        ]
-    )
-
-    if distancia > km_incluidos:
-
-        km_adicionales = (
-            distancia
-            - km_incluidos
-        )
-
-        costo += (
-            km_adicionales
-            * precio_km_adicional
-        )
-
-    # --------------------------------------------------------
-    # 9. Peso adicional
-    # --------------------------------------------------------
-
-    peso_incluido = _decimal(
-        tarifa["peso_incluido_kg"]
-    )
-
-    precio_kg_adicional = _decimal(
-        tarifa[
-            "precio_kg_adicional"
-        ]
-    )
-
-    if peso > peso_incluido:
-
-        kg_adicionales = (
-            peso
-            - peso_incluido
-        )
-
-        costo += (
-            kg_adicionales
-            * precio_kg_adicional
-        )
-
-    # --------------------------------------------------------
-    # 10. Normalizar costo
-    # --------------------------------------------------------
-
-    costo = _dinero(
-        costo
-    )
-
-    # --------------------------------------------------------
-    # 11. Resultado
-    # --------------------------------------------------------
-
-    return {
-        "ok": True,
-
+    base = {
         "tipo":
             "DELIVERY_LOCAL",
 
         "tarifa_delivery_id":
             tarifa["id"],
-        "tarifa_snapshot": tarifa,
+        "tarifa_snapshot":
+            tarifa,
 
         "distancia_km":
             float(distancia),
@@ -659,13 +616,25 @@ def cotizar_delivery_local(
 
         "subtotal_productos":
             float(subtotal),
-
-        "costo_entrega":
-            float(costo),
-
-        "envio_gratis":
-            False,
     }
+
+    if not resultado["ok"]:
+
+        base["ok"] = False
+        base["mensaje"] = resultado["mensaje"]
+
+        if resultado.get("distancia_maxima_km") is not None:
+            base["distancia_maxima_km"] = (
+                resultado["distancia_maxima_km"]
+            )
+
+        return base
+
+    base["ok"] = True
+    base["costo_entrega"] = resultado["costo_entrega"]
+    base["envio_gratis"] = resultado["envio_gratis"]
+
+    return base
 
 
 # ============================================================
@@ -750,15 +719,152 @@ def obtener_servicios_checkout(
 # AGENCIAS DE DESTINO
 # ============================================================
 
+def _coberturas_con_nombre_distrito(coberturas):
+    """
+    Completa cada cobertura con el nombre del distrito.
+
+    La cobertura solo guarda el código de distrito (ubigeo).
+    Para mostrarlo al cliente necesitamos su nombre, que
+    obtenemos del catálogo oficial de Identidad.
+    """
+
+    from app.identidad.repositories import (
+        buscar_distritos_activos,
+    )
+
+    catalogo = {
+        distrito["id"]: distrito
+        for distrito in buscar_distritos_activos()
+    }
+
+    resultado = []
+
+    for cobertura in coberturas:
+
+        distrito = (
+            catalogo.get(
+                cobertura["distrito_id"]
+            )
+            or {}
+        )
+
+        resultado.append({
+            "distrito_id":
+                cobertura["distrito_id"],
+
+            "distrito_nombre":
+                distrito.get("nombre"),
+
+            "provincia_nombre":
+                distrito.get("provincia_nombre"),
+
+            "departamento_nombre":
+                distrito.get("departamento_nombre"),
+
+            "tipo_cobertura":
+                cobertura["tipo_cobertura"],
+        })
+
+    return resultado
+
+
+def obtener_coberturas_checkout(
+    transportista_id,
+    servicio_transportista_id,
+):
+    """
+    Devuelve los distritos de destino que cubre un servicio.
+
+    El cliente debe elegir su distrito de destino entre estos
+    y NO el distrito físico donde está la agencia.
+    """
+
+    if not transportista_id or not servicio_transportista_id:
+
+        return {
+            "ok": False,
+            "mensaje":
+                (
+                    "Debe seleccionar un transportista "
+                    "y un servicio."
+                ),
+        }
+
+    servicio = (
+        obtener_servicio_transportista_activo(
+            servicio_transportista_id,
+            transportista_id,
+        )
+    )
+
+    if not servicio:
+
+        return {
+            "ok": False,
+            "mensaje":
+                (
+                    "El servicio seleccionado "
+                    "no pertenece al transportista "
+                    "o no está disponible."
+                ),
+        }
+
+    coberturas = (
+        listar_coberturas_servicio(
+            servicio["id"]
+        )
+    )
+
+    return {
+        "ok": True,
+
+        "servicio": {
+            "id":
+                servicio["id"],
+
+            "codigo":
+                servicio["codigo"],
+
+            "nombre":
+                servicio["nombre"],
+
+            "modalidad":
+                servicio["modalidad"],
+        },
+
+        "coberturas":
+            _coberturas_con_nombre_distrito(
+                coberturas
+            ),
+    }
+
+
 def obtener_agencias_destino_checkout(
     transportista_id,
     distrito_id=None,
+    servicio_transportista_id=None,
 ):
     """
     Obtiene agencias habilitadas como destino.
 
-    Si se indica distrito_id devuelve únicamente
-    las agencias pertenecientes a dicho distrito.
+    Comportamiento:
+
+    - Sin distrito: devuelve todas las agencias de destino
+      activas del transportista.
+
+    - Con distrito pero sin servicio: filtra por el distrito
+      físico de la agencia (comportamiento histórico).
+
+    - Con servicio y distrito: usa la cobertura del servicio.
+
+        * DIRECTA: la agencia debe estar en el distrito de
+          destino.
+
+        * AGENCIA_CERCANA: el distrito de destino se atiende
+          con la agencia más cercana. Como no existe una tabla
+          que ligue cobertura y agencia, se listan todas las
+          agencias de destino del transportista para que el
+          cliente elija la más conveniente.
     """
 
     if not transportista_id:
@@ -788,6 +894,83 @@ def obtener_agencias_destino_checkout(
                     "no está disponible."
                 ),
         }
+
+    # --------------------------------------------------------
+    # Filtro por cobertura del servicio
+    # --------------------------------------------------------
+
+    if servicio_transportista_id and distrito_id:
+
+        servicio = (
+            obtener_servicio_transportista_activo(
+                servicio_transportista_id,
+                transportista_id,
+            )
+        )
+
+        if not servicio:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    (
+                        "El servicio seleccionado "
+                        "no pertenece al transportista "
+                        "o no está disponible."
+                    ),
+            }
+
+        cobertura = (
+            obtener_cobertura_servicio_distrito(
+                servicio["id"],
+                distrito_id,
+            )
+        )
+
+        if not cobertura:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    (
+                        "El servicio no tiene cobertura "
+                        "para el distrito seleccionado."
+                    ),
+            }
+
+        # Con cobertura DIRECTA la agencia está en el distrito.
+        # Con AGENCIA_CERCANA no se conoce una agencia fija por
+        # distrito: se listan todas las agencias de destino.
+
+        distrito_filtro = (
+            distrito_id
+            if cobertura["tipo_cobertura"] == "DIRECTA"
+            else None
+        )
+
+        sucursales = (
+            listar_sucursales_destino_activas(
+                transportista_id,
+                distrito_filtro,
+            )
+        )
+
+        return {
+            "ok": True,
+
+            "transportista":
+                transportista,
+
+            "tipo_cobertura":
+                cobertura["tipo_cobertura"],
+
+            "sucursales":
+                sucursales,
+        }
+
+    # --------------------------------------------------------
+    # Sin servicio: filtro histórico por distrito físico
+    # --------------------------------------------------------
 
     sucursales = (
         listar_sucursales_destino_activas(
@@ -955,7 +1138,34 @@ def cotizar_envio_transportista(
         }
 
     # --------------------------------------------------------
-    # 5. Agencia destino
+    # 5. Cobertura del destino
+    # --------------------------------------------------------
+
+    # IMPORTANTE:
+    # El distrito de destino es el del CLIENTE, no el de la
+    # agencia. El servicio debe cubrir ese distrito según la
+    # tabla de coberturas del transportista.
+
+    cobertura = (
+        obtener_cobertura_servicio_distrito(
+            servicio["id"],
+            distrito_destino_id,
+        )
+    )
+
+    if not cobertura:
+
+        return {
+            "ok": False,
+            "mensaje":
+                (
+                    "El servicio seleccionado no tiene "
+                    "cobertura para el distrito de destino."
+                ),
+        }
+
+    # --------------------------------------------------------
+    # 6. Agencia destino
     # --------------------------------------------------------
 
     sucursal = None
@@ -980,13 +1190,19 @@ def cotizar_envio_transportista(
                     ),
             }
 
+        # Compatibilidad de la agencia con la cobertura.
+        #
+        # Con cobertura DIRECTA la agencia debe estar en el
+        # distrito de destino.
+        #
+        # Con cobertura AGENCIA_CERCANA el distrito de destino se
+        # atiende con la agencia más cercana, que puede estar en
+        # otro distrito, por lo que NO se exige coincidencia.
+
         if (
-            sucursal.get(
-                "distrito_id"
-            )
-            and sucursal[
-                "distrito_id"
-            ] != distrito_destino_id
+            cobertura["tipo_cobertura"] == "DIRECTA"
+            and sucursal.get("distrito_id")
+            and sucursal["distrito_id"] != distrito_destino_id
         ):
 
             return {
@@ -1000,7 +1216,7 @@ def cotizar_envio_transportista(
             }
 
     # --------------------------------------------------------
-    # 6. Tarifario vigente
+    # 7. Tarifario vigente
     # --------------------------------------------------------
 
     tarifario = (
@@ -1021,7 +1237,7 @@ def cotizar_envio_transportista(
         }
 
     # --------------------------------------------------------
-    # 7. Regla tarifaria
+    # 8. Regla tarifaria
     # --------------------------------------------------------
 
     regla = (
@@ -1045,7 +1261,7 @@ def cotizar_envio_transportista(
         }
 
     # --------------------------------------------------------
-    # 8. Peso máximo
+    # 9. Peso máximo
     # --------------------------------------------------------
 
     peso_maximo = _decimal(
@@ -1077,7 +1293,7 @@ def cotizar_envio_transportista(
         }
 
     # --------------------------------------------------------
-    # 9. Rango tarifario
+    # 10. Rango tarifario
     # --------------------------------------------------------
 
     rango = (
@@ -1103,7 +1319,7 @@ def cotizar_envio_transportista(
         }
 
     # --------------------------------------------------------
-    # 10. Precio del rango
+    # 11. Precio del rango
     # --------------------------------------------------------
 
     costo = _decimal(
@@ -1111,7 +1327,7 @@ def cotizar_envio_transportista(
     )
 
     # --------------------------------------------------------
-    # 11. Recargo fijo configurado
+    # 12. Recargo fijo configurado
     # --------------------------------------------------------
 
     costo += _decimal(
@@ -1125,7 +1341,7 @@ def cotizar_envio_transportista(
     )
 
     # --------------------------------------------------------
-    # 12. Resultado
+    # 13. Resultado
     # --------------------------------------------------------
 
     return {
@@ -1183,6 +1399,12 @@ def cotizar_envio_transportista(
 
             else None
         ),
+
+        "distrito_destino_id":
+            distrito_destino_id,
+
+        "tipo_cobertura":
+            cobertura["tipo_cobertura"],
 
         "tarifario_id":
             tarifario["id"],
@@ -1400,6 +1622,7 @@ def crear_pago_checkout(
     metodo_pago_id,
     monto,
     moneda="PEN",
+    conexion=None,
 ):
     """
     Crea el pago inicial de un pedido.
@@ -1471,6 +1694,7 @@ def crear_pago_checkout(
             monto=monto,
             moneda=moneda,
             usuario_id=usuario_id,
+            conexion=conexion,
         )
 
     except ValueError as error:
@@ -1751,8 +1975,8 @@ def validar_entrega_confirmacion(usuario_id, datos):
         return {'ok': False, 'mensaje': str(error)}
 
 
-def crear_entrega_pedido(pedido_id, usuario_id, entrega):
-    return guardar_entrega_checkout(pedido_id, usuario_id, entrega)
+def crear_entrega_pedido(pedido_id, usuario_id, entrega, conexion=None):
+    return guardar_entrega_checkout(pedido_id, usuario_id, entrega, conexion=conexion)
 
 
 def compensar_entrega_pedido(pedido_id, usuario_id):

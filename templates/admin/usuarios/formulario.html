@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% set editando = usuario is not none %}
+{% block title %}{{ "Editar usuario" if editando else "Nuevo usuario" }} | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "usuarios" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>{{ "Editar usuario" if editando else "Nuevo usuario" }}</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Seguridad</span>
+                    <h1>{{ "Editar usuario" if editando else "Nuevo usuario" }}</h1>
+                    <p>
+                        {% if editando %}
+                            Cuenta: <strong>{{ usuario.correo }}</strong>. Los roles y el estado se guardan de inmediato.
+                        {% else %}
+                            El usuario, su perfil y sus roles se guardan en una sola operación.
+                        {% endif %}
+                    </p>
+                </div>
+                <a href="{{ url_for('admin_usuarios.listado') }}" class="admin-button is-secondary">Volver al listado</a>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% if not editando %}
+                <form method="POST" action="{{ url_for('admin_usuarios.nuevo') }}" class="admin-order-table-card">
+                    <div class="admin-section-heading"><h2>Datos de la cuenta</h2></div>
+                    <div class="admin-form-grid">
+                        <label class="admin-filter-field">
+                            <span>Correo *</span>
+                            <input type="email" name="correo" value="{{ datos.correo or '' }}" required>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Contraseña *</span>
+                            <input type="password" name="password" minlength="8" required>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Nombres *</span>
+                            <input type="text" name="nombres" value="{{ datos.nombres or '' }}" required>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Apellido paterno *</span>
+                            <input type="text" name="apellido_paterno" value="{{ datos.apellido_paterno or '' }}" required>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Apellido materno</span>
+                            <input type="text" name="apellido_materno" value="{{ datos.apellido_materno or '' }}">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>DNI</span>
+                            <input type="text" name="dni" maxlength="8" value="{{ datos.dni or '' }}">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Teléfono *</span>
+                            <input type="text" name="telefono" value="{{ datos.telefono or '' }}" required>
+                        </label>
+                    </div>
+
+                    <div class="admin-section-heading"><h2>Roles</h2></div>
+                    <div class="admin-checkbox-grid">
+                        {% for rol in roles %}
+                            <label class="admin-check-field">
+                                <input type="checkbox" name="roles" value="{{ rol.codigo }}"
+                                    {% if not es_gerente and rol.codigo == "GERENTE" %}disabled{% endif %}>
+                                <span>{{ rol.codigo }}</span>
+                                <small>{{ rol.nombre }}</small>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    {% if not es_gerente %}
+                        <p class="admin-hint">Solo un gerente puede asignar el rol GERENTE.</p>
+                    {% endif %}
+
+                    <div class="admin-filter-actions">
+                        <button type="submit" class="admin-button is-primary">Crear usuario</button>
+                    </div>
+                </form>
+            {% else %}
+                <section class="admin-order-table-card">
+                    <div class="admin-section-heading"><h2>Datos del usuario</h2></div>
+                    <dl class="admin-detail-list">
+                        <div><dt>Correo</dt><dd>{{ usuario.correo }}</dd></div>
+                        <div><dt>Nombre</dt><dd>{{ usuario.nombres or "—" }} {{ usuario.apellido_paterno or "" }} {{ usuario.apellido_materno or "" }}</dd></div>
+                        <div><dt>DNI</dt><dd>{{ usuario.dni or "—" }}</dd></div>
+                        <div><dt>Teléfono</dt><dd>{{ usuario.telefono or "—" }}</dd></div>
+                        <div><dt>Estado</dt><dd>{{ usuario.estado }}</dd></div>
+                        <div><dt>Correo verificado</dt><dd>{{ "Sí" if usuario.correo_verificado else "No" }}</dd></div>
+                    </dl>
+                </section>
+
+                <form method="POST" action="{{ url_for('admin_usuarios.asignar_roles', usuario_id=usuario.id) }}" class="admin-order-table-card">
+                    <div class="admin-section-heading"><h2>Roles asignados</h2></div>
+                    <div class="admin-checkbox-grid">
+                        {% for rol in roles %}
+                            <label class="admin-check-field">
+                                <input type="checkbox" name="roles" value="{{ rol.codigo }}"
+                                    {% if rol.codigo in codigos_actuales %}checked{% endif %}
+                                    {% if not es_gerente and rol.codigo == "GERENTE" %}disabled{% endif %}>
+                                <span>{{ rol.codigo }}</span>
+                                <small>{{ rol.nombre }}</small>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    {% if not es_gerente %}
+                        <p class="admin-hint">Solo un gerente puede gestionar el rol GERENTE.</p>
+                    {% endif %}
+                    <div class="admin-filter-actions">
+                        <button type="submit" class="admin-button is-primary">Guardar roles</button>
+                    </div>
+                </form>
+
+                <form method="POST" action="{{ url_for('admin_usuarios.cambiar_estado', usuario_id=usuario.id) }}" class="admin-order-table-card">
+                    <div class="admin-section-heading"><h2>Estado de la cuenta</h2></div>
+                    <div class="admin-filter-actions">
+                        <select name="estado" class="admin-select">
+                            {% for estado in ["ACTIVO", "INACTIVO", "SUSPENDIDO"] %}
+                                <option value="{{ estado }}"{% if usuario.estado == estado %} selected{% endif %}>{{ estado }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="admin-button is-primary">Aplicar estado</button>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

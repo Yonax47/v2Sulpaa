@@ -59,6 +59,16 @@
                 <span>Entregas</span>
             </span>
         {% endif %}
+        {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
+            <a
+                href="{{ url_for('admin_delivery.configuracion') }}"
+                class="admin-nav-link{% if admin_activo == 'delivery' %} is-active{% endif %}"
+                {% if admin_activo == 'delivery' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">⚙</span>
+                <span>Configuración de Delivery</span>
+            </a>
+        {% endif %}
         {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) or "INVENTARIO" in (session.get("roles") or []) %}
             <a
                 href="{{ url_for('admin_inventario.listado') }}"
@@ -120,6 +130,28 @@
                 <span>Reportes</span>
                 <small>Solo gerencia</small>
             </span>
+        {% endif %}
+
+        {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
+            <span class="admin-nav-heading">Seguridad</span>
+            <a
+                href="{{ url_for('admin_usuarios.listado') }}"
+                class="admin-nav-link{% if admin_activo == 'usuarios' %} is-active{% endif %}"
+                {% if admin_activo == 'usuarios' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">◍</span>
+                <span>Usuarios y roles</span>
+            </a>
+            {% if "GERENTE" in (session.get("roles") or []) %}
+                <a
+                    href="{{ url_for('admin_auditoria.listado') }}"
+                    class="admin-nav-link{% if admin_activo == 'auditoria' %} is-active{% endif %}"
+                    {% if admin_activo == 'auditoria' %}aria-current="page"{% endif %}
+                >
+                    <span class="admin-nav-icon" aria-hidden="true">✎</span>
+                    <span>Auditoría</span>
+                </a>
+            {% endif %}
         {% endif %}
     </nav>
 

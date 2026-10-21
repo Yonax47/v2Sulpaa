@@ -68,6 +68,44 @@
             </form>
 
             {% if encuestas %}
+                <section class="admin-charts" aria-labelledby="encuestas-analitica">
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Analítica</span>
+                            <h2 id="encuestas-analitica">Resumen de encuestas</h2>
+                        </div>
+                        <span class="admin-section-note">Coincide con la lista filtrada</span>
+                    </div>
+                    <div class="admin-chart-grid">
+                        <article class="admin-chart-card">
+                            <h3>Encuestas por estado</h3>
+                            <canvas id="chart-encuestas-estado" aria-label="Encuestas por estado"></canvas>
+                        </article>
+                        <article class="admin-chart-card">
+                            <h3>Satisfacción</h3>
+                            <div class="admin-detail-grid" style="padding:0">
+                                <div class="admin-detail-item">
+                                    <span>Promedio general</span>
+                                    <strong>
+                                        {{ estadisticas.promedio if estadisticas.promedio is not none else "Sin respuestas" }}
+                                    </strong>
+                                </div>
+                                <div class="admin-detail-item">
+                                    <span>Respuestas recibidas</span>
+                                    <strong>{{ estadisticas.respuestas }}</strong>
+                                </div>
+                                <div class="admin-detail-item">
+                                    <span>Recomendarían</span>
+                                    <strong>{{ estadisticas.recomendarian }}</strong>
+                                </div>
+                            </div>
+                            <canvas id="chart-encuestas-satisfaccion" aria-label="Satisfacción promedio"></canvas>
+                        </article>
+                    </div>
+                </section>
+            {% endif %}
+
+            {% if encuestas %}
                 <section class="admin-order-table-card" aria-labelledby="encuestas-titulo">
                     <div class="admin-section-heading admin-order-heading">
                         <div>
@@ -136,4 +174,58 @@
         </div>
     </main>
 </div>
+{% endblock %}
+
+{% block page_js %}
+    {% if encuestas %}
+        <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+        <script>
+            (function () {
+                if (!window.Chart) { return; }
+
+                var porEstado = [];
+                try { porEstado = JSON.parse({{ estadisticas.por_estado | tojson }}) || []; } catch (e) { porEstado = []; }
+
+                var lienzoEstado = document.getElementById("chart-encuestas-estado");
+                if (lienzoEstado && porEstado.length) {
+                    new Chart(lienzoEstado, {
+                        type: "doughnut",
+                        data: {
+                            labels: porEstado.map(function (x) { return x.estado; }),
+                            datasets: [{
+                                data: porEstado.map(function (x) { return Number(x.cantidad) || 0; })
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { position: "bottom" } }
+                        }
+                    });
+                }
+
+                var promedio = {{ estadisticas.promedio if estadisticas.promedio is not none else 0 }};
+                var lienzoSatisfaccion = document.getElementById("chart-encuestas-satisfaccion");
+                if (lienzoSatisfaccion) {
+                    new Chart(lienzoSatisfaccion, {
+                        type: "bar",
+                        data: {
+                            labels: ["Satisfacción promedio (de 5)"],
+                            datasets: [{
+                                label: "Promedio",
+                                data: [promedio],
+                                backgroundColor: "rgba(31, 122, 82, 0.75)"
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true, max: 5 } }
+                        }
+                    });
+                }
+            })();
+        </script>
+    {% endif %}
 {% endblock %}

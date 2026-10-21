@@ -1658,150 +1658,17 @@ La información comercial real llega desde Flask.
 
 
 <!-- ==========================================================
-     11. CARRITO REAL
+     11. DATOS INICIALES DEL CARRITO
      ========================================================== -->
 
-<div
-    class="store-cart-overlay"
-    data-cart-overlay
-    hidden
-></div>
+<!--
+    El carrito lateral (panel + capa oscura) ahora es un
+    componente reutilizable incluido en el navbar.
 
-
-<aside
-    class="store-cart-drawer"
-    data-cart-drawer
-    aria-hidden="true"
-    aria-label="Carrito de compras"
->
-
-    <header>
-
-        <div>
-
-            <span>
-                TU CARRITO
-            </span>
-
-            <strong>
-                Selección SULPAA
-            </strong>
-
-        </div>
-
-
-        <button
-            type="button"
-            data-cart-close
-            aria-label="Cerrar carrito"
-        >
-            ×
-        </button>
-
-    </header>
-
-
-    <div
-        class="store-cart-preview"
-        data-cart-content
-    >
-
-        {% if carrito["items"] %}
-
-            {% for item in carrito["items"] %}
-
-                <article
-                    class="store-cart-item"
-                    data-cart-item="{{ item.carrito_detalle_id }}"
-                >
-
-                    <div>
-
-                        <strong>
-                            {{ item.nombre }}
-                        </strong>
-
-                        <p>
-                            {{ item.cantidad }}
-                            ×
-                            S/ {{ "%.2f"|format(item.precio) }}
-                        </p>
-
-                    </div>
-
-
-                    <strong>
-                        S/ {{ "%.2f"|format(item.subtotal) }}
-                    </strong>
-
-                </article>
-
-            {% endfor %}
-
-        {% else %}
-
-            <div class="store-cart-empty">
-
-                <span aria-hidden="true">
-                    ✦
-                </span>
-
-                <strong>
-                    Tu carrito está vacío.
-                </strong>
-
-                <p>
-                    Elige tus productos SULPAA
-                    para comenzar.
-                </p>
-
-            </div>
-
-        {% endif %}
-
-    </div>
-
-
-    <footer>
-
-        <div class="store-cart-summary">
-
-            <span>
-                Subtotal
-            </span>
-
-            <strong data-cart-subtotal>
-                S/ {{ "%.2f"|format(carrito["subtotal"]) }}
-            </strong>
-
-        </div>
-
-
-        <button
-            type="button"
-            class="store-btn store-btn-secondary"
-            data-cart-continue
-        >
-            Seguir comprando
-        </button>
-
-
-        <a
-            href="{{ url_for('comercio.checkout') }}"
-            class="store-btn store-btn-primary"
-            data-cart-checkout
-        >
-            Continuar pedido
-        </a>
-
-    </footer>
-
-</aside>
-
-
-<!-- ==========================================================
-     12. DATOS INICIALES DEL CARRITO
-     ========================================================== -->
+    Aquí solo dejamos los datos del carrito ya calculados por
+    el servidor. cart.js los lee para dibujar el carrito al
+    instante, sin esperar una petición adicional.
+-->
 
 <script
     type="application/json"

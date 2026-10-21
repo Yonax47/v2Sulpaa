@@ -167,6 +167,7 @@ Si cambia la navegación, se modifica únicamente aquí.
             <a
                 href="#"
                 class="navbar-icon-button"
+                data-cart-open
                 aria-label="Ver carrito"
                 title="Carrito"
             >
@@ -176,11 +177,18 @@ Si cambia la navegación, se modifica únicamente aquí.
                 </span>
 
                 <!--
-                Más adelante este valor será dinámico
-                y vendrá del carrito real del usuario.
+                Contador real del carrito.
+
+                JavaScript (cart.js) rellena este número con la
+                cantidad de productos y lo oculta cuando es cero.
+                Empieza oculto para no mostrar un "0" incorrecto.
                 -->
 
-                <span class="navbar-cart-count">
+                <span
+                    class="navbar-cart-count"
+                    data-cart-count
+                    hidden
+                >
                     0
                 </span>
 
@@ -378,6 +386,7 @@ Si cambia la navegación, se modifica únicamente aquí.
             <a
                 href="#"
                 class="navbar-mobile-link"
+                data-cart-open
             >
                 Carrito
             </a>
@@ -416,3 +425,12 @@ Si cambia la navegación, se modifica únicamente aquí.
     </div>
 
 </header>
+
+
+<!--
+    Carrito lateral reutilizable.
+
+    Se incluye una sola vez para todas las páginas que usan
+    este navbar. El contenido lo llena cart.js.
+-->
+{% include "components/cart_drawer.html" %}

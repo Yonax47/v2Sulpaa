@@ -72,6 +72,7 @@ from app.inventario.repositories import (
 def reservar_stock_pedido(
     pedido_id,
     consumos,
+    conexion=None,
 ):
     """
     Solicita al repositorio de Inventario
@@ -83,6 +84,7 @@ def reservar_stock_pedido(
         referencia_id=pedido_id,
         consumos=consumos,
         minutos_expiracion=30,
+        conexion=conexion,
     )
 
 # ============================================================
@@ -110,6 +112,7 @@ def liberar_stock_pedido(
 def confirmar_stock_pedido(
     pedido_id,
     usuario_id=None,
+    conexion=None,
 ):
     """
     Convierte la reserva de inventario del pedido
@@ -119,4 +122,5 @@ def confirmar_stock_pedido(
     return confirmar_reserva_pedido(
         pedido_id=pedido_id,
         usuario_id=usuario_id,
+        conexion=conexion,
     )

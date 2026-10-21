@@ -23,6 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let carrierQuote = null;
   let destinationVersion = 0;
   let deliveryTimer = null;
+  let paymentRequestVersion = 0;
+  let carrierQuoteRequestVersion = 0;
   const savedSelector = document.getElementById('checkout-saved-selector');
   const savedSelectorGroup = document.getElementById('checkout-saved-selector-group');
   const destinationSummary = document.getElementById('checkout-destination-summary');
@@ -43,10 +45,12 @@ document.addEventListener("DOMContentLoaded", () => {
     destinationVersion += 1;
     deliveryQuote = null;
     carrierQuote = null;
+    carrierQuoteRequestVersion += 1;
     if (quoteInput) quoteInput.value = '';
     if (distanceInput) distanceInput.value = '';
     if (routeResult) routeResult.hidden = true;
     if (carrierResult) carrierResult.hidden = true;
+    if (carrierQuoteButton) carrierQuoteButton.disabled = false;
     if (routeLayer && map) { map.removeLayer(routeLayer); routeLayer = null; }
     clearTimeout(deliveryTimer);
 updateSummary(0);
@@ -60,15 +64,90 @@ updateSummary(0);
     }
   }
 
+  function selectedCarrierService() {
+    return carrierServiceSelect?.selectedOptions[0] || null;
+  }
+
+  function carrierServiceRequiresAgency() {
+    return Boolean(
+      selectedCarrierService()?.dataset.modalidad?.endsWith('_AGENCIA'),
+    );
+  }
+
+  function carrierServiceRequiresAddress() {
+    return Boolean(
+      selectedCarrierService()?.dataset.modalidad?.endsWith('_DOMICILIO'),
+    );
+  }
+
+  function carrierDestinationIsReady() {
+    if (carrierServiceRequiresAgency()) {
+      // Para recojo en agencia hacen falta el distrito de destino
+      // (cobertura) y la agencia elegida.
+      return Boolean(
+        carrierDistrictSelect?.value &&
+        carrierAgencySelect?.value,
+      );
+    }
+    if (carrierServiceRequiresAddress()) {
+      return Boolean(
+        addressInput?.value.trim().length >= 5 &&
+        (savedSelector?.value || districtSelect?.value),
+      );
+    }
+    return false;
+  }
+
   function refreshAddressMode() {
-    const service = carrierServiceSelect?.selectedOptions[0];
     const needsAddress = deliveryType === 'DELIVERY_LOCAL' ||
-      (deliveryType === 'TRANSPORTISTA' && service?.dataset.modalidad?.endsWith('_DOMICILIO'));
+      (deliveryType === 'TRANSPORTISTA' && carrierServiceRequiresAddress());
     if (form) form.hidden = !needsAddress;
     if (savedSelectorGroup) savedSelectorGroup.hidden = !needsAddress;
     if (carrierAgencySelect) carrierAgencySelect.closest('.checkout-form-group')?.toggleAttribute('hidden',
-      deliveryType === 'TRANSPORTISTA' && !!service?.dataset.modalidad?.endsWith('_DOMICILIO'));
+      deliveryType === 'TRANSPORTISTA' && carrierServiceRequiresAddress());
+
+    // El selector de distrito de destino solo se usa al recoger
+    // en agencia.
+    const requiresAgency =
+      deliveryType === 'TRANSPORTISTA' && carrierServiceRequiresAgency();
+    if (carrierDistrictGroup) carrierDistrictGroup.hidden = !requiresAgency;
+
     if (destinationSummary && needsAddress) destinationSummary.textContent = addressInput?.value || 'Selecciona o indica el destino.';
+
+    // Si se recoje en agencia, actualizamos la caja que muestra
+    // el nombre y la dirección real de la agencia elegida.
+    updateCarrierAgencySummary();
+  }
+
+  // Muestra u oculta la caja con el detalle de la agencia
+  // seleccionada (solo aplica al recojo en agencia).
+  function updateCarrierAgencySummary() {
+    const requiresAgency =
+      deliveryType === 'TRANSPORTISTA' && carrierServiceRequiresAgency();
+    const agency = carrierAgencySelect?.selectedOptions[0];
+    const hasAgency = Boolean(requiresAgency && carrierAgencySelect?.value);
+
+    if (carrierAgencySummary) {
+      carrierAgencySummary.hidden = !hasAgency;
+    }
+
+    if (!requiresAgency) {
+      return;
+    }
+
+    const nombre = agency?.dataset?.name || '';
+    const direccion = agency?.dataset?.address || '';
+    const detalle = direccion ? `${nombre} — ${direccion}` : nombre;
+
+    if (carrierAgencyDetail && hasAgency) {
+      carrierAgencyDetail.textContent = detalle;
+    }
+
+    if (destinationSummary) {
+      destinationSummary.textContent = hasAgency
+        ? detalle
+        : 'Selecciona una agencia de destino.';
+    }
   }
 
   // ====================================================
@@ -149,10 +228,6 @@ updateSummary(0);
     "checkout-delivery-map",
   );
 
-  const savedAddress = document.getElementById(
-    "checkout-saved-address",
-  );
-
   const useLocationButton = document.getElementById(
     "checkout-use-location",
   );
@@ -208,9 +283,33 @@ updateSummary(0);
       "checkout-carrier-service",
     );
 
+  // Distrito de destino del cliente (según la cobertura del
+  // servicio). Es distinto del distrito físico de la agencia.
+  const carrierDistrictGroup =
+    document.getElementById(
+      "checkout-carrier-district-group",
+    );
+
+  const carrierDistrictSelect =
+    document.getElementById(
+      "checkout-carrier-district",
+    );
+
   const carrierAgencySelect =
     document.getElementById(
       "checkout-carrier-agency",
+    );
+
+  // Caja donde mostramos el nombre y la dirección real
+  // de la agencia elegida.
+  const carrierAgencySummary =
+    document.getElementById(
+      "checkout-carrier-agency-summary",
+    );
+
+  const carrierAgencyDetail =
+    document.getElementById(
+      "checkout-carrier-agency-detail",
     );
 
   const carrierMessage = document.getElementById(
@@ -224,6 +323,11 @@ updateSummary(0);
   const carrierCostElement =
     document.getElementById(
       "checkout-carrier-cost",
+    );
+
+  const carrierQuoteButton =
+    document.getElementById(
+      "checkout-quote-carrier",
     );
 
   // ====================================================
@@ -443,9 +547,15 @@ updateSummary(0);
       return;
     }
 
+    const invalidateManualDestination = () => {
+      if (savedSelector) savedSelector.value = '';
+      invalidateDestination();
+    };
+
     departmentSelect.addEventListener(
       "change",
       async () => {
+        invalidateManualDestination();
         clearMessage(addressMessage);
 
         const departmentId =
@@ -503,6 +613,7 @@ updateSummary(0);
     provinceSelect.addEventListener(
       "change",
       async () => {
+        invalidateManualDestination();
         clearMessage(addressMessage);
 
         const provinceId =
@@ -549,6 +660,10 @@ updateSummary(0);
         }
       },
     );
+
+    districtSelect.addEventListener("change", invalidateManualDestination);
+    addressInput.addEventListener("input", invalidateManualDestination);
+    referenceInput.addEventListener("input", invalidateManualDestination);
 
     form.addEventListener(
       "submit",
@@ -630,6 +745,98 @@ updateSummary(0);
         }
       },
     );
+  }
+
+  function selectOnlyOption(select, value, label) {
+    if (!select) return;
+    const option = document.createElement("option");
+    option.value = value || '';
+    option.textContent = value ? (label || value) : 'Selecciona una opción';
+    select.replaceChildren(option);
+    select.value = value || '';
+    select.disabled = !value;
+  }
+
+  async function applySavedAddress(address) {
+    invalidateDestination();
+    addressInput.value = address.direccion || '';
+    referenceInput.value = address.referencia || '';
+    aliasInput.value = address.alias || 'Casa';
+    departmentSelect.value = address.departamento_id || '';
+    selectOnlyOption(
+      provinceSelect,
+      address.provincia_id,
+      address.provincia_nombre,
+    );
+    selectOnlyOption(
+      districtSelect,
+      address.distrito_id,
+      address.distrito_nombre,
+    );
+    destinationSummary.textContent = address.direccion;
+
+    const latitude = Number(address.latitud);
+    const longitude = Number(address.longitud);
+    const hasCoordinates = Number.isFinite(latitude) &&
+      Number.isFinite(longitude) && latitude !== 0 && longitude !== 0;
+
+    if (hasCoordinates) {
+      destinationCoordinates = {latitude, longitude};
+      latitudeInput.value = latitude;
+      longitudeInput.value = longitude;
+      if (map) {
+        setDestination(latitude, longitude, true);
+        map.setView([latitude, longitude], 16);
+      }
+      updateConfirmOrderButton();
+      return;
+    }
+
+    destinationCoordinates = null;
+    latitudeInput.value = '';
+    longitudeInput.value = '';
+    if (!map || !address.direccion) {
+      updateConfirmOrderButton();
+      return;
+    }
+
+    try {
+      const coordinates = await geocodeAddress(
+        `${address.direccion}, ${address.distrito_nombre || ''}, Junín, Perú`,
+      );
+      if (savedSelector?.value !== String(address.id)) return;
+      setDestination(coordinates.latitude, coordinates.longitude, true);
+      map.setView([coordinates.latitude, coordinates.longitude], 16);
+    } catch (error) {
+      showMessage(
+        mapMessage,
+        "Selecciona en el mapa el punto exacto de entrega.",
+      );
+    }
+  }
+
+  function initializeSavedAddressSelector() {
+    if (!savedSelector) return;
+    savedSelector.addEventListener("change", async () => {
+      const address = savedAddresses.find(
+        (item) => String(item.id) === savedSelector.value,
+      );
+      if (address) {
+        await applySavedAddress(address);
+        return;
+      }
+
+      invalidateDestination();
+      destinationCoordinates = null;
+      addressInput.value = '';
+      referenceInput.value = '';
+      latitudeInput.value = '';
+      longitudeInput.value = '';
+      departmentSelect.value = '';
+      selectOnlyOption(provinceSelect, '', 'Selecciona una provincia');
+      selectOnlyOption(districtSelect, '', 'Selecciona un distrito');
+      destinationSummary.textContent = 'Indica una nueva dirección.';
+    });
   }
 
   // ====================================================
@@ -867,7 +1074,13 @@ updateSummary(0);
       radio.setAttribute('aria-label', location.nombre);
       const selectPoint = () => {
         selectedPickupId = location.id;
-        destinationSummary.textContent = `${location.nombre} — ${location.direccion}`;
+
+        // Mostramos el punto elegido con su referencia (si existe)
+        // para que el cliente sepa exactamente dónde recoger.
+        destinationSummary.textContent = location.referencia
+          ? `${location.nombre} — ${location.direccion} (Ref. ${location.referencia})`
+          : `${location.nombre} — ${location.direccion}`;
+
         updateConfirmOrderButton();
       };
       radio.addEventListener('change', selectPoint);
@@ -894,6 +1107,17 @@ updateSummary(0);
       card.appendChild(label);
       card.appendChild(name);
       card.appendChild(address);
+
+      // Algunos puntos tienen una referencia útil para llegar.
+      if (location.referencia) {
+        const reference =
+          document.createElement("small");
+
+        reference.textContent =
+          `Referencia: ${location.referencia}`;
+
+        card.appendChild(reference);
+      }
 
       pickupLocationsContainer.appendChild(
         card,
@@ -1021,80 +1245,6 @@ updateSummary(0);
           Jr. Julio Sumar N.º 156<br>
           El Tambo, Huancayo
         `);
-    }
-  }
-
-  // ====================================================
-  // DIRECCIÓN GUARDADA DEL CLIENTE
-  // ====================================================
-
-  async function prepareSavedDestination() {
-    if (!savedAddress || !map) {
-      return;
-    }
-
-    const latitude = Number(
-      savedAddress.dataset.latitude,
-    );
-
-    const longitude = Number(
-      savedAddress.dataset.longitude,
-    );
-
-    if (
-      Number.isFinite(latitude) &&
-      Number.isFinite(longitude) &&
-      latitude !== 0 &&
-      longitude !== 0
-    ) {
-      setDestination(
-        latitude,
-        longitude,
-      );
-
-      map.setView(
-        [latitude, longitude],
-        16,
-      );
-
-      return;
-    }
-
-    const address =
-      savedAddress.dataset.address;
-
-    if (!address) {
-      return;
-    }
-
-    /*
-     * Intentamos ubicar la dirección escrita.
-     * El cliente puede corregirla manualmente.
-     */
-
-    try {
-      const coordinates =
-        await geocodeAddress(
-          `${address}, Junín, Perú`,
-        );
-
-      setDestination(
-        coordinates.latitude,
-        coordinates.longitude,
-      );
-
-      map.setView(
-        [
-          coordinates.latitude,
-          coordinates.longitude,
-        ],
-        16,
-      );
-    } catch (error) {
-      showMessage(
-        mapMessage,
-        "Selecciona en el mapa el punto exacto de entrega.",
-      );
     }
   }
 
@@ -1541,6 +1691,7 @@ updateSummary(0);
     carrierSelect.addEventListener(
       "change",
       async () => {
+        invalidateDestination();
         clearMessage(carrierMessage);
 
         if (carrierResult) {
@@ -1565,11 +1716,25 @@ updateSummary(0);
           </option>
         `;
 
+        // Al cambiar de transportista se reinicia también el
+        // distrito de destino.
+        if (carrierDistrictSelect) {
+          carrierDistrictSelect.innerHTML = `
+            <option value="">
+              Selecciona un distrito
+            </option>
+          `;
+
+          carrierDistrictSelect.disabled = true;
+        }
+
         carrierServiceSelect.disabled =
           true;
 
         carrierAgencySelect.disabled =
           true;
+
+        refreshAddressMode();
 
         if (!carrierId) {
           return;
@@ -1635,21 +1800,146 @@ updateSummary(0);
           return;
         }
 
+        if (!carrierServiceSelect.value) {
+          return;
+        }
+
+        if (!carrierServiceRequiresAgency()) {
+          // Entrega a domicilio: se oculta el distrito de
+          // cobertura y se reutiliza la dirección del cliente.
+          if (carrierDistrictGroup) carrierDistrictGroup.hidden = true;
+          if (
+            !savedSelector?.value &&
+            !addressInput?.value.trim() &&
+            savedAddresses.length
+          ) {
+            savedSelector.value = String(savedAddresses[0].id);
+            savedSelector.dispatchEvent(new Event("change"));
+          }
+          return;
+        }
+
+        // Recojo en agencia: el cliente primero elige su distrito
+        // de destino entre los distritos que cubre el servicio.
+        // El distrito físico de la agencia es distinto y no se
+        // compara con este.
+
+        if (carrierDistrictGroup) carrierDistrictGroup.hidden = false;
+
+        carrierDistrictSelect.innerHTML = `
+          <option value="">
+            Selecciona un distrito
+          </option>
+        `;
+
+        carrierDistrictSelect.disabled = true;
+
         carrierAgencySelect.innerHTML = `
           <option value="">
             Selecciona una agencia
           </option>
         `;
 
-        carrierAgencySelect.disabled =
-          true;
+        carrierAgencySelect.disabled = true;
 
         try {
           const data = await getJSON(
-            `/operaciones/api/transportistas/${carrierId}/agencias`,
+            `/operaciones/api/transportistas/${carrierId}/servicios/${carrierServiceSelect.value}/coberturas`,
           );
 
-          data.sucursales.forEach(
+          const coberturas = data.coberturas || [];
+
+          if (coberturas.length === 0) {
+            showMessage(
+              carrierMessage,
+              "El servicio no tiene distritos de cobertura configurados.",
+            );
+            return;
+          }
+
+          coberturas.forEach((cobertura) => {
+            const option =
+              document.createElement("option");
+
+            option.value = cobertura.distrito_id;
+
+            const nombre =
+              cobertura.distrito_nombre || cobertura.distrito_id;
+            const provincia = cobertura.provincia_nombre
+              ? ` (${cobertura.provincia_nombre})`
+              : "";
+
+            option.textContent = `${nombre}${provincia}`;
+            option.dataset.coverage = cobertura.tipo_cobertura;
+
+            carrierDistrictSelect.appendChild(option);
+          });
+
+          carrierDistrictSelect.disabled = false;
+        } catch (error) {
+          showMessage(
+            carrierMessage,
+            error.message,
+          );
+        }
+      },
+    );
+  }
+
+  // ====================================================
+  // AGENCIAS SEGÚN EL DISTRITO DE COBERTURA
+  // ====================================================
+
+  if (carrierDistrictSelect) {
+    carrierDistrictSelect.addEventListener(
+      "change",
+      async () => {
+        const carrierId = carrierSelect?.value;
+        const serviceId = carrierServiceSelect?.value;
+
+        invalidateDestination();
+
+        if (carrierResult) {
+          carrierResult.hidden = true;
+        }
+
+        updateSummary(0);
+        updateConfirmOrderButton();
+
+        carrierAgencySelect.innerHTML = `
+          <option value="">
+            Selecciona una agencia
+          </option>
+        `;
+
+        carrierAgencySelect.disabled = true;
+
+        if (
+          !carrierId ||
+          !serviceId ||
+          !carrierDistrictSelect.value
+        ) {
+          return;
+        }
+
+        try {
+          const data = await getJSON(
+            `/operaciones/api/transportistas/${carrierId}/agencias`
+              + `?servicio_id=${encodeURIComponent(serviceId)}`
+              + `&distrito_id=${encodeURIComponent(carrierDistrictSelect.value)}`,
+          );
+
+          const sucursales = data.sucursales || [];
+
+          if (sucursales.length === 0) {
+            showMessage(
+              carrierMessage,
+              "No hay agencias compatibles con el distrito seleccionado.",
+            );
+            return;
+          }
+
+          sucursales.forEach(
             (agency) => {
               const option =
                 document.createElement(
@@ -1664,6 +1954,7 @@ updateSummary(0);
               option.dataset.district =
                 agency.distrito_id;
               option.dataset.address = agency.direccion;
+              option.dataset.name = agency.nombre;
 
               carrierAgencySelect.appendChild(
                 option,
@@ -1671,8 +1962,7 @@ updateSummary(0);
             },
           );
 
-          carrierAgencySelect.disabled =
-            false;
+          carrierAgencySelect.disabled = false;
         } catch (error) {
           showMessage(
             carrierMessage,
@@ -1687,96 +1977,93 @@ updateSummary(0);
   // COTIZACIÓN DEL TRANSPORTISTA
   // ====================================================
 
+  async function quoteCarrierShipment() {
+    const requestVersion = ++carrierQuoteRequestVersion;
+    const quoteVersion = destinationVersion;
+    const carrierId = carrierSelect?.value;
+    const serviceId = carrierServiceSelect?.value;
+    const requiresAgency = carrierServiceRequiresAgency();
+    const agencyId = requiresAgency ? carrierAgencySelect?.value : null;
+
+    // Al recoger en agencia, el distrito de destino es el del
+    // cliente (cobertura), NO el distrito físico de la agencia.
+    const districtId = requiresAgency
+      ? carrierDistrictSelect?.value
+      : districtSelect?.value;
+
+    if (!carrierId || !serviceId) {
+      showMessage(carrierMessage, "Selecciona un transportista y servicio.");
+      return;
+    }
+    if (!carrierDestinationIsReady()) {
+      showMessage(
+        carrierMessage,
+        requiresAgency
+          ? "Selecciona una agencia de destino."
+          : "Selecciona o completa una dirección de destino.",
+      );
+      return;
+    }
+
+    carrierQuote = null;
+    if (carrierResult) carrierResult.hidden = true;
+    if (carrierQuoteButton) carrierQuoteButton.disabled = true;
+    clearMessage(carrierMessage);
+
+    try {
+      const quote = await postJSON(
+        "/operaciones/api/entregas/transportista/cotizar",
+        {
+          ...(requiresAgency ? {} : destinationPayload()),
+          tipo_entrega: "TRANSPORTISTA",
+          transportista_id: carrierId,
+          servicio_transportista_id: serviceId,
+          ...(requiresAgency ? {
+            distrito_destino_id: districtId,
+            sucursal_destino_id: agencyId,
+          } : {}),
+        },
+      );
+      if (requestVersion !== carrierQuoteRequestVersion) return;
+      if (quoteVersion !== destinationVersion || deliveryType !== "TRANSPORTISTA") {
+        throw new Error("El destino cambió. Vuelve a calcular el envío.");
+      }
+      carrierQuote = quote;
+      const cost = Number(quote.costo_entrega);
+      if (carrierCostElement) {
+        carrierCostElement.textContent = `S/ ${cost.toFixed(2)}`;
+      }
+      if (carrierResult) carrierResult.hidden = false;
+      updateSummary(cost);
+      updateConfirmOrderButton();
+      showMessage(carrierMessage, "Envío calculado correctamente.", "success");
+    } catch (error) {
+      if (requestVersion !== carrierQuoteRequestVersion) return;
+      carrierQuote = null;
+      if (carrierResult) carrierResult.hidden = true;
+      updateSummary(0);
+      updateConfirmOrderButton();
+      showMessage(carrierMessage, error.message);
+    } finally {
+      if (requestVersion === carrierQuoteRequestVersion && carrierQuoteButton) {
+        carrierQuoteButton.disabled = false;
+      }
+    }
+  }
+
   if (carrierAgencySelect) {
-    carrierAgencySelect.addEventListener(
-      "change",
-      async () => {
-        const selectedOption =
-          carrierAgencySelect.options[
-            carrierAgencySelect.selectedIndex
-          ];
+    carrierAgencySelect.addEventListener("change", async () => {
+      invalidateDestination();
 
-        const carrierId =
-          carrierSelect.value;
+      // Reflejamos la agencia elegida antes de cotizar.
+      updateCarrierAgencySummary();
 
-        const serviceId =
-          carrierServiceSelect.value;
+      if (carrierAgencySelect.value) await quoteCarrierShipment();
+    });
+  }
 
-        const agencyId =
-          carrierAgencySelect.value;
-
-        const districtId =
-          selectedOption?.dataset?.district;
-
-        if (
-          !carrierId ||
-          !serviceId ||
-          !agencyId ||
-          !districtId
-        ) {
-          if (carrierResult) {
-            carrierResult.hidden = true;
-          }
-
-          updateSummary(0);
-          updateConfirmOrderButton();
-
-          return;
-        }
-
-        clearMessage(carrierMessage);
-
-        try {
-           const quote =
-             await postJSON(
-               "/operaciones/api/entregas/transportista/cotizar",
-               {
-                 ...destinationPayload(),
-                 tipo_entrega: "TRANSPORTISTA",
-                 transportista_id: carrierId,
-                 servicio_transportista_id: serviceId,
-                 distrito_destino_id: districtId,
-                 sucursal_destino_id: agencyId,
-               },
-             );
-
-           carrierQuote = quote;
-           const cost = Number(
-             quote.costo_entrega,
-           );
-
-           if (carrierCostElement) {
-             carrierCostElement.textContent =
-               `S/ ${cost.toFixed(2)}`;
-           }
-
-           if (carrierResult) {
-             carrierResult.hidden = false;
-           }
-
-           updateSummary(cost);
-           updateConfirmOrderButton();
-
-           showMessage(
-             carrierMessage,
-             "Envío calculado correctamente.",
-             "success",
-           );
-         } catch (error) {
-          if (carrierResult) {
-            carrierResult.hidden = true;
-          }
-
-          updateSummary(0);
-          updateConfirmOrderButton();
-
-          showMessage(
-            carrierMessage,
-            error.message,
-          );
-        }
-      },
-    );
+  if (carrierQuoteButton) {
+    carrierQuoteButton.addEventListener("click", quoteCarrierShipment);
   }
     // ====================================================
   // ESTADO DEL BOTÓN CONFIRMAR PEDIDO
@@ -1847,8 +2134,18 @@ updateSummary(0);
     message =
       "Selecciona un método de pago.";
   } else if (
+    deliveryType === "RECOJO_LOCAL" &&
+    !selectedPickupId
+  ) {
+    ready = false;
+    message =
+      "Selecciona un punto de recojo.";
+  } else if (
     deliveryType === "DELIVERY_LOCAL" &&
     (
+      !deliveryQuote ||
+      !destinationCoordinates ||
+      addressInput?.value.trim().length < 5 ||
       !distanceInput?.value ||
       !quoteInput?.value
     )
@@ -1861,14 +2158,17 @@ updateSummary(0);
     (
       !carrierSelect?.value ||
       !carrierServiceSelect?.value ||
-      !carrierAgencySelect?.value ||
+      !carrierDestinationIsReady() ||
+      !carrierQuote ||
       !carrierResult ||
       carrierResult.hidden
     )
   ) {
     ready = false;
     message =
-      "Selecciona transportista, servicio y agencia.";
+      carrierServiceRequiresAgency()
+        ? "Selecciona transportista, servicio y agencia."
+        : "Completa el destino y calcula el envío.";
   }
 
   confirmOrderButton.disabled =
@@ -2039,6 +2339,7 @@ updateSummary(0);
       return;
     }
 
+    const requestVersion = ++paymentRequestVersion;
     resetPaymentSelection();
     clearMessage(paymentMessage);
 
@@ -2067,10 +2368,17 @@ updateSummary(0);
           )}`,
       );
 
+      if (requestVersion !== paymentRequestVersion || type !== deliveryType) {
+        return;
+      }
+
       renderPaymentMethods(
         data.metodos_pago || [],
       );
     } catch (error) {
+      if (requestVersion !== paymentRequestVersion || type !== deliveryType) {
+        return;
+      }
       paymentOptions.innerHTML = "";
 
       showMessage(
@@ -2168,7 +2476,15 @@ updateSummary(0);
     if (
       deliveryType === "RECOJO_LOCAL"
     ) {
-      return payload;
+      if (!selectedPickupId) {
+        throw new Error(
+          "Selecciona un punto de recojo.",
+        );
+      }
+      return {
+        ...payload,
+        punto_recojo_id: selectedPickupId,
+      };
     }
 
     // --------------------------------------------------
@@ -2206,16 +2522,18 @@ updateSummary(0);
       const serviceId =
         carrierServiceSelect?.value;
 
+      const requiresAgency =
+        carrierServiceRequiresAgency();
+
       const agencyId =
         carrierAgencySelect?.value;
 
-      const selectedAgency =
-        carrierAgencySelect?.options[
-          carrierAgencySelect.selectedIndex
-        ];
-
+      // Para recojo en agencia el distrito de destino es el del
+      // cliente (cobertura), no el de la agencia.
       const districtId =
-        selectedAgency?.dataset?.district;
+        requiresAgency
+          ? carrierDistrictSelect?.value
+          : districtSelect?.value;
 
       if (!carrierId) {
         throw new Error(
@@ -2229,13 +2547,15 @@ updateSummary(0);
         );
       }
 
-      if (!agencyId) {
+      if (!carrierDestinationIsReady()) {
         throw new Error(
-          "Selecciona una agencia de destino.",
+          requiresAgency
+            ? "Selecciona una agencia de destino."
+            : "Selecciona o completa una dirección de destino.",
         );
       }
 
-      if (!districtId) {
+      if (requiresAgency && !districtId) {
         throw new Error(
           "No se pudo determinar el distrito de destino.",
         );
@@ -2258,12 +2578,14 @@ updateSummary(0);
 
       return {
         ...payload,
-        ...destinationPayload(),
+        ...(requiresAgency ? {} : destinationPayload()),
         tipo_entrega: "TRANSPORTISTA",
         transportista_id: carrierId,
         servicio_transportista_id: serviceId,
-        distrito_destino_id: districtId,
-        sucursal_destino_id: agencyId,
+        ...(requiresAgency ? {
+          distrito_destino_id: districtId,
+          sucursal_destino_id: agencyId,
+        } : {}),
         cotizacion_token: carrierQuote.cotizacion_token,
       };
     }
@@ -2428,6 +2750,7 @@ updateSummary(0);
   // ====================================================
 
   initializeAddressForm();
+  initializeSavedAddressSelector();
   loadDeliveryOptions();
   updateConfirmOrderButton();
 });

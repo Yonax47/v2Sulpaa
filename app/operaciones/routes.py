@@ -38,6 +38,7 @@ from app.operaciones.services import (
     obtener_transportistas_checkout,
     obtener_servicios_checkout,
     obtener_agencias_destino_checkout,
+    obtener_coberturas_checkout,
     cotizar_delivery_local,
     cotizar_envio_transportista,
     obtener_metodos_pago_checkout,
@@ -232,6 +233,13 @@ def api_agencias_transportista(
         ).strip()
     )
 
+    servicio_id = (
+        request.args.get(
+            "servicio_id",
+            "",
+        ).strip()
+    )
+
     resultado = (
         obtener_agencias_destino_checkout(
             transportista_id=(
@@ -241,6 +249,42 @@ def api_agencias_transportista(
                 distrito_id
                 or None
             ),
+            servicio_transportista_id=(
+                servicio_id
+                or None
+            ),
+        )
+    )
+
+    return _respuesta(
+        resultado
+    )
+
+
+# ============================================================
+# 5.b COBERTURAS DE UN SERVICIO
+# ============================================================
+
+@operaciones_bp.route(
+    "/api/transportistas/<transportista_id>/servicios/<servicio_id>/coberturas",
+    methods=["GET"],
+)
+@login_required
+def api_coberturas_servicio(
+    transportista_id,
+    servicio_id,
+):
+    """
+    Lista los distritos de destino que cubre un servicio.
+
+    El cliente elige su distrito de destino entre estos,
+    no el distrito físico de la agencia.
+    """
+
+    resultado = (
+        obtener_coberturas_checkout(
+            transportista_id,
+            servicio_id,
         )
     )
 

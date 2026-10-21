@@ -24,6 +24,7 @@ from flask import (
 from app.admin.encuestas.services import (
     ROLES_ENCUESTAS_ADMIN,
     ReglaEncuestaError,
+    estadisticas_encuestas,
     listar_encuestas,
     obtener_detalle,
     reenviar,
@@ -50,10 +51,12 @@ def listado():
         "hasta": request.args.get("hasta", ""),
     }
     encuestas = listar_encuestas(filtros)
+    estadisticas = estadisticas_encuestas(encuestas)
     return render_template(
         "admin/encuestas/lista.html",
         encuestas=encuestas,
         filtros=filtros,
+        estadisticas=estadisticas,
     )
 
 

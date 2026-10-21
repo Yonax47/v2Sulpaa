@@ -18,18 +18,15 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from app.inventario.services import (
     reservar_stock_pedido,
-    liberar_stock_pedido,
     confirmar_stock_pedido,
 )
 
 from app.operaciones.services import (
     crear_pago_checkout,
-    cancelar_pago_checkout,
     cotizar_delivery_local,
     cotizar_envio_transportista,
     validar_entrega_confirmacion,
     crear_entrega_pedido,
-    compensar_entrega_pedido,
 )
 
 from app.comercio.repositories import (
@@ -47,11 +44,9 @@ from app.comercio.repositories import (
     eliminar_detalle_carrito,
     obtener_pesos_variantes,
     crear_pedido,
-    actualizar_estado_pedido,
     cerrar_carrito_usuario,
     obtener_variantes_snapshot,
-    reabrir_carrito_usuario,
-obtener_pedidos_usuario,
+    obtener_pedidos_usuario,
     obtener_pedido_usuario,
     obtener_detalles_pedido,
     obtener_composiciones_pedido,
@@ -66,6 +61,12 @@ obtener_pedidos_usuario,
 )
 
 from app.comercio.pedido_states import etiqueta_estado_pedido
+from app.comercio.imagenes import resolver_imagen_producto
+
+from app.shared.unit_of_work import (
+    UnidadTrabajo,
+    esquemas_sulpaa,
+)
 
 from app.operaciones.repositories import (
     obtener_pago_pedido,
@@ -1346,6 +1347,31 @@ def obtener_carrito_usuario(usuario_id):
             "tipo":
                 detalle["tipo"],
 
+            # Datos descriptivos de la variante.
+            # El carrito lateral los usa para mostrar sabor y
+            # presentación, y para elegir la imagen real del producto.
+            # En los packs quedan en None y el frontend lee el sabor
+            # directamente desde el nombre del pack.
+            "variante_id":
+                detalle.get("variante_id"),
+
+            "sabor":
+                detalle.get("sabor"),
+
+            "presentacion":
+                detalle.get("presentacion"),
+
+            # Ruta de la imagen real (o None). El carrito lateral
+            # la usa tal cual, con las mismas reglas que el resto
+            # de páginas, para no elegirla con lógica aparte.
+            "imagen":
+                resolver_imagen_producto(
+                    sabor=detalle.get("sabor"),
+                    presentacion=detalle.get("presentacion"),
+                    tipo=detalle["tipo"],
+                    nombre=nombre,
+                ),
+
             "nombre":
                 nombre,
 
@@ -2217,28 +2243,217 @@ def _generar_numero_pedido():
 # 19. CONFIRMAR CHECKOUT
 # ============================================================
 
+def _checkout_escrituras(
+    conexion,
+    esquemas,
+    pedido_id,
+    pago_id,
+    numero_pedido,
+    usuario_id,
+    tipo_entrega,
+    metodo_pago_id,
+    total,
+    costo_entrega,
+    subtotal,
+    items,
+    consumos,
+    entrega,
+):
+    """Ejecuta las escrituras del checkout sobre UNA conexión ya abierta.
+
+    No confirma ni cierra la conexión: eso lo decide el dueño de la
+    transacción (el propio checkout o su llamador). Devuelve el resumen
+    de éxito o un ``{"ok": False, ...}`` ante un fallo controlado; una
+    excepción inesperada se propaga para provocar el rollback completo.
+    """
+
+    # -------- Inventario: reservar stock ----------
+
+    conexion.select_db(
+        esquemas["inventario"]
+    )
+
+    resultado_reserva = reservar_stock_pedido(
+        pedido_id=pedido_id,
+        consumos=consumos,
+        conexion=conexion,
+    )
+
+    if not resultado_reserva.get(
+        "ok"
+    ):
+
+        return resultado_reserva
+
+    # -------- Comercio: crear pedido --------------
+
+    conexion.select_db(
+        esquemas["comercio"]
+    )
+
+    resultado_pedido = crear_pedido(
+        pedido_id=pedido_id,
+        numero_pedido=numero_pedido,
+        usuario_id=usuario_id,
+        items=items,
+        costo_entrega=costo_entrega,
+        moneda="PEN",
+        conexion=conexion,
+    )
+
+    if not resultado_pedido.get(
+        "ok"
+    ):
+
+        return {
+            "ok": False,
+            "mensaje":
+                resultado_pedido.get(
+                    "mensaje",
+                    "No se pudo crear el pedido.",
+                ),
+        }
+
+    # -------- Operaciones: crear pago -------------
+
+    conexion.select_db(
+        esquemas["operaciones"]
+    )
+
+    resultado_pago = crear_pago_checkout(
+        pago_id=pago_id,
+        pedido_id=pedido_id,
+        usuario_id=usuario_id,
+        tipo_entrega=tipo_entrega,
+        metodo_pago_id=metodo_pago_id,
+        monto=total,
+        moneda="PEN",
+        conexion=conexion,
+    )
+
+    if not resultado_pago.get(
+        "ok"
+    ):
+
+        return {
+            "ok": False,
+            "mensaje":
+                resultado_pago.get(
+                    "mensaje",
+                    "No se pudo crear el pago.",
+                ),
+        }
+
+    # -------- Operaciones: persistir entrega ------
+
+    entrega_id = crear_entrega_pedido(
+        pedido_id,
+        usuario_id,
+        entrega,
+        conexion=conexion,
+    )
+
+    # -------- Comercio: cerrar carrito ------------
+
+    conexion.select_db(
+        esquemas["comercio"]
+    )
+
+    resultado_carrito = cerrar_carrito_usuario(
+        usuario_id,
+        conexion=conexion,
+    )
+
+    if resultado_carrito is False or (
+        isinstance(resultado_carrito, dict) and not resultado_carrito.get('ok', False)
+    ):
+
+        return {
+            "ok": False,
+            "mensaje":
+                "No se pudo cerrar el carrito.",
+        }
+
+    # -------- Inventario: confirmar salida --------
+
+    conexion.select_db(
+        esquemas["inventario"]
+    )
+
+    resultado_inventario = confirmar_stock_pedido(
+        pedido_id=pedido_id,
+        usuario_id=usuario_id,
+        conexion=conexion,
+    )
+
+    if not resultado_inventario.get(
+        "ok"
+    ):
+
+        return {
+            "ok": False,
+            "mensaje":
+                resultado_inventario.get(
+                    "mensaje",
+                    "No se pudo confirmar el inventario.",
+                ),
+        }
+
+    return {
+        "ok": True,
+        "mensaje":
+            "Pedido confirmado correctamente.",
+        "pedido_id":
+            pedido_id,
+        "numero_pedido":
+            numero_pedido,
+        "pago_id":
+            pago_id,
+        "subtotal":
+            float(subtotal),
+        "costo_entrega":
+            float(costo_entrega),
+        "total":
+            float(total),
+        "tipo_entrega":
+            tipo_entrega,
+        "entrega_id": entrega_id,
+        "direccion_entrega": entrega['direccion_entrega'],
+    }
+
+
 def confirmar_checkout(
     usuario_id,
     tipo_entrega,
     metodo_pago_id,
     costo_entrega,
     entrega=None,
+    conexion=None,
 ):
     """
     Orquesta la confirmación definitiva del checkout.
 
-    Orden seguro:
+    Orden seguro dentro de UNA única transacción entre esquemas:
 
     1. Volver a preparar el carrito desde backend.
     2. Reservar inventario.
     3. Crear pedido.
     4. Crear pago.
-    5. Cerrar carrito.
-    6. Confirmar salida física del inventario.
+    5. Persistir la entrega.
+    6. Cerrar carrito.
+    7. Confirmar salida física del inventario.
+    8. Confirmar la transacción con un solo commit.
 
-    Si algo falla antes de confirmar el inventario,
-    se ejecutan compensaciones para evitar datos
-    inconsistentes entre módulos.
+    Todas las escrituras comparten la conexión de UnidadTrabajo. Si
+    cualquier paso falla, InnoDB revierte el conjunto completo: nunca
+    queda un pedido sin pago, una entrega sin pedido, ni stock
+    descontado sin venta. No existen compensaciones que puedan fallar
+    en silencio.
+
+    Si se recibe una ``conexion`` externa, el checkout participa de esa
+    transacción (por ejemplo, la del checkout con facturación) y deja
+    el commit en manos de su llamador. Sin conexión, abre su propia
+    UnidadTrabajo y confirma al terminar.
     """
 
     # --------------------------------------------------------
@@ -2417,237 +2632,82 @@ def confirmar_checkout(
         _generar_numero_pedido()
     )
 
-    reserva_creada = False
-    pedido_creado = False
-    pago_creado = False
-    carrito_cerrado = False
-    entrega_creada = False
+    # --------------------------------------------------------
+    # 4.b Escrituras coordinadas en UNA sola transacción
+    # --------------------------------------------------------
+    #
+    # Los cuatro esquemas viven en el mismo servidor MariaDB y
+    # son InnoDB, así que una misma conexión puede escribir en
+    # todos y confirmar con un único commit. Cambiar el esquema
+    # por defecto con select_db NO abre transacción implícita ni
+    # confirma la anterior: la unidad de trabajo permanece viva.
+    # --------------------------------------------------------
+
+    esquemas = esquemas_sulpaa()
+
+    # Si el llamador aportó una conexión (checkout con facturación),
+    # se reutiliza y el commit queda en sus manos; de lo contrario,
+    # el checkout abre su propia UnidadTrabajo.
+    if conexion is not None:
+
+        try:
+
+            return _checkout_escrituras(
+                conexion,
+                esquemas,
+                pedido_id,
+                pago_id,
+                numero_pedido,
+                usuario_id,
+                tipo_entrega,
+                metodo_pago_id,
+                total,
+                costo_entrega,
+                subtotal,
+                items,
+                consumos,
+                entrega,
+            )
+
+        except Exception as error:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    str(error),
+            }
 
     try:
 
-        # ----------------------------------------------------
-        # 5. Reservar inventario
-        # ----------------------------------------------------
+        with UnidadTrabajo() as uow:
 
-        resultado_reserva = (
-            reservar_stock_pedido(
-                pedido_id=pedido_id,
-                consumos=consumos,
-            )
-        )
-
-        if not resultado_reserva.get(
-            "ok"
-        ):
-
-            return resultado_reserva
-
-        reserva_creada = True
-
-        # ----------------------------------------------------
-        # 6. Crear pedido en Comercio
-        # ----------------------------------------------------
-
-        resultado_pedido = crear_pedido(
-            pedido_id=pedido_id,
-            numero_pedido=numero_pedido,
-            usuario_id=usuario_id,
-            items=items,
-            costo_entrega=costo_entrega,
-            moneda="PEN",
-        )
-
-        if not resultado_pedido.get(
-            "ok"
-        ):
-
-            raise RuntimeError(
-                resultado_pedido.get(
-                    "mensaje",
-                    "No se pudo crear el pedido.",
-                )
-            )
-
-        pedido_creado = True
-
-        # ----------------------------------------------------
-        # 7. Crear pago
-        # ----------------------------------------------------
-
-        resultado_pago = (
-            crear_pago_checkout(
-                pago_id=pago_id,
-                pedido_id=pedido_id,
-                usuario_id=usuario_id,
-                tipo_entrega=tipo_entrega,
-                metodo_pago_id=metodo_pago_id,
-                monto=total,
-                moneda="PEN",
-            )
-        )
-
-        if not resultado_pago.get(
-            "ok"
-        ):
-
-            raise RuntimeError(
-                resultado_pago.get(
-                    "mensaje",
-                    "No se pudo crear el pago.",
-                )
-            )
-
-        pago_creado = True
-
-        # Persistir el destino antes de cerrar carrito y confirmar stock.
-        entrega_id = crear_entrega_pedido(pedido_id, usuario_id, entrega)
-        entrega_creada = True
-
-        # ----------------------------------------------------
-        # 8. Cerrar carrito
-        # ----------------------------------------------------
-
-        resultado_carrito = (
-            cerrar_carrito_usuario(
-                usuario_id
-            )
-        )
-
-        if resultado_carrito is False or (
-            isinstance(resultado_carrito, dict) and not resultado_carrito.get('ok', False)
-        ):
-
-            raise RuntimeError(
-                "No se pudo cerrar el carrito."
-            )
-
-        carrito_cerrado = True
-
-        # ----------------------------------------------------
-        # 9. Confirmar salida del inventario
-        # ----------------------------------------------------
-
-        resultado_inventario = (
-            confirmar_stock_pedido(
-                pedido_id=pedido_id,
-                usuario_id=usuario_id,
-            )
-        )
-
-        if not resultado_inventario.get(
-            "ok"
-        ):
-
-            raise RuntimeError(
-                resultado_inventario.get(
-                    "mensaje",
-                    "No se pudo confirmar el inventario.",
-                )
-            )
-
-        # ----------------------------------------------------
-        # 10. Compra terminada correctamente
-        # ----------------------------------------------------
-
-        return {
-            "ok": True,
-            "mensaje":
-                "Pedido confirmado correctamente.",
-            "pedido_id":
+            resultado = _checkout_escrituras(
+                uow.conexion,
+                esquemas,
                 pedido_id,
-            "numero_pedido":
-                numero_pedido,
-            "pago_id":
                 pago_id,
-            "subtotal":
-                float(
-                    subtotal
-                ),
-            "costo_entrega":
-                float(
-                    costo_entrega
-                ),
-            "total":
-                float(
-                    total
-                ),
-            "tipo_entrega":
+                numero_pedido,
+                usuario_id,
                 tipo_entrega,
-            "entrega_id": entrega_id,
-            "direccion_entrega": entrega['direccion_entrega'],
-        }
+                metodo_pago_id,
+                total,
+                costo_entrega,
+                subtotal,
+                items,
+                consumos,
+                entrega,
+            )
+
+            if resultado.get("ok"):
+                uow.confirmar()
+
+            return resultado
 
     except Exception as error:
 
-        # ----------------------------------------------------
-        # COMPENSACIONES
-        # ----------------------------------------------------
-
-        if entrega_creada:
-            try:
-                compensar_entrega_pedido(pedido_id, usuario_id)
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception('No se pudo cancelar la entrega del pedido %s', pedido_id)
-
-        if carrito_cerrado:
-
-            try:
-
-                reabrir_carrito_usuario(
-                    usuario_id
-                )
-
-            except Exception:
-
-                pass
-
-        if pago_creado:
-
-            try:
-
-                cancelar_pago_checkout(
-                    pedido_id=pedido_id,
-                    usuario_id=usuario_id,
-                    observacion=(
-                        "Pago cancelado automáticamente "
-                        "por error durante checkout."
-                    ),
-                )
-
-            except Exception:
-
-                pass
-
-        if pedido_creado:
-
-            try:
-
-                actualizar_estado_pedido(
-                    pedido_id,
-                    "CANCELADO",
-                    usuario_id=usuario_id,
-                    comentario=(
-                        "Pedido cancelado automáticamente por error durante checkout."
-                    ),
-                )
-
-            except Exception:
-
-                pass
-
-        if reserva_creada:
-
-            try:
-
-                liberar_stock_pedido(
-                    pedido_id
-                )
-
-            except Exception:
-
-                pass
-
+        # UnidadTrabajo ya revirtió el conjunto completo al salir del
+        # bloque with. No se compensa nada por separado y la causa no
+        # se oculta: se devuelve tal cual al llamador.
         return {
             "ok": False,
             "mensaje":
@@ -2688,6 +2748,9 @@ def confirmar_checkout_con_entrega(
 
     El costo final de entrega también se vuelve a
     calcular en backend.
+
+    Facturación y checkout se escriben en una sola
+    transacción: si una parte falla, se revierte todo.
     """
 
     # ========================================================
@@ -2790,30 +2853,12 @@ def confirmar_checkout_con_entrega(
         registrar_facturacion_checkout,
     )
 
-    resultado_facturacion = (
-        registrar_facturacion_checkout(
-            usuario_id=usuario_id,
-            tipo=tipo_comprobante,
-            documento=documento_facturacion,
-        )
-    )
-
-    if not resultado_facturacion.get(
-        "ok"
-    ):
-
-        return {
-            "ok": False,
-            "mensaje":
-                resultado_facturacion.get(
-                    "mensaje",
-                    "No se pudieron verificar los datos de facturación.",
-                ),
-        }
-
     # ========================================================
     # 3. DATOS GENERALES DE ENTREGA Y PAGO
     # ========================================================
+    #
+    # Todas las validaciones se hacen ANTES de abrir la
+    # transacción, así ningún efecto queda a medio camino.
 
     tipo_entrega = str(
         datos.get(
@@ -2887,7 +2932,7 @@ def confirmar_checkout_con_entrega(
         )
 
     # ========================================================
-    # 7. MODALIDAD DE ENTREGA INVÁLIDA
+    # 7. MODALIDAD DE ENTREGA NO RECONOCIDA
     # ========================================================
 
     else:
@@ -2899,22 +2944,69 @@ def confirmar_checkout_con_entrega(
         }
 
     # ========================================================
-    # 8. EJECUTAR ORQUESTADOR DEFINITIVO
+    # 8. UNA SOLA TRANSACCIÓN: FACTURACIÓN + CHECKOUT
     # ========================================================
+    #
+    # Facturación (esquema identidad) y checkout (comercio,
+    # operaciones, inventario) comparten la misma conexión y el
+    # mismo commit. Si cualquiera falla, InnoDB revierte todo,
+    # incluida la escritura en datos_facturacion.
 
-    resultado_checkout = confirmar_checkout(
-        usuario_id=usuario_id,
-        tipo_entrega=tipo_entrega,
-        metodo_pago_id=metodo_pago_id,
-        costo_entrega=costo_entrega,
-        entrega=entrega_validada,
-    )
+    esquemas = esquemas_sulpaa()
 
-    if not resultado_checkout.get(
-        "ok"
-    ):
+    try:
 
-        return resultado_checkout
+        with UnidadTrabajo() as uow:
+
+            conexion = uow.conexion
+
+            # -------- Identidad: guardar facturación ------
+
+            conexion.select_db(
+                esquemas["identidad"]
+            )
+
+            resultado_facturacion = (
+                registrar_facturacion_checkout(
+                    usuario_id=usuario_id,
+                    tipo=tipo_comprobante,
+                    documento=documento_facturacion,
+                    conexion=conexion,
+                )
+            )
+
+            if not resultado_facturacion.get(
+                "ok"
+            ):
+
+                return resultado_facturacion
+
+            # -------- Comercio/Operaciones: checkout ------
+
+            resultado_checkout = confirmar_checkout(
+                usuario_id=usuario_id,
+                tipo_entrega=tipo_entrega,
+                metodo_pago_id=metodo_pago_id,
+                costo_entrega=costo_entrega,
+                entrega=entrega_validada,
+                conexion=conexion,
+            )
+
+            if not resultado_checkout.get(
+                "ok"
+            ):
+
+                return resultado_checkout
+
+            uow.confirmar()
+
+    except Exception as error:
+
+        return {
+            "ok": False,
+            "mensaje":
+                str(error),
+        }
 
     # ========================================================
     # 9. AGREGAR INFORMACIÓN DE FACTURACIÓN AL RESULTADO

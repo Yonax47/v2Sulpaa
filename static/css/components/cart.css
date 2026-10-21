@@ -1,0 +1,556 @@
+/* ==========================================================
+SULPAA V2 - CARRITO LATERAL (ESTILOS GLOBALES)
+==========================================================
+
+Este archivo define la apariencia del carrito lateral
+reutilizable (components/cart_drawer.html).
+
+IMPORTANTE:
+
+- Se carga en TODAS las páginas (desde base.html), no solo en
+  la tienda. Así el carrito nunca se muestra como contenido
+  suelto en Inicio, Aprende, Mis pedidos, etc.
+- El carrito empieza OCULTO y fuera de la pantalla. Solo se
+  muestra cuando JavaScript agrega la clase is-open.
+- No depende de store.css ni de ninguna otra hoja de página.
+
+El contenido del carrito (productos, cantidades) lo dibuja
+cart.js con datos reales del backend.
+========================================================== */
+
+
+/* ==========================================================
+   1. CAPA OSCURA Y PANEL LATERAL
+   ========================================================== */
+
+/* Capa oscura que aparece detrás del carrito. */
+.store-cart-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(7, 29, 21, 0.42);
+    backdrop-filter: blur(3px);
+}
+
+/* Panel lateral del carrito.
+
+   Empieza oculto y desplazado a la derecha. Como es
+   position: fixed, NO ocupa espacio en el flujo de la página.
+
+   visibility: hidden además evita que sus botones reciban
+   foco con el teclado mientras está cerrado. */
+.store-cart-drawer {
+    position: fixed;
+    z-index: 1110;
+    top: 0;
+    right: 0;
+    width: min(420px, 94vw);
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    box-shadow: -20px 0 55px rgba(9, 43, 31, 0.18);
+
+    transform: translateX(105%);
+    visibility: hidden;
+
+    /*
+    La animación desliza el panel. La visibilidad cambia
+    justo al terminar de cerrarse para que no se vea un
+    "salto", pero sin dejar el panel visible mientras está
+    cerrado.
+    */
+    transition:
+        transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 320ms;
+}
+
+/* Se aplica cuando JavaScript quiere mostrar el carrito. */
+.store-cart-drawer.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    transition:
+        transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s;
+}
+
+
+/* ==========================================================
+   2. ENCABEZADO
+   ========================================================== */
+
+.store-cart-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem 1.4rem 1.2rem;
+    border-bottom: 1px solid #e9eeeb;
+}
+
+.store-cart-heading span {
+    display: block;
+    color: #6c7d75;
+    font-size: 0.62rem;
+    font-weight: 850;
+    letter-spacing: 0.12em;
+}
+
+.store-cart-heading strong {
+    display: block;
+    margin-top: 0.3rem;
+    color: #173d31;
+    font-size: 1.05rem;
+}
+
+.store-cart-close {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 50%;
+    background: #f1f5f2;
+    color: #315443;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+
+    transition:
+        background 180ms ease,
+        color 180ms ease;
+}
+
+.store-cart-close:hover {
+    background: #e3ece6;
+    color: #173d31;
+}
+
+
+/* ==========================================================
+   3. ZONA DESPLAZABLE CON LOS PRODUCTOS
+   ========================================================== */
+
+.store-cart-preview {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.1rem 1.4rem;
+}
+
+
+/* ==========================================================
+   4. ESTADO DE CARGA
+   ========================================================== */
+
+.store-cart-loading {
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.9rem;
+    color: #85938c;
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.store-cart-spinner {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 3px solid #e3ece6;
+    border-top-color: #2c8052;
+    animation: store-cart-spin 720ms linear infinite;
+}
+
+@keyframes store-cart-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* ==========================================================
+   5. CARRITO VACÍO
+   ========================================================== */
+
+.store-cart-empty {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+.store-cart-empty-icon {
+    width: 54px;
+    height: 54px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #edf7e9;
+    color: #4a8a5d;
+    font-size: 1.4rem;
+}
+
+.store-cart-empty strong {
+    margin-top: 0.9rem;
+    color: #173d31;
+    font-size: 0.95rem;
+}
+
+.store-cart-empty p {
+    max-width: 240px;
+    margin: 0.45rem 0 1.1rem;
+    color: #77877f;
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+
+/* ==========================================================
+   6. UN PRODUCTO DEL CARRITO
+   ========================================================== */
+
+.store-cart-item {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.9rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid #edf0ee;
+}
+
+.store-cart-item:first-child {
+    padding-top: 0;
+}
+
+/* Mientras se actualiza una línea, la atenuamos y
+   bloqueamos sus botones para evitar dobles envíos. */
+.store-cart-item[data-loading="true"] {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+/* Miniatura pequeña y controlada. */
+.store-cart-thumb {
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid #e9eeeb;
+    border-radius: 12px;
+    background: #f4f8f5;
+}
+
+.store-cart-thumb img {
+    width: 100%;
+    height: 100%;
+    padding: 4px;
+    object-fit: contain;
+}
+
+.store-cart-thumb-fallback {
+    color: #9fb3a8;
+}
+
+.store-cart-item-info {
+    min-width: 0;
+}
+
+.store-cart-item-name {
+    display: block;
+    color: #244b39;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.store-cart-item-meta {
+    margin: 0.2rem 0 0;
+    color: #84918b;
+    font-size: 0.68rem;
+    text-transform: capitalize;
+}
+
+.store-cart-item-price {
+    display: block;
+    margin-top: 0.3rem;
+    color: #6b7c74;
+    font-size: 0.7rem;
+}
+
+.store-cart-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 0.6rem;
+}
+
+.store-cart-qty {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border: 1px solid #e3ece6;
+    border-radius: 999px;
+    background: #f7faf8;
+}
+
+.store-cart-qty button {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #244b39;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+
+    transition: background 160ms ease;
+}
+
+.store-cart-qty button:not(:disabled):hover {
+    background: #d8f47a;
+}
+
+.store-cart-qty button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.store-cart-qty span {
+    min-width: 22px;
+    text-align: center;
+    color: #173d31;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.store-cart-remove {
+    border: 0;
+    background: none;
+    color: #9f3535;
+    font-size: 0.68rem;
+    font-weight: 750;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.store-cart-remove:hover {
+    color: #7d2323;
+}
+
+.store-cart-item-total {
+    color: #173d31;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+
+/* ==========================================================
+   7. PIE CON SUBTOTAL Y ACCIONES
+   ========================================================== */
+
+.store-cart-footer {
+    display: grid;
+    gap: 0.7rem;
+    padding: 1.2rem 1.4rem 1.4rem;
+    border-top: 1px solid #e9eeeb;
+    background: #ffffff;
+}
+
+.store-cart-summary {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px dashed #e3ece6;
+}
+
+.store-cart-summary span {
+    color: #728078;
+    font-size: 0.78rem;
+}
+
+.store-cart-summary strong {
+    color: #173d31;
+    font-size: 1.25rem;
+}
+
+.store-cart-hint {
+    margin: 0;
+    color: #9aa8a1;
+    font-size: 0.68rem;
+}
+
+.store-cart-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+}
+
+
+/* ==========================================================
+   8. BOTONES PROPIOS DEL CARRITO
+   ==========================================================
+   Usamos clases propias (store-cart-btn...) para que el
+   carrito se vea igual en TODAS las páginas, aunque la hoja
+   store.css no esté cargada. */
+
+.store-cart-btn {
+    min-height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.8rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-align: center;
+    cursor: pointer;
+
+    transition:
+        background-color 200ms ease,
+        border-color 200ms ease,
+        transform 200ms ease,
+        box-shadow 200ms ease;
+}
+
+.store-cart-btn:hover {
+    transform: translateY(-1px);
+}
+
+.store-cart-btn-primary {
+    background: var(--sulpaa-green-900, #016f46);
+    color: #ffffff;
+    box-shadow: 0 12px 28px rgba(0, 81, 49, 0.17);
+}
+
+.store-cart-btn-primary:hover {
+    background: var(--sulpaa-green-800, #08784d);
+    color: #ffffff;
+}
+
+.store-cart-btn-secondary {
+    border-color: rgba(1, 111, 70, 0.18);
+    background: rgba(255, 255, 255, 0.9);
+    color: #17503a;
+}
+
+.store-cart-btn-secondary:hover {
+    background: #ffffff;
+}
+
+
+/* ==========================================================
+   9. CONTADOR DEL CARRITO (GLOBITO DEL NAVBAR)
+   ========================================================== */
+
+[data-cart-count] {
+    min-width: 18px;
+    height: 18px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--sulpaa-lime-500, #82c341);
+    color: var(--sulpaa-green-900, #016f46);
+    font-size: 0.62rem;
+    font-weight: 900;
+}
+
+/*
+Cuando JavaScript pone hidden, el globito debe desaparecer.
+Esta regla es necesaria porque otros estilos del navbar usan
+display: grid y, sin ella, taparían el atributo hidden.
+*/
+[data-cart-count][hidden] {
+    display: none !important;
+}
+
+
+/* ==========================================================
+   10. AVISO (TOAST) GLOBAL
+   ==========================================================
+   Se usa desde el carrito y desde los packs. Vive aquí para
+   que funcione en cualquier página. */
+
+.store-toast {
+    position: fixed;
+    z-index: 1300;
+    right: 22px;
+    bottom: 22px;
+    width: min(360px, calc(100vw - 32px));
+    padding: 0.95rem 1.05rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    background: #173d31;
+    color: #ffffff;
+    box-shadow: 0 18px 45px rgba(8, 43, 33, 0.22);
+    font-size: 0.75rem;
+    font-weight: 750;
+    line-height: 1.45;
+
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(12px);
+
+    transition:
+        opacity 200ms ease,
+        transform 200ms ease,
+        visibility 200ms ease;
+}
+
+.store-toast.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.store-toast.is-success {
+    background: #176d49;
+}
+
+.store-toast.is-error {
+    background: #9f3535;
+}
+
+
+/* ==========================================================
+   11. RESPONSIVE Y MOVIMIENTO REDUCIDO
+   ========================================================== */
+
+@media (max-width: 480px) {
+
+    .store-cart-drawer {
+        width: min(100%, 420px);
+    }
+
+    .store-cart-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .store-toast {
+        right: 16px;
+        bottom: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .store-cart-drawer {
+        transition: none;
+    }
+
+    .store-cart-spinner {
+        animation-duration: 1.6s;
+    }
+}

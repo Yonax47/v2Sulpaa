@@ -837,3 +837,52 @@ def resumen_dashboard():
             "no_cumplen": no_cumplen,
         },
     }
+
+# ========================================================
+# MÉTRICAS GERENCIALES EXTENDIDAS
+# ========================================================
+
+
+def obtener_resumen_gerencial(desde=None, hasta=None):
+    resumen = {}
+    try:
+        resumen['ventas_cobradas'] = repos.obtener_ventas_cobradas(desde, hasta)
+    except Exception:
+        resumen['ventas_cobradas'] = {'pedidos_cobrados': 0, 'ingresos_cobrados': 0.0}
+    try:
+        resumen['top_productos'] = repos.obtener_top_productos_vendidos(desde, hasta, limit=10)
+    except Exception:
+        resumen['top_productos'] = []
+    try:
+        resumen['top_productos_cobrados'] = repos.obtener_top_productos_vendidos_cobrados(desde, hasta, limit=10)
+    except Exception:
+        resumen['top_productos_cobrados'] = []
+    try:
+        resumen['ingresos_por_producto'] = repos.obtener_ingresos_por_producto_cobrado(desde, hasta, limit=10)
+    except Exception:
+        resumen['ingresos_por_producto'] = []
+    try:
+        resumen['ventas_cobradas_por_dia'] = repos.obtener_ventas_cobradas_por_dia(desde, hasta)
+    except Exception:
+        resumen['ventas_cobradas_por_dia'] = []
+    try:
+        resumen['evolucion_diaria'] = repos.obtener_evolucion_ventas_diarias(desde, hasta)
+    except Exception:
+        resumen['evolucion_diaria'] = []
+    try:
+        resumen['pedidos_por_estado'] = repos.obtener_pedidos_por_estado_agrupado(desde, hasta)
+    except Exception:
+        try:
+            resumen['pedidos_por_estado'] = repos.obtener_pedidos_por_estado(desde, hasta)
+        except Exception:
+            resumen['pedidos_por_estado'] = []
+    try:
+        resumen['entregas_por_estado'] = repos.obtener_entregas_por_estado(desde, hasta)
+    except Exception:
+        resumen['entregas_por_estado'] = []
+    try:
+        resumen['caja_resumen'] = repos.obtener_caja_movimientos_resumen(desde, hasta)
+    except Exception:
+        resumen['caja_resumen'] = {'ingresos': 0.0, 'egresos': 0.0, 'total': 0}
+    return resumen
+

@@ -280,7 +280,7 @@ def serie_flujo_mensual(meses=6):
         with conexion.cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT DATE_FORMAT(m.fecha_movimiento, '%Y-%m') AS periodo,
+                SELECT DATE_FORMAT(m.fecha_movimiento, '%%Y-%%m') AS periodo,
                        COALESCE(SUM(CASE WHEN m.tipo = 'INGRESO'
                                         THEN m.monto ELSE 0 END), 0)
                            AS ingresos,
@@ -290,9 +290,9 @@ def serie_flujo_mensual(meses=6):
                 FROM caja_movimientos AS m
                 WHERE m.estado = 'ACTIVO'
                   AND m.fecha_movimiento >= DATE_SUB(
-                        DATE_FORMAT(CURDATE(), '%Y-%m-01'),
+                        DATE_FORMAT(CURDATE(), '%%Y-%%m-01'),
                         INTERVAL %s MONTH)
-                GROUP BY DATE_FORMAT(m.fecha_movimiento, '%Y-%m')
+                GROUP BY DATE_FORMAT(m.fecha_movimiento, '%%Y-%%m')
                 ORDER BY periodo ASC
                 """,
                 (meses - 1,),

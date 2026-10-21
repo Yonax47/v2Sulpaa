@@ -39,8 +39,8 @@ Variables esperadas:
 - producto.nombre
 - producto.slug
 - producto.sabor
+- producto.sabor_bd
 - producto.perfil
-- producto.imagen
 - producto.clase
 - producto.descripcion
 - producto.atributos
@@ -49,6 +49,9 @@ Variables esperadas:
 
 ============================================================
 #}
+
+{# Componente que decide la foto real del producto. #}
+{% from "components/foto_producto.html" import foto_producto %}
 
 
 <article
@@ -104,15 +107,16 @@ Variables esperadas:
         <!--
         Imagen principal.
 
-        Cada sabor mantiene SIEMPRE su botella correspondiente.
-        Ya no cambiamos esta imagen por 1 L o barril.
+        Cada sabor mantiene SIEMPRE su botella de 330 ml.
+        Usamos la misma lógica que Ficha, Favoritos y carrito.
         -->
-        <img
-            src="{{ url_for('static', filename=producto.imagen) }}"
-            alt="Kombucha SULPAA sabor {{ producto.nombre }}"
-            loading="lazy"
-            class="store-product-image"
-        >
+        {{ foto_producto(
+            sabor=producto.sabor_bd,
+            presentacion="Botella 330 ml",
+            nombre=producto.nombre,
+            clase="store-product-image",
+            alt="Kombucha SULPAA sabor " ~ producto.nombre
+        ) }}
 
     </div>
 

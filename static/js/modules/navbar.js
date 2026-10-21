@@ -30,6 +30,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
+    // Deja el menú cerrado y actualiza el botón.
+    function cerrarMenu() {
+
+        menu.classList.remove("is-open");
+
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "Abrir menú");
+        toggle.textContent = "☰";
+    }
+
+
     toggle.addEventListener(
         "click",
         () => {
@@ -65,6 +76,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 abierto
                     ? "✕"
                     : "☰";
+        }
+    );
+
+
+    /*
+    Al tocar un enlace del menú móvil (incluido "Carrito"),
+    cerramos el menú. Así no queda abierto detrás del
+    carrito lateral.
+    */
+    menu.addEventListener(
+        "click",
+        (event) => {
+
+            if (
+                event.target.closest(".navbar-mobile-link")
+            ) {
+
+                cerrarMenu();
+            }
         }
     );
 

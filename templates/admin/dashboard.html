@@ -398,6 +398,102 @@
                     </div>
                 </section>
 
+                <!-- ================================================
+                     E. RESUMEN GERENCIAL (solo datos reales cobrados)
+                     ================================================
+                     Se apoya en obtener_resumen_gerencial(): ventas
+                     cobradas, top de productos cobrados, ingresos por
+                     producto, evolución diaria, flujo de caja y
+                     pedidos por estado. Las gráficas solo se dibujan
+                     cuando hay datos reales. Chart.js es local.
+                     ================================================ -->
+
+                <section
+                    class="admin-charts"
+                    aria-labelledby="gerencial-titulo"
+                >
+                    <div class="admin-section-heading">
+                        <div>
+                            <span class="admin-section-kicker">Gerencia</span>
+                            <h2 id="gerencial-titulo">Resumen gerencial</h2>
+                        </div>
+                        <span class="admin-section-note">
+                            Cobrado real, no proyectado
+                        </span>
+                    </div>
+
+                    <div class="admin-kpi-grid">
+                        <article class="admin-kpi-card">
+                            <span class="admin-kpi-label">Ventas cobradas (pedidos)</span>
+                            <strong class="admin-kpi-value">
+                                {{ gerencial.ventas_cobradas.pedidos_cobrados
+                                   if gerencial.ventas_cobradas is defined
+                                   and gerencial.ventas_cobradas.pedidos_cobrados is defined
+                                   else 0 }}
+                            </strong>
+                            <small>
+                                S/ {{ "%.2f"|format(
+                                    gerencial.ventas_cobradas.ingresos_cobrados
+                                    if gerencial.ventas_cobradas is defined
+                                    and gerencial.ventas_cobradas.ingresos_cobrados is defined
+                                    else 0) }}
+                            </small>
+                        </article>
+                        <article class="admin-kpi-card">
+                            <span class="admin-kpi-label">Ingresos de caja (ACTIVO)</span>
+                            <strong class="admin-kpi-value">
+                                S/ {{ "%.2f"|format(
+                                   gerencial.caja_resumen.ingresos
+                                   if gerencial.caja_resumen is defined
+                                   and gerencial.caja_resumen.ingresos is defined
+                                   else 0) }}
+                            </strong>
+                            <small>
+                                Egresos: S/
+                                {{ "%.2f"|format(gerencial.caja_resumen.egresos
+                                   if gerencial.caja_resumen is defined
+                                   and gerencial.caja_resumen.egresos is defined
+                                   else 0) }}
+                            </small>
+                        </article>
+                    </div>
+
+                    <div class="admin-chart-grid">
+                        <article class="admin-chart-card">
+                            <h3>Top 10 productos cobrados</h3>
+                            <canvas id="chart-top-cobrados" aria-label="Top de productos cobrados"></canvas>
+                            <p class="admin-chart-empty" id="chart-top-cobrados-vacio" hidden>
+                                Sin ventas cobradas todavía.
+                            </p>
+                        </article>
+                        <article class="admin-chart-card">
+                            <h3>Ingresos por producto cobrado</h3>
+                            <canvas id="chart-ingresos-producto" aria-label="Ingresos por producto cobrado"></canvas>
+                            <p class="admin-chart-empty" id="chart-ingresos-producto-vacio" hidden>
+                                Sin ingresos cobrados todavía.
+                            </p>
+                        </article>
+                        <article class="admin-chart-card">
+                            <h3>Ventas cobradas por día</h3>
+                            <canvas id="chart-evol-ventas" aria-label="Evolución diaria de ventas cobradas"></canvas>
+                            <p class="admin-chart-empty" id="chart-evol-ventas-vacio" hidden>
+                                Sin ventas cobradas por día todavía.
+                            </p>
+                        </article>
+                        <article class="admin-chart-card">
+                            <h3>Flujo de caja (resumen)</h3>
+                            <canvas id="chart-flujo-caja-2" aria-label="Flujo de caja del período"></canvas>
+                        </article>
+                        <article class="admin-chart-card">
+                            <h3>Pedidos por estado</h3>
+                            <canvas id="chart-estados-pedidos" aria-label="Pedidos por estado"></canvas>
+                            <p class="admin-chart-empty" id="chart-estados-pedidos-vacio" hidden>
+                                Sin pedidos registrados todavía.
+                            </p>
+                        </article>
+                    </div>
+                </section>
+
                 <footer class="admin-data-note">
                     <strong>Panel de solo lectura.</strong>
                     Los diez KPI funcionales están instrumentados en el
@@ -421,72 +517,208 @@
     <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <script>
         (function () {
+            if (!window.Chart) { return; }
 
-            var flujoDiv = "{{ graficos.flujo_caja | tojson }}";
+            function aNumero(valor) {
+                var numero = Number(valor);
+                return isNaN(numero) ? 0 : numero;
+            }
+
+            function mostrarVacio(id) {
+                var aviso = document.getElementById(id + "-vacio");
+                if (aviso) { aviso.hidden = false; }
+                var lienzo = document.getElementById(id);
+                if (lienzo) { lienzo.hidden = true; }
+            }
+
+            // --- Gráficos operativos existentes (flujo mensual y KPI-09) ---
             var flujo = [];
-            try { flujo = JSON.parse(flujoDiv) || []; } catch (e) { flujo = []; }
+            try { flujo = JSON.parse({{ graficos.flujo_caja | tojson }}) || []; } catch (e) { flujo = []; }
 
             var flujoCanvas = document.getElementById("chart-flujo-caja");
-            if (flujoCanvas && flujo.length && window.Chart) {
+            if (flujoCanvas && flujo.length) {
                 new Chart(flujoCanvas, {
                     type: "bar",
                     data: {
                         labels: flujo.map(function (f) { return f.periodo; }),
-                        datasets: [
-                            {
-                                label: "Ingresos (S/)",
-                                data: flujo.map(function (f) { return f.ingresos; }),
-                                backgroundColor: "rgba(34,139,34,0.75)"
-                            },
-                            {
-                                label: "Egresos (S/)",
-                                data: flujo.map(function (f) { return f.egresos; }),
-                                backgroundColor: "rgba(178,34,34,0.75)"
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: "bottom" }
-                        }
-                    }
-                });
-            }
-
-            var kpi09Div = "{{ graficos.kpi09 | tojson }}";
-            var kpi09 = null;
-            try { kpi09 = JSON.parse(kpi09Div) || null; } catch (e) { kpi09 = null; }
-
-            var kpi09Canvas = document.getElementById("chart-kpi09");
-            if (kpi09Canvas && kpi09 && window.Chart) {
-                new Chart(kpi09Canvas, {
-                    type: "bar",
-                    data: {
-                        labels: [
-                            "Invitaciones PORTAL (INVITACION_OK)",
-                            "Pedidos entregados (ENTREGADO)"
-                        ],
                         datasets: [{
-                            label: "Cantidad por pedido (COUNT DISTINCT)",
-                            data: [
-                                kpi09.invitaciones_ok || 0,
-                                kpi09.pedidos_entregados || 0
-                            ],
-                            backgroundColor: "rgba(70,130,180,0.75)"
+                            label: "Ingresos (S/)",
+                            data: flujo.map(function (f) { return aNumero(f.ingresos); }),
+                            backgroundColor: "rgba(31, 122, 82, 0.75)"
+                        }, {
+                            label: "Egresos (S/)",
+                            data: flujo.map(function (f) { return aNumero(f.egresos); }),
+                            backgroundColor: "rgba(178, 45, 45, 0.7)"
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }
-                        }
+                        plugins: { legend: { position: "bottom" } }
                     }
                 });
             }
 
+            var kpi09 = null;
+            try { kpi09 = JSON.parse({{ graficos.kpi09 | tojson }}); } catch (e) { kpi09 = null; }
+
+            var kpi09Canvas = document.getElementById("chart-kpi09");
+            if (kpi09Canvas && kpi09) {
+                new Chart(kpi09Canvas, {
+                    type: "bar",
+                    data: {
+                        labels: ["Invitaciones PORTAL", "Pedidos entregados"],
+                        datasets: [{
+                            label: "Cantidad",
+                            data: [aNumero(kpi09.invitaciones_ok), aNumero(kpi09.pedidos_entregados)],
+                            backgroundColor: "rgba(70, 130, 180, 0.75)"
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            // --- Resumen gerencial (datos reales cobrados) ---
+            var gerencial = {};
+            try { gerencial = JSON.parse({{ gerencial | tojson }}) || {}; } catch (e) { gerencial = {}; }
+
+            var topCobrados = gerencial.top_productos_cobrados || [];
+            var canvasTop = document.getElementById("chart-top-cobrados");
+            if (canvasTop) {
+                if (topCobrados.length) {
+                    new Chart(canvasTop, {
+                        type: "bar",
+                        data: {
+                            labels: topCobrados.map(function (p) {
+                                return p.nombre_comercial || p.producto || p.sku || "Producto";
+                            }),
+                            datasets: [{
+                                label: "Unidades cobradas",
+                                data: topCobrados.map(function (p) { return aNumero(p.unidades_vendidas); }),
+                                backgroundColor: "rgba(31, 122, 82, 0.75)"
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                } else {
+                    mostrarVacio("chart-top-cobrados");
+                }
+            }
+
+            var ingresosProducto = gerencial.ingresos_por_producto || [];
+            var canvasIngresos = document.getElementById("chart-ingresos-producto");
+            if (canvasIngresos) {
+                if (ingresosProducto.length) {
+                    new Chart(canvasIngresos, {
+                        type: "bar",
+                        data: {
+                            labels: ingresosProducto.map(function (p) {
+                                return p.nombre_comercial || p.producto || "Producto";
+                            }),
+                            datasets: [{
+                                label: "Ingresos (S/)",
+                                data: ingresosProducto.map(function (p) { return aNumero(p.ingresos_linea); }),
+                                backgroundColor: "rgba(70, 130, 180, 0.75)"
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                } else {
+                    mostrarVacio("chart-ingresos-producto");
+                }
+            }
+
+            var ventasPorDia = gerencial.ventas_cobradas_por_dia || [];
+            var canvasEvol = document.getElementById("chart-evol-ventas");
+            if (canvasEvol) {
+                if (ventasPorDia.length) {
+                    new Chart(canvasEvol, {
+                        type: "line",
+                        data: {
+                            labels: ventasPorDia.map(function (d) { return String(d.fecha); }),
+                            datasets: [{
+                                label: "Ingresos cobrados (S/)",
+                                data: ventasPorDia.map(function (p) { return aNumero(p.total); }),
+                                borderColor: "rgba(31, 122, 82, 1)",
+                                backgroundColor: "rgba(31, 122, 82, 0.15)",
+                                fill: true,
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                } else {
+                    mostrarVacio("chart-evol-ventas");
+                }
+            }
+
+            var caja = gerencial.caja_resumen || {};
+            var canvasCajaReal = document.getElementById("chart-flujo-caja-2");
+            if (canvasCajaReal) {
+                new Chart(canvasCajaReal, {
+                    type: "bar",
+                    data: {
+                        labels: ["Ingresos", "Egresos", "Flujo neto"],
+                        datasets: [{
+                            label: "S/",
+                            data: [
+                                aNumero(caja.ingresos),
+                                aNumero(caja.egresos),
+                                aNumero(caja.ingresos) - aNumero(caja.egresos)
+                            ],
+                            backgroundColor: [
+                                "rgba(31, 122, 82, 0.75)",
+                                "rgba(178, 45, 45, 0.7)",
+                                "rgba(70, 130, 180, 0.75)"
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            var pedidosEstado = gerencial.pedidos_por_estado || [];
+            var canvasEstados = document.getElementById("chart-estados-pedidos");
+            if (canvasEstados) {
+                if (pedidosEstado.length) {
+                    new Chart(canvasEstados, {
+                        type: "doughnut",
+                        data: {
+                            labels: pedidosEstado.map(function (p) { return p.estado; }),
+                            datasets: [{
+                                data: pedidosEstado.map(function (p) { return aNumero(p.cantidad); })
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { position: "bottom" } }
+                        }
+                    });
+                } else {
+                    mostrarVacio("chart-estados-pedidos");
+                }
+            }
         })();
     </script>
 {% endblock %}

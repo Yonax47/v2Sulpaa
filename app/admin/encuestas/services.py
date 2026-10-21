@@ -27,6 +27,50 @@ def listar_encuestas(filtros=None):
     })
 
 
+def estadisticas_encuestas(encuestas):
+    """Agrega conteos reales por estado y satisfacción (sin inventar).
+
+    Se calcula sobre la MISMA lista que se muestra, por lo que el
+    gráfico siempre coincide con la tabla. La satisfacción solo
+    promedia calificaciones realmente respondidas (1..5).
+    """
+    por_estado = {}
+    calificaciones = []
+    recomendarian = 0
+    respuestas = 0
+
+    for encuesta in encuestas or []:
+        estado = encuesta.get("estado") or "SIN_ESTADO"
+        por_estado[estado] = por_estado.get(estado, 0) + 1
+
+        calificacion = encuesta.get("calificacion_general")
+        if calificacion is not None:
+            respuestas += 1
+            try:
+                calificaciones.append(float(calificacion))
+            except (TypeError, ValueError):
+                pass
+
+        if encuesta.get("recomendaria") in (1, True, "1"):
+            recomendarian += 1
+
+    promedio = (
+        round(sum(calificaciones) / len(calificaciones), 2)
+        if calificaciones
+        else None
+    )
+
+    return {
+        "por_estado": [
+            {"estado": estado, "cantidad": cantidad}
+            for estado, cantidad in sorted(por_estado.items())
+        ],
+        "respuestas": respuestas,
+        "promedio": promedio,
+        "recomendarian": recomendarian,
+    }
+
+
 def obtener_detalle(encuesta_id):
     """Devuelve la encuesta con su respuesta y eventos."""
     detalle = detalle_del_dominio(encuesta_id)

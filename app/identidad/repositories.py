@@ -738,6 +738,7 @@ def guardar_datos_facturacion(
     razon_social=None,
     distrito_id=None,
     direccion_fiscal=None,
+    conexion=None,
 ):
     """
     Guarda los datos de facturación verificados del usuario.
@@ -748,7 +749,10 @@ def guardar_datos_facturacion(
     El registro utilizado queda marcado como predeterminado.
     """
 
-    conexion = conexion_identidad()
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_identidad()
 
     try:
         with conexion.cursor() as cursor:
@@ -904,13 +908,16 @@ def guardar_datos_facturacion(
 
                 resultado_id = facturacion_id
 
-        conexion.commit()
+        if propia:
+            conexion.commit()
 
         return resultado_id
 
     except Exception:
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
 
     finally:
-        conexion.close()
+        if propia:
+            conexion.close()

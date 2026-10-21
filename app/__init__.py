@@ -49,6 +49,7 @@ load_dotenv()
 
 from app.identidad.routes import identidad_bp
 from app.comercio.routes import comercio_bp
+from app.comercio.imagenes import resolver_imagen_producto
 from app.operaciones.routes import operaciones_bp
 from app.admin.routes import admin_bp
 from app.admin.pedidos.routes import admin_pedidos_bp
@@ -60,6 +61,9 @@ from app.admin.caja.commands import registrar_comandos_caja
 from app.admin.caja.routes import admin_caja_bp
 from app.admin.reportes.routes import admin_reportes_bp
 from app.admin.encuestas.routes import admin_encuestas_bp
+from app.admin.usuarios.routes import admin_usuarios_bp
+from app.admin.auditoria.routes import admin_auditoria_bp
+from app.admin.delivery.routes import admin_delivery_bp
 from app.aprende.routes import aprende_bp
 from app.repartidor.routes import repartidor_bp
 from app.encuestas.routes import encuesta_bp
@@ -103,6 +107,21 @@ def create_app():
     app.config["SECRET_KEY"] = os.getenv(
         "SECRET_KEY",
         "clave-desarrollo-no-segura",
+    )
+
+
+    # ========================================================
+    # FUNCIONES DISPONIBLES EN LAS PLANTILLAS
+    # ========================================================
+    #
+    # imagen_producto(sabor, presentacion, tipo, nombre)
+    #
+    # Devuelve la ruta de la imagen real de un producto o None.
+    # Se usa igual en Tienda, Ficha, Favoritos y carrito para
+    # que todos elijan la imagen con las mismas reglas.
+
+    app.jinja_env.globals["imagen_producto"] = (
+        resolver_imagen_producto
     )
 
 
@@ -246,6 +265,18 @@ def create_app():
 
     app.register_blueprint(
         admin_encuestas_bp
+    )
+
+    app.register_blueprint(
+        admin_usuarios_bp
+    )
+
+    app.register_blueprint(
+        admin_auditoria_bp
+    )
+
+    app.register_blueprint(
+        admin_delivery_bp
     )
 
     app.register_blueprint(

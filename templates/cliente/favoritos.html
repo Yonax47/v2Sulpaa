@@ -22,6 +22,10 @@ Mis favoritos | SULPAA
 
 {% include "components/navbar.html" %}
 
+{# Importamos el componente que resuelve la foto real del
+   producto (o el placeholder si no existe imagen). #}
+{% from "components/foto_producto.html" import foto_producto %}
+
 
 <main class="store-page fav-page">
 
@@ -57,14 +61,17 @@ Mis favoritos | SULPAA
                 >
 
                     <div class="fav-card-visual"
-                         style="--sabor: 1"
                          aria-hidden="true">
                         <span class="fav-orbit"></span>
-                        <img
-                            src="{{ url_for('static', filename='img/BotellaCafe.png') }}"
-                            alt=""
-                            class="fav-bottle"
-                        >
+                        {# Cada favorito muestra SU imagen real según
+                           sabor y presentación. #}
+                        {{ foto_producto(
+                            sabor=favorito.sabor,
+                            presentacion=favorito.presentacion,
+                            nombre=favorito.nombre_comercial,
+                            clase="fav-bottle",
+                            alt="Kombucha SULPAA sabor " ~ (favorito.sabor or "")
+                        ) }}
                     </div>
 
                     <div class="fav-card-body">
@@ -106,13 +113,45 @@ Mis favoritos | SULPAA
 
                             <div class="fav-actions">
 
-                                {% if favorito.articulo_venta_id %}
-                                    <a
-                                        href="{{ url_for('comercio.tienda') }}"
+                                {#
+                                Botón "Comprar".
+
+                                - Con stock y artículo activo: agrega al
+                                  carrito real (lo maneja cart.js).
+                                - Sin stock: queda deshabilitado.
+                                - Sin artículo activo (no está a la venta):
+                                  enviamos a su ficha por SKU.
+                                #}
+                                {% if favorito.articulo_venta_id and favorito.disponible %}
+
+                                    <button
+                                        type="button"
                                         class="store-btn store-btn-primary fav-btn-buy"
+                                        data-fav-buy
+                                        data-articulo-venta-id="{{ favorito.articulo_venta_id }}"
                                     >
                                         Comprar
+                                    </button>
+
+                                {% elif favorito.articulo_venta_id %}
+
+                                    <button
+                                        type="button"
+                                        class="store-btn store-btn-primary fav-btn-buy"
+                                        disabled
+                                    >
+                                        Agotado
+                                    </button>
+
+                                {% else %}
+
+                                    <a
+                                        href="{{ url_for('comercio.ficha_producto', sku=favorito.sku) }}"
+                                        class="store-btn store-btn-secondary fav-btn-buy"
+                                    >
+                                        Ver producto
                                     </a>
+
                                 {% endif %}
 
                                 <button
@@ -164,7 +203,44 @@ Mis favoritos | SULPAA
 
 
 <script>
+    /*
+    Acciones de la página de favoritos:
+    - Comprar: agrega el producto al carrito real.
+    - Quitar: elimina el producto de la lista de favoritos.
+    */
+
     document.addEventListener("click", async (event) => {
+
+        // ------------------------------------------------
+        // Comprar (agregar al carrito)
+        // ------------------------------------------------
+        // Delegamos toda la lógica en cart.js para no repetir
+        // la llamada al backend ni el manejo de errores.
+
+        const botonComprar = event.target.closest("[data-fav-buy]");
+
+        if (botonComprar) {
+
+            event.preventDefault();
+
+            if (!window.SulpaaCart) {
+
+                alert("El carrito aún no está listo. Vuelve a intentarlo.");
+                return;
+            }
+
+            await window.SulpaaCart.add({
+                articleId: botonComprar.dataset.articuloVentaId,
+                quantity: 1,
+                button: botonComprar,
+            });
+
+            return;
+        }
+
+        // ------------------------------------------------
+        // Quitar de favoritos
+        // ------------------------------------------------
 
         const boton = event.target.closest(".fav-btn-remove");
 

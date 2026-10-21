@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración de Delivery | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "delivery" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Configuración de Delivery</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Operación logística</span>
+                    <h1>Configuración de Delivery</h1>
+                    <p>Tarifas reales del delivery local y tarifarios de transportistas. Los cambios aplican al checkout de inmediato.</p>
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% if tarifa_activa %}
+                <section class="admin-order-table-card">
+                    <div class="admin-section-heading">
+                        <h2>Tarifa de delivery local activa</h2>
+                        {% if not puede_editar %}
+                            <span class="admin-badge is-info">Solo lectura</span>
+                        {% endif %}
+                    </div>
+
+                    {% if puede_editar %}
+                        <form method="POST" action="{{ url_for('admin_delivery.actualizar_tarifa') }}">
+                            <input type="hidden" name="tarifa_id" value="{{ tarifa_activa.id }}">
+                            <div class="admin-form-grid">
+                                <label class="admin-filter-field">
+                                    <span>Nombre</span>
+                                    <input type="text" name="nombre" value="{{ tarifa_activa.nombre }}" required>
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Tarifa base (S/)</span>
+                                    <input type="number" step="0.01" min="0" name="tarifa_base" value="{{ tarifa_activa.tarifa_base }}" required>
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Km incluidos</span>
+                                    <input type="number" step="0.01" min="0" name="km_incluidos" value="{{ tarifa_activa.km_incluidos }}" required>
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Precio por km adicional (S/)</span>
+                                    <input type="number" step="0.01" min="0" name="precio_km_adicional" value="{{ tarifa_activa.precio_km_adicional }}" required>
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Peso incluido (kg)</span>
+                                    <input type="number" step="0.01" min="0" name="peso_incluido_kg" value="{{ tarifa_activa.peso_incluido_kg }}" required>
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Precio por kg adicional (S/)</span>
+                                    <input type="number" step="0.01" min="0" name="precio_kg_adicional" value="{{ tarifa_activa.precio_kg_adicional }}" required>
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Distancia máxima (km, 0 = sin límite)</span>
+                                    <input type="number" step="0.01" min="0" name="distancia_maxima_km" value="{{ tarifa_activa.distancia_maxima_km or 0 }}">
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Peso máximo (kg, 0 = sin límite)</span>
+                                    <input type="number" step="0.01" min="0" name="peso_maximo_kg" value="{{ tarifa_activa.peso_maximo_kg or 0 }}">
+                                </label>
+                                <label class="admin-filter-field">
+                                    <span>Envío gratis desde (S/, 0 = sin envío gratis)</span>
+                                    <input type="number" step="0.01" min="0" name="monto_envio_gratis" value="{{ tarifa_activa.monto_envio_gratis or 0 }}">
+                                </label>
+                            </div>
+                            <p class="admin-hint">
+                                Fórmula: <strong>base + (km − km incluidos) × precio km + (kg − kg incluidos) × precio kg</strong>.
+                                Los recargos (hora pico, feriado, espera) se definen pero no se suman automáticamente.
+                            </p>
+                            <div class="admin-filter-actions">
+                                <button type="submit" class="admin-button is-primary">Guardar tarifa</button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <dl class="admin-detail-list">
+                            <div><dt>Nombre</dt><dd>{{ tarifa_activa.nombre }}</dd></div>
+                            <div><dt>Tarifa base</dt><dd>S/ {{ "%.2f"|format(tarifa_activa.tarifa_base or 0) }}</dd></div>
+                            <div><dt>Km incluidos</dt><dd>{{ tarifa_activa.km_incluidos }}</dd></div>
+                            <div><dt>Precio por km adicional</dt><dd>S/ {{ tarifa_activa.precio_km_adicional }}</dd></div>
+                            <div><dt>Peso incluido</dt><dd>{{ tarifa_activa.peso_incluido_kg }} kg</dd></div>
+                            <div><dt>Precio por kg adicional</dt><dd>S/ {{ tarifa_activa.precio_kg_adicional }}</dd></div>
+                            <div><dt>Distancia máxima</dt><dd>{{ tarifa_activa.distancia_maxima_km or "Sin límite" }}</dd></div>
+                            <div><dt>Peso máximo</dt><dd>{{ tarifa_activa.peso_maximo_kg or "Sin límite" }}</dd></div>
+                            <div><dt>Envío gratis desde</dt><dd>{{ ("S/ " ~ tarifa_activa.monto_envio_gratis) if tarifa_activa.monto_envio_gratis else "No aplica" }}</dd></div>
+                        </dl>
+                    {% endif %}
+                </section>
+
+                <section class="admin-order-table-card">
+                    <div class="admin-section-heading"><h2>Simulador de costo (fórmula real)</h2></div>
+                    <form id="delivery-simulador" class="admin-form-grid">
+                        <label class="admin-filter-field">
+                            <span>Distancia (km)</span>
+                            <input type="number" step="0.01" min="0.01" name="distancia_km" value="6" required>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Peso (kg)</span>
+                            <input type="number" step="0.01" min="0.01" name="peso_kg" value="3" required>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Subtotal productos (S/)</span>
+                            <input type="number" step="0.01" min="0" name="subtotal" value="50" required>
+                        </label>
+                    </form>
+                    <div class="admin-filter-actions">
+                        <button type="button" class="admin-button is-primary" id="delivery-simular-btn">Calcular</button>
+                    </div>
+                    <p id="delivery-resultado" class="admin-hint" aria-live="polite">Ingresa los datos y pulsa Calcular.</p>
+                </section>
+            {% else %}
+                <div class="admin-empty-state">
+                    <span aria-hidden="true">◉</span>
+                    <h2>Sin tarifa de delivery activa</h2>
+                    <p>No hay una tarifa de delivery local vigente configurada en la base de datos.</p>
+                </div>
+            {% endif %}
+
+            <section class="admin-order-table-card">
+                <div class="admin-section-heading"><h2>Transportistas</h2></div>
+                <div class="admin-order-table-wrap">
+                    <table class="admin-order-table">
+                        <thead><tr><th>Código</th><th>Nombre</th><th>Teléfono</th><th>Estado</th></tr></thead>
+                        <tbody>
+                            {% for t in transportistas %}
+                                <tr>
+                                    <td data-label="Código">{{ t.codigo }}</td>
+                                    <td data-label="Nombre">{{ t.nombre }}</td>
+                                    <td data-label="Teléfono">{{ t.telefono or "—" }}</td>
+                                    <td data-label="Estado"><span class="admin-badge {{ 'is-success' if t.estado == 'ACTIVO' else 'is-pending' }}">{{ t.estado }}</span></td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="4">Sin transportistas registrados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="admin-order-table-card">
+                <div class="admin-section-heading"><h2>Tarifarios de transportista</h2></div>
+                <div class="admin-order-table-wrap">
+                    <table class="admin-order-table">
+                        <thead><tr><th>Transportista</th><th>Tarifario</th><th>Versión</th><th>Vigente desde</th><th>Estado</th></tr></thead>
+                        <tbody>
+                            {% for t in tarifarios %}
+                                <tr>
+                                    <td data-label="Transportista">{{ t.transportista or "—" }}</td>
+                                    <td data-label="Tarifario">{{ t.nombre }}</td>
+                                    <td data-label="Versión">{{ t.version or "—" }}</td>
+                                    <td data-label="Vigente desde">{{ t.vigente_desde }}</td>
+                                    <td data-label="Estado"><span class="admin-badge {{ 'is-success' if t.estado == 'ACTIVO' else 'is-pending' }}">{{ t.estado }}</span></td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="5">Sin tarifarios registrados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="admin-order-table-card">
+                <div class="admin-section-heading"><h2>Coberturas activas</h2></div>
+                <div class="admin-order-table-wrap">
+                    <table class="admin-order-table">
+                        <thead><tr><th>Transportista</th><th>Servicio</th><th>Distrito</th><th>Tipo</th></tr></thead>
+                        <tbody>
+                            {% for c in coberturas %}
+                                <tr>
+                                    <td data-label="Transportista">{{ c.transportista or "—" }}</td>
+                                    <td data-label="Servicio">{{ c.servicio or "—" }}</td>
+                                    <td data-label="Distrito">{{ c.distrito_id }}</td>
+                                    <td data-label="Tipo"><span class="admin-badge is-info">{{ c.tipo_cobertura }}</span></td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="4">Sin coberturas activas.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+(function () {
+    var boton = document.getElementById('delivery-simular-btn');
+    if (!boton) { return; }
+    var formulario = document.getElementById('delivery-simulador');
+    var salida = document.getElementById('delivery-resultado');
+
+    boton.addEventListener('click', function () {
+        var datos = {
+            distancia_km: formulario.distancia_km.value,
+            peso_kg: formulario.peso_kg.value,
+            subtotal: formulario.subtotal.value
+        };
+        salida.textContent = 'Calculando...';
+        fetch('{{ url_for("admin_delivery.simular") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datos)
+        })
+        .then(function (respuesta) { return respuesta.json(); })
+        .then(function (resultado) {
+            if (resultado.ok) {
+                salida.textContent = 'Costo de entrega: S/ ' +
+                    Number(resultado.costo_entrega).toFixed(2) +
+                    (resultado.envio_gratis ? ' (envío gratis)' : '');
+            } else {
+                salida.textContent = resultado.mensaje || 'No se pudo calcular.';
+            }
+        })
+        .catch(function () { salida.textContent = 'Error al calcular.'; });
+    });
+})();
+</script>
+{% endblock %}

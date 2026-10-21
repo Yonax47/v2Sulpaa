@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoría | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "auditoria" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Auditoría</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Control y trazabilidad</span>
+                    <h1>Auditoría del sistema</h1>
+                    <p>Registro real e inalterable de las operaciones. Solo lectura para gerencia.</p>
+                </div>
+                <div class="admin-live-status">
+                    <span class="admin-live-dot" aria-hidden="true"></span>
+                    {{ total }} eventos
+                </div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="admin-alert-stack" aria-live="polite">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="GET" class="admin-order-filters" aria-label="Filtros de auditoría">
+                <label class="admin-filter-field">
+                    <span>Módulo</span>
+                    <select name="modulo">
+                        <option value="">Todos</option>
+                        {% for m in modulos %}
+                            <option value="{{ m }}"{% if filtros.modulo == m %} selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Acción</span>
+                    <select name="accion">
+                        <option value="">Todas</option>
+                        {% for a in acciones %}
+                            <option value="{{ a }}"{% if filtros.accion == a %} selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Entidad</span>
+                    <input type="text" name="entidad" value="{{ filtros.entidad or '' }}" placeholder="usuario, pedido, pago...">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Desde</span>
+                    <input type="date" name="desde" value="{{ filtros.desde[:10] if filtros.desde else '' }}">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Hasta</span>
+                    <input type="date" name="hasta" value="{{ filtros.hasta[:10] if filtros.hasta else '' }}">
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-primary">Aplicar</button>
+                    <a href="{{ url_for('admin_auditoria.listado') }}" class="admin-button is-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            {% if eventos %}
+                <section class="admin-order-table-card">
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha y hora</th>
+                                    <th>Responsable</th>
+                                    <th>Rol</th>
+                                    <th>Módulo</th>
+                                    <th>Acción</th>
+                                    <th>Registro</th>
+                                    <th>Resultado</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for e in eventos %}
+                                    <tr>
+                                        <td data-label="Fecha">{{ e.creado_en.strftime("%d/%m/%Y %H:%M:%S") if e.creado_en else "—" }}</td>
+                                        <td data-label="Responsable">{{ e.responsable }}</td>
+                                        <td data-label="Rol">
+                                            {% for codigo in e.usuario_roles_lista %}
+                                                <span class="admin-badge is-info">{{ codigo }}</span>
+                                            {% else %}
+                                                <small>{{ e.actor_rol or "—" }}</small>
+                                            {% endfor %}
+                                        </td>
+                                        <td data-label="Módulo">{{ e.modulo }}</td>
+                                        <td data-label="Acción">{{ e.accion }}</td>
+                                        <td data-label="Registro">
+                                            <small>{{ e.entidad }}{% if e.entidad_id %} · {{ e.entidad_id }}{% endif %}</small>
+                                        </td>
+                                        <td data-label="Resultado">
+                                            {% if e.resultado == "FALLO" %}
+                                                <span class="admin-badge is-danger">Fallo</span>
+                                            {% else %}
+                                                <span class="admin-badge is-success">Éxito</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="">
+                                            <a href="{{ url_for('admin_auditoria.detalle', evento_id=e.id) }}" class="admin-table-link">Ver detalle</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                {% if paginas > 1 %}
+                    <nav class="admin-pagination" aria-label="Paginación de auditoría">
+                        {% if pagina > 1 %}
+                            <a href="{{ url_for('admin_auditoria.listado', pagina=pagina-1, **filtros) }}" class="admin-button is-secondary">Anterior</a>
+                        {% endif %}
+                        <span>Página {{ pagina }} de {{ paginas }}</span>
+                        {% if pagina < paginas %}
+                            <a href="{{ url_for('admin_auditoria.listado', pagina=pagina+1, **filtros) }}" class="admin-button is-secondary">Siguiente</a>
+                        {% endif %}
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="admin-empty-state">
+                    <span aria-hidden="true">✎</span>
+                    <h2>Sin eventos registrados</h2>
+                    <p>Aún no existen operaciones auditadas con los filtros aplicados.</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

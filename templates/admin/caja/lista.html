@@ -66,6 +66,30 @@
                 </div>
             </section>
 
+            <section class="admin-charts" aria-labelledby="caja-flujo-titulo">
+                <div class="admin-section-heading">
+                    <div>
+                        <span class="admin-section-kicker">Analítica</span>
+                        <h2 id="caja-flujo-titulo">Flujo de caja mensual</h2>
+                    </div>
+                    <span class="admin-section-note">Ingresos vs. egresos (movimientos ACTIVOS)</span>
+                </div>
+                {% if serie_flujo %}
+                    <div class="admin-chart-grid">
+                        <article class="admin-chart-card is-wide">
+                            <h3>Ingresos y egresos por mes</h3>
+                            <canvas id="chart-caja-flujo" aria-label="Flujo de caja mensual"></canvas>
+                        </article>
+                    </div>
+                {% else %}
+                    <div class="admin-empty-state">
+                        <span aria-hidden="true">◫</span>
+                        <h2>Sin datos para graficar</h2>
+                        <p>Aún no hay movimientos ACTIVOS en los últimos meses.</p>
+                    </div>
+                {% endif %}
+            </section>
+
             <div class="admin-filter-row">
                 <a href="{{ url_for('admin_caja.nuevo_egreso') }}" class="admin-button is-primary">
                     + Registrar egreso manual
@@ -201,4 +225,41 @@
         </div>
     </main>
 </div>
+{% endblock %}
+
+{% block page_js %}
+    {% if serie_flujo %}
+        <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+        <script>
+            (function () {
+                var lienzo = document.getElementById("chart-caja-flujo");
+                if (!lienzo || !window.Chart) { return; }
+
+                var serie = [];
+                try { serie = JSON.parse({{ serie_flujo | tojson }}) || []; } catch (e) { serie = []; }
+                if (!serie.length) { return; }
+
+                new Chart(lienzo, {
+                    type: "bar",
+                    data: {
+                        labels: serie.map(function (p) { return p.periodo; }),
+                        datasets: [{
+                            label: "Ingresos (S/)",
+                            data: serie.map(function (p) { return Number(p.ingresos) || 0; }),
+                            backgroundColor: "rgba(31, 122, 82, 0.75)"
+                        }, {
+                            label: "Egresos (S/)",
+                            data: serie.map(function (p) { return Number(p.egresos) || 0; }),
+                            backgroundColor: "rgba(178, 45, 45, 0.7)"
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: "bottom" } }
+                    }
+                });
+            })();
+        </script>
+    {% endif %}
 {% endblock %}

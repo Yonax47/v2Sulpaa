@@ -1146,6 +1146,7 @@ def registrar_facturacion_checkout(
     usuario_id,
     tipo,
     documento,
+    conexion=None,
 ):
     """
     Verifica nuevamente el documento desde el backend
@@ -1154,6 +1155,11 @@ def registrar_facturacion_checkout(
     El navegador únicamente indica el tipo de comprobante
     y el documento. Los nombres oficiales, razón social
     y dirección fiscal provienen de la validación backend.
+
+    Cuando se recibe una ``conexion`` externa (checkout), el
+    guardado participa de esa misma transacción y NO se
+    confirma por separado. Sin conexión, se conserva el
+    comportamiento autónomo de siempre.
     """
 
     tipo = (tipo or "").strip().upper()
@@ -1189,6 +1195,7 @@ def registrar_facturacion_checkout(
             razon_social=None,
             distrito_id=None,
             direccion_fiscal=None,
+            conexion=conexion,
         )
 
         return {
@@ -1232,6 +1239,7 @@ def registrar_facturacion_checkout(
             direccion_fiscal=(
                 empresa["direccion"] or None
             ),
+            conexion=conexion,
         )
 
         return {

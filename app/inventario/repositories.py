@@ -88,6 +88,7 @@ def crear_reserva_inventario(
     referencia_id,
     consumos,
     minutos_expiracion=30,
+    conexion=None,
 ):
     """
     Reserva stock para un pedido.
@@ -107,7 +108,13 @@ def crear_reserva_inventario(
             "La reserva no contiene productos."
         )
 
-    conexion = conexion_inventario()
+    # Cuando el llamador coordina una transacción mayor (checkout),
+    # reutiliza su conexión y controla commit/rollback. En caso
+    # contrario, el repositorio es dueño de su propia transacción.
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_inventario()
 
     try:
 
@@ -309,7 +316,8 @@ def crear_reserva_inventario(
                     ),
                 )
 
-            conexion.commit()
+            if propia:
+                conexion.commit()
 
             return {
                 "ok": True,
@@ -330,12 +338,14 @@ def crear_reserva_inventario(
             }
     except Exception:
 
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
 
     finally:
 
-        conexion.close()
+        if propia:
+            conexion.close()
 
 # ============================================================
 # 3. LIBERAR RESERVA DE UN PEDIDO
@@ -538,6 +548,7 @@ def liberar_reserva_pedido(
 def confirmar_reserva_pedido(
     pedido_id,
     usuario_id=None,
+    conexion=None,
 ):
     """
     Confirma una reserva ACTIVA y convierte el stock reservado
@@ -562,7 +573,10 @@ def confirmar_reserva_pedido(
             "No se recibió el identificador del pedido."
         )
 
-    conexion = conexion_inventario()
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_inventario()
 
     try:
 
@@ -854,7 +868,8 @@ def confirmar_reserva_pedido(
                     "No fue posible confirmar la reserva."
                 )
 
-            conexion.commit()
+            if propia:
+                conexion.commit()
 
             return {
                 "ok": True,
@@ -865,9 +880,11 @@ def confirmar_reserva_pedido(
 
     except Exception:
 
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
 
     finally:
 
-        conexion.close()
+        if propia:
+            conexion.close()

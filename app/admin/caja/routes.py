@@ -28,6 +28,7 @@ from app.admin.caja.services import (
     listar_movimientos,
     registrar_egreso_manual,
     resumen_caja,
+    serie_flujo_mensual,
 )
 from app.admin.caja.repositories import (
     listar_categorias,
@@ -59,12 +60,14 @@ def listado():
     movimientos = listar_movimientos(filtros)
     resumen = resumen_caja(filtros)
     categorias = listar_categorias()
+    serie_flujo = serie_flujo_mensual()
     return render_template(
         "admin/caja/lista.html",
         movimientos=movimientos,
         resumen=resumen,
         categorias=categorias,
         filtros=filtros,
+        serie_flujo=serie_flujo,
     )
 
 

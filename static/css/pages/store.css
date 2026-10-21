@@ -1583,119 +1583,15 @@ Objetivo:
 
 
 /* ==========================================================
-   14. MINI CARRITO
+   14. CARRITO LATERAL
+   ==========================================================
+   Los estilos del carrito lateral ahora son GLOBALES y viven
+   en static/css/components/cart.css, porque el componente se
+   usa en todas las páginas (no solo en la tienda).
+
+   No volver a definir aquí reglas .store-cart-* para evitar
+   que en otras páginas el panel se vea como contenido suelto.
    ========================================================== */
-
-.store-cart-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1100;
-    background: rgba(7, 29, 21, 0.42);
-    backdrop-filter: blur(3px);
-}
-
-.store-cart-drawer {
-    position: fixed;
-    z-index: 1110;
-    top: 0;
-    right: 0;
-    width: min(410px, 92vw);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: #ffffff;
-    box-shadow: -20px 0 55px rgba(9, 43, 31, 0.18);
-    transform: translateX(105%);
-    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.store-cart-drawer.is-open {
-    transform: translateX(0);
-}
-
-.store-cart-drawer > header {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1.4rem;
-    border-bottom: 1px solid #e9eeeb;
-}
-
-.store-cart-drawer > header span {
-    display: block;
-    color: #6c7d75;
-    font-size: 0.62rem;
-    font-weight: 850;
-    letter-spacing: 0.12em;
-}
-
-.store-cart-drawer > header strong {
-    display: block;
-    margin-top: 0.3rem;
-    color: #173d31;
-}
-
-.store-cart-drawer > header button {
-    width: 38px;
-    height: 38px;
-    border: 0;
-    border-radius: 50%;
-    background: #f1f5f2;
-    color: #315443;
-    font-size: 1.3rem;
-    cursor: pointer;
-}
-
-.store-cart-preview {
-    flex: 1;
-    padding: 1.4rem;
-}
-
-.store-cart-success {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 1rem;
-    border-radius: 14px;
-    background: #edf7e9;
-}
-
-.store-cart-success > span {
-    width: 36px;
-    height: 36px;
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: #2c8052;
-    color: #ffffff;
-    font-weight: 900;
-}
-
-.store-cart-success strong {
-    color: #254c3a;
-    font-size: 0.82rem;
-}
-
-.store-cart-success p {
-    margin: 0.25rem 0 0;
-    color: #6b7c74;
-    font-size: 0.72rem;
-}
-
-.store-cart-note {
-    margin-top: 1.2rem;
-    color: #84918b;
-    font-size: 0.72rem;
-    line-height: 1.6;
-}
-
-.store-cart-drawer > footer {
-    display: grid;
-    gap: 0.6rem;
-    padding: 1.4rem;
-    border-top: 1px solid #e9eeeb;
-}
 
 
 /* ==========================================================
@@ -2013,8 +1909,7 @@ Objetivo:
     .store-product-card,
     .store-product-image,
     .store-pack-card,
-    .store-btn,
-    .store-cart-drawer {
+    .store-btn {
         transition: none;
     }
 }
@@ -2431,166 +2326,12 @@ Se utilizan para:
 
 
 /* ==========================================================
-   CARRITO REAL
+   CONTADOR DEL CARRITO Y TOAST
+   ==========================================================
+   Sus estilos ahora son GLOBALES y viven en
+   static/css/components/cart.css, para que funcionen en
+   todas las páginas, no solo en la tienda.
    ========================================================== */
-
-.store-cart-preview {
-    overflow-y: auto;
-}
-
-.store-cart-empty {
-    min-height: 220px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1rem;
-    text-align: center;
-}
-
-.store-cart-empty > span {
-    width: 46px;
-    height: 46px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: #edf7e9;
-    color: #4a8a5d;
-    font-size: 1.2rem;
-}
-
-.store-cart-empty strong {
-    margin-top: 0.8rem;
-    color: #173d31;
-    font-size: 0.9rem;
-}
-
-.store-cart-empty p {
-    max-width: 230px;
-    margin: 0.4rem 0 0;
-    color: #77877f;
-    font-size: 0.72rem;
-    line-height: 1.55;
-}
-
-.store-cart-item {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid #edf0ee;
-}
-
-.store-cart-item:first-child {
-    padding-top: 0;
-}
-
-.store-cart-item > div {
-    min-width: 0;
-}
-
-.store-cart-item strong {
-    color: #244b39;
-    font-size: 0.78rem;
-}
-
-.store-cart-item > div > strong {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.store-cart-item p {
-    margin: 0.25rem 0 0;
-    color: #7d8b84;
-    font-size: 0.68rem;
-}
-
-.store-cart-subtotal {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-    color: #173d31;
-}
-
-.store-cart-subtotal span {
-    color: #728078;
-    font-size: 0.75rem;
-}
-
-.store-cart-subtotal strong {
-    font-size: 1.05rem;
-}
-
-
-/* ==========================================================
-   CONTADOR DEL CARRITO
-   ========================================================== */
-
-[data-cart-count] {
-    min-width: 18px;
-    height: 18px;
-    display: inline-grid;
-    place-items: center;
-    padding: 0 5px;
-    border-radius: 999px;
-    background: #d8f47a;
-    color: #173d31;
-    font-size: 0.58rem;
-    font-weight: 900;
-}
-
-[data-cart-count][hidden] {
-    display: none !important;
-}
-
-
-/* ==========================================================
-   TOAST / NOTIFICACIÓN
-   ========================================================== */
-
-.store-toast {
-    position: fixed;
-    z-index: 1300;
-    right: 22px;
-    bottom: 22px;
-    width: min(360px, calc(100vw - 32px));
-    padding: 0.95rem 1.05rem;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 14px;
-    background: #173d31;
-    color: #ffffff;
-    box-shadow: 0 18px 45px rgba(8, 43, 33, 0.22);
-    font-size: 0.75rem;
-    font-weight: 750;
-    line-height: 1.45;
-
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(12px);
-
-    transition:
-        opacity 200ms ease,
-        transform 200ms ease,
-        visibility 200ms ease;
-}
-
-.store-toast.is-visible {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-.store-toast.is-success {
-    background: #176d49;
-}
-
-.store-toast.is-error {
-    background: #9f3535;
-}
 
 
 /* ==========================================================
@@ -2662,15 +2403,6 @@ Se utilizan para:
         width: 40px;
         height: 38px;
     }
-
-    .store-cart-drawer {
-        width: min(100%, 410px);
-    }
-
-    .store-toast {
-        right: 16px;
-        bottom: 16px;
-    }
 }
 
 
@@ -2680,10 +2412,30 @@ Se utilizan para:
 
 @media (prefers-reduced-motion: reduce) {
 
-    .store-toast,
     .store-mix-progress-bar,
     .store-barrel-sizes button,
     .store-mix-size-selector button {
         transition: none;
     }
+}
+
+
+/* ==========================================================
+   FOTO DE PRODUCTO SIN IMAGEN REAL
+   ==========================================================
+   Cuando un producto no tiene foto propia mostramos este
+   dibujo neutro. Comparte la clase de tamaño del <img> para
+   ocupar el mismo espacio. */
+
+.producto-sin-foto {
+    display: grid;
+    place-items: center;
+    color: #aab9ae;
+    filter: drop-shadow(0 12px 14px rgba(63, 125, 85, .18));
+}
+
+.producto-sin-foto svg {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
 }

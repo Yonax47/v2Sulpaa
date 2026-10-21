@@ -5,6 +5,7 @@ import unittest
 from app import create_app
 from app.admin.pedidos import repositories as repositorios_pedidos
 from app.admin.pedidos.services import listar_pedidos_admin
+from app.comercio.services import obtener_catalogo_tienda
 from app.shared.unit_of_work import UnidadTrabajo
 
 
@@ -67,6 +68,53 @@ class LecturasRealesTest(unittest.TestCase):
 
         gerente = self.cliente_autenticado("actor-admin", ["GERENTE"])
         self.assertEqual(gerente.get("/admin/dashboard").status_code, 200)
+
+    def test_favoritos_y_ficha_cargan_con_el_carrito_lateral(self):
+        """Las páginas con carrito reutilizable deben renderizar bien."""
+        cliente = self.cliente_autenticado(self.pedido["usuario_id"], [])
+
+        # Favoritos: siempre existe y debe traer el carrito lateral.
+        favoritos = cliente.get("/favoritos")
+        self.assertEqual(favoritos.status_code, 200)
+        self.assertIn(b"data-cart-drawer", favoritos.data)
+
+        # Ficha: usamos un producto real del catálogo.
+        catalogo = obtener_catalogo_tienda()
+        if not catalogo:
+            self.skipTest("No hay productos para abrir la ficha.")
+
+        sku = catalogo[0]["sku"]
+        ficha = cliente.get(f"/producto/{sku}")
+        self.assertEqual(ficha.status_code, 200)
+        self.assertIn(b"data-cart-drawer", ficha.data)
+
+    def test_paginas_sin_tienda_cargan_el_css_global_del_carrito(self):
+        """Regresión: el carrito no debe verse suelto fuera de la tienda.
+
+        El problema era que sus estilos vivían en store.css (solo
+        cargado en la tienda), por eso en Inicio, Aprende, Mis
+        pedidos... el panel aparecía como un bloque enorme.
+        """
+        cliente = self.cliente_autenticado(self.pedido["usuario_id"], [])
+
+        inicio = cliente.get("/")
+        self.assertEqual(inicio.status_code, 200)
+
+        # El componente viaja en el navbar global...
+        self.assertIn(b"data-cart-drawer", inicio.data)
+        # ...y su hoja de estilos se carga en TODAS las páginas.
+        self.assertIn(b"css/components/cart.css", inicio.data)
+
+    def test_el_css_global_del_carrito_oculta_el_panel(self):
+        cliente = self.app.test_client()
+        respuesta = cliente.get("/static/css/components/cart.css")
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(b".store-cart-drawer", respuesta.data)
+        self.assertIn(b"position: fixed", respuesta.data)
+        self.assertIn(b"translateX(105%)", respuesta.data)
+        self.assertIn(b"visibility: hidden", respuesta.data)
+        respuesta.close()
 
     def test_logout_conserva_flujo_existente(self):
         cliente = self.cliente_autenticado(self.pedido["usuario_id"], [])

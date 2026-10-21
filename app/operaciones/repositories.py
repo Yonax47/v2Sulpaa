@@ -15,13 +15,21 @@ from app.config.database import conexion_operaciones
 import uuid
 
 
-def guardar_entrega_checkout(pedido_id, usuario_id, entrega):
+def guardar_entrega_checkout(pedido_id, usuario_id, entrega, conexion=None):
     """Cabecera, cotización, destino e historial: una transacción local.
 
     Recibe exclusivamente datos normalizados por services. La cotización
     firmada del checkout se materializa como ACEPTADA al crear la entrega.
+
+    Cuando el checkout coordina una transacción entre esquemas, recibe la
+    conexión compartida y no confirma por su cuenta. De este modo nunca
+    puede existir una entrega confirmada sin su pedido y pago asociados.
     """
-    conexion = conexion_operaciones()
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_operaciones()
+
     entrega_id = str(uuid.uuid4())
     cotizacion_id = str(uuid.uuid4())
     tipo = entrega['tipo']
@@ -102,13 +110,16 @@ def guardar_entrega_checkout(pedido_id, usuario_id, entrega):
                 (entrega_id, estado_anterior, estado_nuevo, usuario_responsable_id, comentario)
                 VALUES (%s, NULL, 'PENDIENTE', %s, 'Entrega creada desde checkout.')
             """, (entrega_id, usuario_id))
-        conexion.commit()
-        return entrega_id
+            if propia:
+                conexion.commit()
+            return entrega_id
     except Exception:
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
     finally:
-        conexion.close()
+        if propia:
+            conexion.close()
 
 
 def cancelar_entrega_checkout(pedido_id, usuario_id):
@@ -479,6 +490,86 @@ def obtener_sucursal_destino_activa(
 
 
 # ============================================================
+# COBERTURAS DE TRANSPORTISTAS
+# ============================================================
+
+def listar_coberturas_servicio(servicio_transportista_id):
+    """
+    Lista las coberturas ACTIVAS de un servicio.
+
+    La cobertura indica en qué distritos el servicio puede
+    ofrecerse. El distrito de la cobertura es el distrito del
+    cliente (destino), NO necesariamente el distrito donde
+    físicamente está la agencia.
+    """
+    conexion = conexion_operaciones()
+
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT
+                    id,
+                    servicio_transportista_id,
+                    distrito_id,
+                    tipo_cobertura,
+                    estado,
+                    verificado_en
+                FROM coberturas_transportista
+                WHERE servicio_transportista_id = %s
+                  AND estado = 'ACTIVA'
+                ORDER BY distrito_id ASC
+            """
+
+            cursor.execute(sql, (servicio_transportista_id,))
+            return cursor.fetchall()
+
+    finally:
+        conexion.close()
+
+
+def obtener_cobertura_servicio_distrito(
+    servicio_transportista_id,
+    distrito_id,
+):
+    """
+    Busca la cobertura activa de un servicio para un distrito.
+
+    Devuelve None cuando el servicio no cubre ese distrito.
+    """
+    conexion = conexion_operaciones()
+
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT
+                    id,
+                    servicio_transportista_id,
+                    distrito_id,
+                    tipo_cobertura,
+                    estado,
+                    verificado_en
+                FROM coberturas_transportista
+                WHERE servicio_transportista_id = %s
+                  AND distrito_id = %s
+                  AND estado = 'ACTIVA'
+                LIMIT 1
+            """
+
+            cursor.execute(
+                sql,
+                (
+                    servicio_transportista_id,
+                    distrito_id,
+                ),
+            )
+
+            return cursor.fetchone()
+
+    finally:
+        conexion.close()
+
+
+# ============================================================
 # TARIFARIOS DE TRANSPORTISTAS
 # ============================================================
 
@@ -680,6 +771,7 @@ def crear_pago_pedido(
     monto,
     moneda="PEN",
     usuario_id=None,
+    conexion=None,
 ):
     """
     Crea el pago inicial de un pedido.
@@ -751,7 +843,10 @@ def crear_pago_pedido(
             "El monto del pago debe ser mayor que cero."
         )
 
-    conexion = conexion_operaciones()
+    propia = conexion is None
+
+    if propia:
+        conexion = conexion_operaciones()
 
     try:
 
@@ -887,7 +982,8 @@ def crear_pago_pedido(
                 ),
             )
 
-            conexion.commit()
+            if propia:
+                conexion.commit()
 
             return {
                 "pago_id":
@@ -920,12 +1016,14 @@ def crear_pago_pedido(
 
     except Exception:
 
-        conexion.rollback()
+        if propia:
+            conexion.rollback()
         raise
 
     finally:
 
-        conexion.close()
+        if propia:
+            conexion.close()
 
 
 # ============================================================

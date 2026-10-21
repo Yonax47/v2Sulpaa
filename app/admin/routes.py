@@ -24,6 +24,7 @@ from app.shared.decorators import (
 )
 
 from app.admin.services import (
+    obtener_resumen_gerencial,
     resumen_dashboard,
 )
 
@@ -82,12 +83,17 @@ def dashboard():
 
     resumen = resumen_dashboard()
 
+    try:
+        gerencial = obtener_resumen_gerencial()
+    except Exception:
+        gerencial = {}
     return render_template(
         "admin/dashboard.html",
         kpis=resumen["kpis_funcionales"],
         resumen=resumen["resumen"],
         operativo=resumen["operativo"],
         graficos=resumen["graficos"],
+        gerencial=gerencial,
     )
 
 

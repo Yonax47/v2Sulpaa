@@ -988,3 +988,238 @@ def obtener_metrica_accesos_contenido():
         }
     finally:
         conexion.close()
+
+# ========================================================
+# MÉTRICAS COMERCIALES Y FINANCIERAS (DASHBOARD GERENCIAL)
+# ========================================================
+
+
+
+# DASHGER
+
+# ========================================================
+# METRICAS COMERCIALES Y FINANCIERAS (DASHBOARD GERENCIAL)
+# ========================================================
+
+def obtener_ventas_cobradas(desde=None, hasta=None):
+    from app.config.database import conexion_comercio, conexion_operaciones
+    import os, re
+    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
+    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
+        raise RuntimeError("DB_COMERCIO no contiene un esquema valido.")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
+        raise RuntimeError("DB_OPERACIONES no contiene un esquema valido.")
+    conn = conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where = ["pe.estado != 'CANCELADO'", "pg.estado = 'PAGADO'"]
+            params = []
+            if desde:
+                where.append("DATE(pe.creado_en) >= %s")
+                params.append(desde)
+            if hasta:
+                where.append("DATE(pe.creado_en) <= %s")
+                params.append(hasta)
+            cond = " AND ".join(where)
+            cursor.execute(f"""SELECT COUNT(DISTINCT pe.id) AS pedidos_cobrados, COALESCE(SUM(pe.total), 0) AS ingresos_cobrados FROM {comercio}.pedidos pe JOIN {operaciones}.pagos pg ON pg.pedido_id = pe.id WHERE {cond}""", params)
+            fila = cursor.fetchone()
+        return {"pedidos_cobrados": int(fila["pedidos_cobrados"] or 0), "ingresos_cobrados": float(fila["ingresos_cobrados"] or 0.0)}
+    finally:
+        conn.close()
+
+def obtener_top_productos_vendidos(desde=None, hasta=None, limit=10, dimension='variante'):
+    from app.config.database import conexion_comercio
+    import os, re
+    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
+        raise RuntimeError("DB_COMERCIO no contiene un esquema valido.")
+    conn = conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where = ["pe.estado != 'CANCELADO'"]
+            params = []
+            if desde:
+                where.append("DATE(pe.creado_en) >= %s")
+                params.append(desde)
+            if hasta:
+                where.append("DATE(pe.creado_en) <= %s")
+                params.append(hasta)
+            cond = " AND ".join(where)
+            sql = f"""SELECT v2.sku, v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion,
+                         SUM(pd.cantidad * pc.cantidad) AS unidades_vendidas,
+                         SUM(pd.subtotal_linea) AS ingresos_linea
+                  FROM {comercio}.pedidos pe
+                  JOIN {comercio}.pedido_detalles pd ON pd.pedido_id = pe.id
+                  JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id = pd.id
+                  JOIN {comercio}.variantes v2 ON v2.id = pc.variante_id
+                  LEFT JOIN {comercio}.productos p ON p.id = v2.producto_id
+                  LEFT JOIN {comercio}.sabores s ON s.id = v2.sabor_id
+                  LEFT JOIN {comercio}.presentaciones pr ON pr.id = v2.presentacion_id
+                  WHERE {cond}
+                  GROUP BY v2.id, v2.sku, v2.nombre_comercial, p.nombre, s.nombre, pr.nombre
+                  ORDER BY unidades_vendidas DESC, ingresos_linea DESC
+                  LIMIT %s"""
+            params.append(int(limit))
+            cursor.execute(sql, params)
+            return cursor.fetchall()
+    finally:
+        conn.close()
+
+def obtener_top_productos_vendidos_cobrados(desde=None, hasta=None, limit=10):
+    """Top de productos COBRADOS: solo pedidos con pago PAGADO.
+
+    Mide lo realmente cobrado (no lo pedido). El ingreso se toma de la
+    linea del pedido y las unidades de la composicion real.
+    """
+    from app.config.database import conexion_comercio, conexion_operaciones
+    import os, re
+    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
+    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", comercio) or not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
+        raise RuntimeError("DB_COMERCIO o DB_OPERACIONES no contienen un esquema valido.")
+    conn = conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where = ["pe.estado != 'CANCELADO'", "pg.estado = 'PAGADO'"]
+            params = []
+            if desde:
+                where.append("DATE(pe.creado_en) >= %s")
+                params.append(desde)
+            if hasta:
+                where.append("DATE(pe.creado_en) <= %s")
+                params.append(hasta)
+            cond = " AND ".join(where)
+            sql = f"""SELECT v2.sku, v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion,
+                         SUM(pd.cantidad * pc.cantidad) AS unidades_vendidas,
+                         SUM(pd.subtotal_linea) AS ingresos_linea
+                  FROM {comercio}.pedidos pe
+                  JOIN {operaciones}.pagos pg ON pg.pedido_id = pe.id
+                  JOIN {comercio}.pedido_detalles pd ON pd.pedido_id = pe.id
+                  JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id = pd.id
+                  JOIN {comercio}.variantes v2 ON v2.id = pc.variante_id
+                  LEFT JOIN {comercio}.productos p ON p.id = v2.producto_id
+                  LEFT JOIN {comercio}.sabores s ON s.id = v2.sabor_id
+                  LEFT JOIN {comercio}.presentaciones pr ON pr.id = v2.presentacion_id
+                  WHERE {cond}
+                  GROUP BY v2.id, v2.sku, v2.nombre_comercial, p.nombre, s.nombre, pr.nombre
+                  ORDER BY unidades_vendidas DESC, ingresos_linea DESC
+                  LIMIT %s"""
+            params.append(int(limit))
+            cursor.execute(sql, params)
+            return cursor.fetchall()
+    finally:
+        conn.close()
+def obtener_caja_movimientos_resumen(desde=None, hasta=None):
+    from app.config.database import conexion_operaciones
+    conn = conexion_operaciones()
+    try:
+        with conn.cursor() as cursor:
+            where = ["estado = 'ACTIVO'"]
+            params = []
+            if desde:
+                where.append("DATE(fecha_movimiento) >= %s")
+                params.append(desde)
+            if hasta:
+                where.append("DATE(fecha_movimiento) <= %s")
+                params.append(hasta)
+            cond = " AND ".join(where)
+            cursor.execute(f"""SELECT 
+                COALESCE(SUM(CASE WHEN tipo='INGRESO' THEN monto ELSE 0 END),0) AS ingresos,
+                COALESCE(SUM(CASE WHEN tipo='EGRESO' THEN monto ELSE 0 END),0) AS egresos,
+                COUNT(*) AS total
+                FROM caja_movimientos WHERE {cond}""", params)
+            fila = cursor.fetchone()
+        return {'ingresos': float(fila['ingresos'] or 0), 'egresos': float(fila['egresos'] or 0), 'total': int(fila['total'] or 0)}
+    finally:
+        conn.close()
+def obtener_evolucion_ventas_diarias(desde=None, hasta=None):
+    from app.config.database import conexion_comercio
+    import os, re
+    comercio = str(os.getenv('DB_COMERCIO') or '').strip()
+    if not re.fullmatch(r'[A-Za-z0-9_]+', comercio):
+        raise RuntimeError('DB_COMERCIO invalido')
+    conn = conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where = ["pe.estado != 'CANCELADO'"]
+            params = []
+            if desde:
+                where.append("DATE(pe.creado_en) >= %s")
+                params.append(desde)
+            if hasta:
+                where.append("DATE(pe.creado_en) <= %s")
+                params.append(hasta)
+            cond = ' AND '.join(where)
+            cursor.execute(f"SELECT DATE(pe.creado_en) AS fecha, COUNT(DISTINCT pe.id) AS pedidos, COALESCE(SUM(pe.total), 0) AS total FROM {comercio}.pedidos pe WHERE {cond} GROUP BY DATE(pe.creado_en) ORDER BY fecha", params)
+            return cursor.fetchall()
+    finally:
+        conn.close()
+
+def obtener_entregas_por_estado(desde=None, hasta=None):
+    from app.config.database import conexion_operaciones
+    conn = conexion_operaciones()
+    try:
+        with conn.cursor() as cursor:
+            where = []
+            params = []
+            if desde:
+                where.append("DATE(creado_en) >= %s"); params.append(desde)
+            if hasta:
+                where.append("DATE(creado_en) <= %s"); params.append(hasta)
+            cond = ' WHERE ' + ' AND '.join(where) if where else ''
+            cursor.execute(f"SELECT estado, COUNT(*) AS c FROM entregas{cond} GROUP BY estado", params)
+            return cursor.fetchall()
+    finally:
+        conn.close()
+def obtener_ventas_cobradas_por_dia(desde=None, hasta=None):
+    from app.config.database import conexion_comercio, conexion_operaciones
+    import os, re
+    comercio=str(os.getenv('DB_COMERCIO')or'').strip(); operaciones=str(os.getenv('DB_OPERACIONES')or'').strip()
+    if not re.fullmatch(r'[A-Za-z0-9_]+',comercio) or not re.fullmatch(r'[A-Za-z0-9_]+',operaciones): raise RuntimeError('inv')
+    conn=conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where=["pe.estado!='CANCELADO'","pg.estado='PAGADO'"]
+            params=[]
+            if desde: where.append("DATE(pe.creado_en)>= %s"); params.append(desde)
+            if hasta: where.append("DATE(pe.creado_en)<= %s"); params.append(hasta)
+            cond=' AND '.join(where)
+            cursor.execute(f"SELECT DATE(pe.creado_en) AS fecha, COUNT(DISTINCT pe.id) AS pedidos, COALESCE(SUM(pe.total),0) AS total FROM {comercio}.pedidos pe JOIN {operaciones}.pagos pg ON pg.pedido_id=pe.id WHERE {cond} GROUP BY DATE(pe.creado_en) ORDER BY fecha", params)
+            return cursor.fetchall()
+    finally:
+        conn.close()
+def obtener_ingresos_por_producto_cobrado(desde=None, hasta=None, limit=10):
+    from app.config.database import conexion_comercio, conexion_operaciones
+    import os, re
+    comercio=str(os.getenv('DB_COMERCIO')or'').strip(); operaciones=str(os.getenv('DB_OPERACIONES')or'').strip()
+    if not re.fullmatch(r'[A-Za-z0-9_]+',comercio) or not re.fullmatch(r'[A-Za-z0-9_]+',operaciones): raise RuntimeError('inv')
+    conn=conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where=["pe.estado!='CANCELADO'","pg.estado='PAGADO'"]
+            params=[]
+            if desde: where.append("DATE(pe.creado_en)>= %s"); params.append(desde)
+            if hasta: where.append("DATE(pe.creado_en)<= %s"); params.append(hasta)
+            cond=' AND '.join(where)
+            cursor.execute(f"SELECT v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion, SUM(pd.subtotal_linea) AS ingresos_linea FROM {comercio}.pedidos pe JOIN {operaciones}.pagos pg ON pg.pedido_id=pe.id JOIN {comercio}.pedido_detalles pd ON pd.pedido_id=pe.id JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id=pd.id JOIN {comercio}.variantes v2 ON v2.id=pc.variante_id LEFT JOIN {comercio}.productos p ON p.id=v2.producto_id LEFT JOIN {comercio}.sabores s ON s.id=v2.sabor_id LEFT JOIN {comercio}.presentaciones pr ON pr.id=v2.presentacion_id WHERE {cond} GROUP BY v2.id,v2.nombre_comercial,p.nombre,s.nombre,pr.nombre ORDER BY ingresos_linea DESC LIMIT %s", params+[int(limit)])
+            return cursor.fetchall()
+    finally:
+        conn.close()
+def obtener_pedidos_por_estado_agrupado(desde=None, hasta=None):
+    from app.config.database import conexion_comercio
+    import os, re
+    comercio=str(os.getenv('DB_COMERCIO')or'').strip()
+    if not re.fullmatch(r'[A-Za-z0-9_]+',comercio): raise RuntimeError('inv')
+    conn=conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
+            where=[]
+            params=[]
+            if desde: where.append("DATE(creado_en)>= %s"); params.append(desde)
+            if hasta: where.append("DATE(creado_en)<= %s"); params.append(hasta)
+            cond=' WHERE '+' AND '.join(where) if where else ''
+            cursor.execute(f"SELECT estado, COUNT(*) AS cantidad FROM {comercio}.pedidos{cond} GROUP BY estado", params)
+            return cursor.fetchall()
+    finally:
+        conn.close()

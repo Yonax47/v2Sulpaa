@@ -39,6 +39,18 @@
         href="{{ url_for('static', filename='css/components.css') }}"
     >
 
+    <!--
+        Carrito lateral reutilizable.
+
+        Se carga en TODAS las páginas para que el panel siempre
+        empiece oculto y con el mismo aspecto, incluso donde no
+        se carga store.css (Inicio, Aprende, Mis pedidos...).
+    -->
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/components/cart.css') }}"
+    >
+
 
     <!--
         Cada página podrá cargar CSS propio
@@ -66,6 +78,19 @@
 
     <script
         src="{{ url_for('static', filename='js/main.js') }}"
+    ></script>
+
+
+    <!--
+        Carrito lateral reutilizable.
+
+        Se carga en todas las páginas, pero solo se activa
+        cuando la página incluye el componente del carrito
+        (todos los que muestran el navbar del cliente).
+    -->
+    <script
+        src="{{ url_for('static', filename='js/modules/cart.js') }}"
+        defer
     ></script>
 
 

@@ -22,12 +22,9 @@
 
 {% include "components/navbar.html" %}
 
-{% set imagenes_sabor = {
-    "Café": "img/BotellaCafe.png",
-    "Jamaica": "img/Botellaflordejamaica.png",
-    "Limón": "img/Botellalimon.png",
-    "Kion": "img/Botellakion.png"
-} %}
+{# Importamos el componente que resuelve la foto real del
+   producto (o el placeholder si no existe imagen). #}
+{% from "components/foto_producto.html" import foto_producto %}
 
 {% set descripciones_sabor = {
     "Café": "Una kombucha con carácter, notas tostadas y una experiencia aromática.",
@@ -53,11 +50,13 @@
 
             <span class="ficha-orbit" aria-hidden="true"></span>
 
-            <img
-                src="{{ url_for('static', filename=imagenes_sabor.get(producto.sabor, 'img/BotellaCafe.png')) }}"
-                alt="Kombucha SULPAA sabor {{ producto.sabor }}"
-                class="ficha-bottle"
-            >
+            {{ foto_producto(
+                sabor=producto.sabor,
+                presentacion=producto.presentacion,
+                nombre=producto.nombre_comercial,
+                clase="ficha-bottle",
+                alt="Kombucha SULPAA sabor " ~ (producto.sabor or "")
+            ) }}
 
             <span class="ficha-float ficha-float-one">●</span>
             <span class="ficha-float ficha-float-two">✦</span>
@@ -136,7 +135,8 @@
                     <button
                         type="button"
                         class="store-btn store-btn-primary"
-                        onclick="agregarProducto('{{ producto.articulo_venta_id }}')"
+                        data-ficha-buy
+                        data-articulo-venta-id="{{ producto.articulo_venta_id }}"
                     >
                         Agregar al carrito
                     </button>
@@ -208,45 +208,39 @@
 
 
 <script>
-    window.agregarProducto = async function (articuloVentaId) {
+    /*
+    Agregar al carrito desde la ficha del producto.
 
-        try {
+    Reutilizamos cart.js (window.SulpaaCart) para:
+    - llamar al endpoint real del carrito,
+    - mostrar el aviso de éxito o error,
+    - abrir el carrito lateral,
+    - evitar dobles envíos.
 
-            const respuesta = await fetch(
-                "{{ url_for('comercio.agregar_carrito') }}",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        "articulo_venta_id": articuloVentaId,
-                        "cantidad": 1,
-                    }),
-                }
-            );
+    Así la ficha se comporta igual que la tienda.
+    */
 
-            const datos = await respuesta.json();
+    document.addEventListener("click", async (event) => {
 
-            if (datos.ok) {
+        const boton = event.target.closest("[data-ficha-buy]");
 
-                alert("Producto agregado al carrito.");
-                window.location.href = "{{ url_for('comercio.tienda') }}";
+        if (!boton) return;
 
-            } else {
+        event.preventDefault();
 
-                alert(datos.mensaje || "No se pudo agregar el producto.");
+        if (!window.SulpaaCart) {
 
-            }
-
-        } catch (error) {
-
-            alert("Ocurrió un error de conexión. Inténtalo de nuevo.");
-
+            alert("El carrito aún no está listo. Vuelve a intentarlo.");
+            return;
         }
 
-    };
+        await window.SulpaaCart.add({
+            articleId: boton.dataset.articuloVentaId,
+            quantity: 1,
+            button: boton,
+        });
 
+    });
 </script>
 
 {% endblock %}
