@@ -12,9 +12,12 @@ Aquí vive la lógica comercial:
 """
 
 from collections import defaultdict
+import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
+
+from pymysql.err import MySQLError
 
 from app.inventario.services import (
     reservar_stock_pedido,
@@ -77,6 +80,9 @@ from app.operaciones.repositories import (
 from app.inventario.services import (
     obtener_disponibilidad_variantes,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -2243,6 +2249,81 @@ def _generar_numero_pedido():
 # 19. CONFIRMAR CHECKOUT
 # ============================================================
 
+# Mensajes seguros para el cliente, indexados por el código de
+# error de MariaDB. Nunca se muestra el texto original de la base
+# porque puede incluir nombres de tablas y restricciones.
+_MENSAJES_ERROR_BD = {
+    # Restricción de integridad incumplida (incluye los CHECK).
+    4025: (
+        "No se pudo confirmar el pedido porque los datos de la "
+        "reserva no son válidos. Intenta nuevamente."
+    ),
+    # Registro duplicado: por ejemplo, dos clics en "Pagar".
+    1062: (
+        "El pedido ya fue registrado. Revisa tus pedidos antes "
+        "de volver a intentarlo."
+    ),
+    # Bloqueo por otra transacción en curso.
+    1205: (
+        "El inventario se está actualizando en este momento. "
+        "Intenta nuevamente en unos segundos."
+    ),
+    # Transacción cancelada por un conflicto de concurrencia.
+    1213: (
+        "Se produjo un conflicto con otra compra simultánea. "
+        "Intenta nuevamente en unos segundos."
+    ),
+    # Clave foránea: algún dato relacionado ya no existe.
+    1452: (
+        "No se pudo completar el pedido porque uno de los "
+        "productos ya no está disponible."
+    ),
+}
+
+
+def _mensaje_error_checkout(error):
+    """
+    Traduce un error técnico a un mensaje comprensible para el cliente.
+
+    Los detalles internos (código de MariaDB, nombre de la
+    restricción, tabla afectada) se escriben en el registro del
+    servidor. El navegador recibe solo una explicación breve en
+    español.
+
+    Los errores de negocio del propio sistema se crean con
+    ValueError y ya traen un mensaje seguro, por eso se devuelven
+    tal cual.
+    """
+
+    logger.error(
+        "Fallo al confirmar el checkout: %s",
+        error,
+        exc_info=error,
+    )
+
+    if isinstance(error, ValueError):
+        return str(error)
+
+    if isinstance(error, MySQLError):
+
+        codigo = (
+            error.args[0]
+            if error.args and isinstance(error.args[0], int)
+            else None
+        )
+
+        return _MENSAJES_ERROR_BD.get(
+            codigo,
+            "No se pudo completar el pedido por un problema interno. "
+            "Intenta nuevamente en unos segundos.",
+        )
+
+    return (
+        "No se pudo completar el pedido por un problema interno. "
+        "Intenta nuevamente en unos segundos."
+    )
+
+
 def _checkout_escrituras(
     conexion,
     esquemas,
@@ -2674,7 +2755,7 @@ def confirmar_checkout(
             return {
                 "ok": False,
                 "mensaje":
-                    str(error),
+                    _mensaje_error_checkout(error),
             }
 
     try:
@@ -2706,12 +2787,13 @@ def confirmar_checkout(
     except Exception as error:
 
         # UnidadTrabajo ya revirtió el conjunto completo al salir del
-        # bloque with. No se compensa nada por separado y la causa no
-        # se oculta: se devuelve tal cual al llamador.
+        # bloque with. No se compensa nada por separado y la causa
+        # real queda en el registro del servidor. Al cliente se le
+        # devuelve un mensaje comprensible, nunca el texto de MariaDB.
         return {
             "ok": False,
             "mensaje":
-                str(error),
+                _mensaje_error_checkout(error),
         }
 
 # ============================================================
@@ -3005,7 +3087,7 @@ def confirmar_checkout_con_entrega(
         return {
             "ok": False,
             "mensaje":
-                str(error),
+                _mensaje_error_checkout(error),
         }
 
     # ========================================================

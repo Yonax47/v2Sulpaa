@@ -81,7 +81,6 @@ def obtener_existencias_por_variantes(variantes_ids):
 # ============================================================
 
 import uuid
-from datetime import datetime, timedelta
 
 
 def crear_reserva_inventario(
@@ -101,6 +100,11 @@ def crear_reserva_inventario(
 
     La operación se realiza dentro de una única
     transacción de Inventario.
+
+    La fecha de expiración la genera MariaDB con NOW(), nunca
+    Python. De ese modo "expira_en" y "creado_en" comparten el
+    mismo reloj aunque el servidor de la aplicación esté en otra
+    zona horaria.
     """
 
     if not consumos:
@@ -218,6 +222,29 @@ def crear_reserva_inventario(
             # ------------------------------------------------
             # 3. Crear cabecera de reserva
             # ------------------------------------------------
+            #
+            # La fecha de expiración se calcula en MariaDB, no en
+            # Python. Así "creado_en" (que la base llena sola) y
+            # "expira_en" salen del mismo reloj y la restricción
+            # CHECK (expira_en > creado_en) siempre se cumple.
+            #
+            # Esto es importante en producción: el contenedor de
+            # Railway trabaja en UTC, mientras que MariaDB puede
+            # usar otra zona horaria (por ejemplo CEST). Cuando
+            # Python calculaba la fecha, la reserva podía nacer
+            # ya vencida y la base rechazaba el INSERT.
+            # ------------------------------------------------
+
+            minutos_expiracion = int(
+                minutos_expiracion
+            )
+
+            if minutos_expiracion <= 0:
+
+                raise ValueError(
+                    "El tiempo de expiración de la reserva "
+                    "debe ser mayor que cero."
+                )
 
             reserva_id = str(
                 uuid.uuid4()
@@ -228,13 +255,6 @@ def crear_reserva_inventario(
                 + uuid.uuid4().hex[
                     :12
                 ].upper()
-            )
-
-            expira_en = (
-                datetime.now()
-                + timedelta(
-                    minutes=minutos_expiracion
-                )
             )
 
             cursor.execute(
@@ -253,15 +273,42 @@ def crear_reserva_inventario(
                     'PEDIDO',
                     %s,
                     'ACTIVA',
-                    %s
+                    DATE_ADD(
+                        NOW(),
+                        INTERVAL %s MINUTE
+                    )
                 )
                 """,
                 (
                     reserva_id,
                     codigo_reserva,
                     referencia_id,
-                    expira_en,
+                    minutos_expiracion,
                 ),
+            )
+
+            # Leemos de la base la fecha que realmente quedó
+            # guardada, para devolver ese valor y no uno calculado
+            # en Python.
+            cursor.execute(
+                """
+                SELECT expira_en
+
+                FROM reservas
+
+                WHERE id = %s
+                """,
+                (
+                    reserva_id,
+                ),
+            )
+
+            reserva_creada = cursor.fetchone()
+
+            expira_en = (
+                reserva_creada["expira_en"]
+                if reserva_creada
+                else None
             )
 
             # ------------------------------------------------
@@ -557,11 +604,12 @@ def confirmar_reserva_pedido(
     Toda la operación se ejecuta dentro de una sola transacción:
 
     1. Bloquea la reserva.
-    2. Bloquea las existencias involucradas.
-    3. Descuenta stock_fisico.
-    4. Descuenta stock_reservado.
-    5. Registra el movimiento VENTA.
-    6. Marca la reserva como CONFIRMADA.
+    2. Verifica que no esté vencida.
+    3. Bloquea las existencias involucradas.
+    4. Descuenta stock_fisico.
+    5. Descuenta stock_reservado.
+    6. Registra el movimiento VENTA.
+    7. Marca la reserva como CONFIRMADA.
 
     Si cualquier paso falla, se ejecuta ROLLBACK.
     """
@@ -590,7 +638,9 @@ def confirmar_reserva_pedido(
                 """
                 SELECT
                     id,
-                    estado
+                    estado,
+                    expira_en,
+                    NOW() AS ahora
 
                 FROM reservas
 
@@ -621,6 +671,26 @@ def confirmar_reserva_pedido(
 
                 raise ValueError(
                     "La reserva del pedido ya no está activa."
+                )
+
+            # Una reserva vencida no puede convertirse en venta,
+            # aunque su estado siga siendo ACTIVA.
+            #
+            # La comparación usa dos valores que genera MariaDB en
+            # la misma consulta, así que no depende de la zona
+            # horaria de Railway.
+            expira_en = reserva.get("expira_en")
+            ahora = reserva.get("ahora")
+
+            if (
+                expira_en is not None
+                and ahora is not None
+                and expira_en <= ahora
+            ):
+
+                raise ValueError(
+                    "La reserva del pedido expiró. "
+                    "Vuelve a armar el carrito e intenta nuevamente."
                 )
 
             reserva_id = reserva["id"]

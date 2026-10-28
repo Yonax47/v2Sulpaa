@@ -14,6 +14,8 @@ import uuid
 from decimal import Decimal
 from unittest.mock import patch
 
+from pymysql.err import MySQLError
+
 from app.comercio import services
 from app.identidad import services as identidad_services
 from app.shared.unit_of_work import UnidadTrabajo
@@ -57,7 +59,7 @@ class _UnidadTrabajoFalsa:
 class CheckoutAtomicoUnitTest(unittest.TestCase):
     """El checkout se apoya en una única conexión y un único commit."""
 
-    def _ejecutar(self, falla_en=None):
+    def _ejecutar(self, falla_en=None, error_inventario=None):
         capturas = {}
         snapshot = {
             "ok": True,
@@ -68,6 +70,8 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
         def fabricar(nombre, exito):
             def _falso(*args, **kwargs):
                 capturas.setdefault(nombre, []).append(kwargs.get("conexion"))
+                if nombre == "inventario" and error_inventario is not None:
+                    raise error_inventario
                 if falla_en == nombre:
                     if nombre == "entrega":
                         raise RuntimeError("fallo simulado en entrega")
@@ -78,6 +82,7 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
+                patch.object(services.logger, "error"), \
                 patch.object(services, "UnidadTrabajo", _UnidadTrabajoFalsa), \
                 patch.object(services, "preparar_snapshot_pedido", return_value=snapshot), \
                 patch.object(services, "reservar_stock_pedido", fabricar("reserva", {"ok": True})), \
@@ -136,7 +141,9 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
     def test_fallo_entrega_revierte_lo_anterior(self):
         resultado, capturas = self._ejecutar(falla_en="entrega")
         self.assertFalse(resultado["ok"])
-        self.assertIn("entrega", resultado["mensaje"])
+        # El mensaje interno queda en el log; al cliente no se filtra.
+        self.assertNotIn("fallo simulado", resultado["mensaje"])
+        self.assertIn("Intenta nuevamente", resultado["mensaje"])
         self.assertFalse(_UnidadTrabajoFalsa.instancias[-1].confirmada)
         self.assertEqual(set(capturas), {"reserva", "pedido", "pago", "entrega"})
 
@@ -156,6 +163,46 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
             set(capturas),
             {"reserva", "pedido", "pago", "entrega", "carrito", "inventario"},
         )
+
+    def test_error_de_base_revierte_todo_y_no_expone_detalles(self):
+        """Un fallo de MariaDB revierte el conjunto y no filtra detalles."""
+        error = MySQLError(
+            4025,
+            "CONSTRAINT `chk_reserva_expiracion` failed for "
+            "`base1sulpaa_inventario`.`reservas`",
+        )
+
+        resultado, capturas = self._ejecutar(error_inventario=error)
+
+        self.assertFalse(resultado["ok"])
+        self.assertFalse(_UnidadTrabajoFalsa.instancias[-1].confirmada)
+        self.assertEqual(
+            set(capturas),
+            {"reserva", "pedido", "pago", "entrega", "carrito", "inventario"},
+        )
+
+        for prohibido in (
+            "4025",
+            "CONSTRAINT",
+            "chk_reserva_expiracion",
+            "base1sulpaa_inventario",
+        ):
+            self.assertNotIn(prohibido, resultado["mensaje"])
+
+        self.assertIn("Intenta nuevamente", resultado["mensaje"])
+
+    def test_reserva_expirada_durante_checkout_no_confirma(self):
+        """Una reserva vencida detiene el checkout con mensaje claro."""
+        resultado, _ = self._ejecutar(
+            error_inventario=ValueError(
+                "La reserva del pedido expiró. "
+                "Vuelve a armar el carrito e intenta nuevamente."
+            )
+        )
+
+        self.assertFalse(resultado["ok"])
+        self.assertIn("expiró", resultado["mensaje"])
+        self.assertFalse(_UnidadTrabajoFalsa.instancias[-1].confirmada)
 
     def test_no_quedan_compensaciones_silenciosas(self):
         for nombre in (
@@ -214,6 +261,7 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
+                patch.object(services.logger, "error"), \
                 patch.object(services, "UnidadTrabajo", _UnidadTrabajoFalsa), \
                 patch.object(services, "validar_entrega_confirmacion",
                              return_value={"ok": True, "costo_entrega": Decimal("0.00"),
@@ -274,7 +322,8 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
         resultado, capturas = self._ejecutar(falla_en="entrega")
 
         self.assertFalse(resultado["ok"])
-        self.assertIn("entrega", resultado["mensaje"])
+        self.assertNotIn("fallo simulado", resultado["mensaje"])
+        self.assertIn("Intenta nuevamente", resultado["mensaje"])
         self.assertFalse(_UnidadTrabajoFalsa.instancias[-1].confirmada)
         self.assertEqual(
             set(capturas),
