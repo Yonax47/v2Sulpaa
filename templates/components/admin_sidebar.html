@@ -1,0 +1,390 @@
+<aside class="admin-sidebar">
+
+    <div class="admin-sidebar-inner">
+
+
+        <!-- =================================================
+             ENCABEZADO
+             ================================================= -->
+
+        <div class="admin-sidebar-header">
+
+            <span class="admin-sidebar-title">
+                Panel SULPAA
+            </span>
+
+            <span class="admin-sidebar-role">
+                {{ rol_actual() }}
+            </span>
+
+        </div>
+
+
+        <!-- =================================================
+             NAVEGACIÓN
+             ================================================= -->
+
+        <nav
+            class="admin-sidebar-nav"
+            aria-label="Menú administrativo"
+        >
+
+
+            <!-- =================================================
+                 PRINCIPAL
+                 ================================================= -->
+
+            <div class="admin-menu-section">
+
+                <span class="admin-menu-title">
+                    Principal
+                </span>
+
+
+                {% if tiene_permiso('dashboard') %}
+
+                    <a
+                        href="{{ url_for('admin.dashboard') }}"
+                        class="admin-menu-item"
+                    >
+
+                        <span class="admin-menu-icon">
+                            📊
+                        </span>
+
+                        <span>
+                            Dashboard
+                        </span>
+
+                    </a>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- =================================================
+                 IDENTIDAD
+                 ================================================= -->
+
+            {% if tiene_permiso('identidad.ver') %}
+
+                <div class="admin-menu-section">
+
+                    <span class="admin-menu-title">
+                        Identidad
+                    </span>
+
+
+                    {% if tiene_permiso('identidad.ver') %}
+
+                        <a
+                            href="{{ url_for('admin.usuarios') }}"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                👥
+                            </span>
+
+                            <span>
+                                Usuarios
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+                </div>
+
+            {% endif %}
+
+
+            <!-- =================================================
+                 COMERCIO
+                 ================================================= -->
+
+            {% if tiene_permiso('comercio.ver') %}
+
+                <div class="admin-menu-section">
+
+                    <span class="admin-menu-title">
+                        Comercio
+                    </span>
+
+
+                    {% if tiene_permiso('comercio.catalogo') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                🛍️
+                            </span>
+
+                            <span>
+                                Catálogo
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('comercio.precios') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                💰
+                            </span>
+
+                            <span>
+                                Precios
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+                </div>
+
+            {% endif %}
+
+
+            <!-- =================================================
+                 INVENTARIO
+                 ================================================= -->
+
+            {% if tiene_permiso('inventario.ver') %}
+
+                <div class="admin-menu-section">
+
+                    <span class="admin-menu-title">
+                        Inventario
+                    </span>
+
+
+                    {% if tiene_permiso('inventario.stock') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                📦
+                            </span>
+
+                            <span>
+                                Stock
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('inventario.entradas') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                📥
+                            </span>
+
+                            <span>
+                                Entradas
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('inventario.mermas') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                ⚠️
+                            </span>
+
+                            <span>
+                                Mermas
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('inventario.ajustes') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                ⚙️
+                            </span>
+
+                            <span>
+                                Ajustes
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+                </div>
+
+            {% endif %}
+
+
+            <!-- =================================================
+                 OPERACIONES
+                 ================================================= -->
+
+            {% if tiene_permiso('operaciones.ver') %}
+
+                <div class="admin-menu-section">
+
+                    <span class="admin-menu-title">
+                        Operaciones
+                    </span>
+
+
+                    {% if tiene_permiso('operaciones.pedidos') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                🧾
+                            </span>
+
+                            <span>
+                                Pedidos
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('operaciones.preparacion') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                🧃
+                            </span>
+
+                            <span>
+                                Preparación
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('operaciones.despachos') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                🚚
+                            </span>
+
+                            <span>
+                                Despachos
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if tiene_permiso('operaciones.entregas') %}
+
+                        <a
+                            href="#"
+                            class="admin-menu-item"
+                        >
+
+                            <span class="admin-menu-icon">
+                                📍
+                            </span>
+
+                            <span>
+                                Entregas
+                            </span>
+
+                        </a>
+
+                    {% endif %}
+
+                </div>
+
+            {% endif %}
+
+
+            <!-- =================================================
+                 REPORTES
+                 ================================================= -->
+
+            {% if tiene_permiso('reportes.ver') %}
+
+                <div class="admin-menu-section">
+
+                    <span class="admin-menu-title">
+                        Supervisión
+                    </span>
+
+
+                    <a
+                        href="#"
+                        class="admin-menu-item"
+                    >
+
+                        <span class="admin-menu-icon">
+                            📈
+                        </span>
+
+                        <span>
+                            Reportes
+                        </span>
+
+                    </a>
+
+                </div>
+
+            {% endif %}
+
+        </nav>
+
+    </div>
+
+</aside>
