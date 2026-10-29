@@ -76,6 +76,12 @@ def actualizar_tarifa_delivery(tarifa_id, datos):
                 valores,
             )
         conexion.commit()
+    except Exception:
+        # Si el cambio no se confirma, se descarta por completo: la
+        # conexión puede reutilizarse después dentro de la misma
+        # solicitud y no debe arrastrar escrituras a medias.
+        conexion.rollback()
+        raise
     finally:
         conexion.close()
 

@@ -160,7 +160,11 @@ def reconciliar_caja():
     from app.config.database import crear_conexion
 
     esquemas = esquemas_sulpaa()
-    conexion = crear_conexion(esquemas["operaciones"])
+    # Conexión independiente: maneja su propio commit/rollback.
+    conexion = crear_conexion(
+        esquemas["operaciones"],
+        reutilizar=False,
+    )
     try:
         conexion.begin()
         pendientes = repos.pagos_sin_movimiento_caja(conexion, esquemas)

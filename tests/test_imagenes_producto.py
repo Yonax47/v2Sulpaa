@@ -37,10 +37,10 @@ class ResolverImagenTest(unittest.TestCase):
 
     def test_botellas_330ml_por_sabor(self):
         esperado = {
-            "Café": "img/BotellaCafe.png",
-            "Jamaica": "img/Botellaflordejamaica.png",
-            "Kion": "img/Botellakion.png",
-            "Limón": "img/Botellalimon.png",
+            "Café": "img/BotellaCafe.webp",
+            "Jamaica": "img/Botellaflordejamaica.webp",
+            "Kion": "img/Botellakion.webp",
+            "Limón": "img/Botellalimon.webp",
         }
         for sabor, ruta in esperado.items():
             with self.subTest(sabor=sabor):
@@ -54,17 +54,17 @@ class ResolverImagenTest(unittest.TestCase):
     def test_ignora_tildes_y_mayusculas(self):
         self.assertEqual(
             resolver_imagen_producto(sabor="CAFE", presentacion="botella 330 ml"),
-            "img/BotellaCafe.png",
+            "img/BotellaCafe.webp",
         )
         self.assertEqual(
             resolver_imagen_producto(sabor="limon", presentacion="Botella 330 ml"),
-            "img/Botellalimon.png",
+            "img/Botellalimon.webp",
         )
 
     def test_botella_de_un_litro_usa_imagen_generica(self):
         self.assertEqual(
             resolver_imagen_producto(sabor="Café", presentacion="Botella 1 L"),
-            "img/Botellalitrosulpaa.png",
+            "img/Botellalitrosulpaa.webp",
         )
 
     def test_barril_usa_imagen_generica(self):
@@ -72,7 +72,7 @@ class ResolverImagenTest(unittest.TestCase):
             with self.subTest(barril=barril):
                 self.assertEqual(
                     resolver_imagen_producto(sabor="Café", presentacion=barril),
-                    "img/Barrilsulpaa.png",
+                    "img/Barrilsulpaa.webp",
                 )
 
     def test_pack_por_sabor(self):

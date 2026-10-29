@@ -132,9 +132,16 @@ def _convertir_cantidad(valor):
 # 1. PRODUCTOS INDIVIDUALES
 # ============================================================
 
-def obtener_catalogo_tienda():
+def obtener_catalogo_tienda(productos=None, disponibilidad=None):
+    """
+    Devuelve el catálogo individual de la tienda con su stock.
 
-    productos = obtener_variantes_comerciales_tienda()
+    Los parámetros opcionales permiten reutilizar datos que ya leyó
+    obtener_datos_tienda(): así no se repite el mismo SQL.
+    """
+
+    if productos is None:
+        productos = obtener_variantes_comerciales_tienda()
 
     if not productos:
         return []
@@ -144,9 +151,10 @@ def obtener_catalogo_tienda():
         for producto in productos
     ]
 
-    disponibilidad = obtener_disponibilidad_variantes(
-        variantes_ids
-    )
+    if disponibilidad is None:
+        disponibilidad = obtener_disponibilidad_variantes(
+            variantes_ids
+        )
 
     catalogo = []
 
@@ -182,9 +190,15 @@ def obtener_catalogo_tienda():
 # 2. VARIANTES 330 ML
 # ============================================================
 
-def obtener_variantes_330ml_con_stock():
+def obtener_variantes_330ml_con_stock(variantes=None, disponibilidad=None):
+    """
+    Devuelve las variantes de 330 ml con su stock.
 
-    variantes = obtener_variantes_330ml_tienda()
+    Los parámetros opcionales permiten reutilizar datos ya leídos.
+    """
+
+    if variantes is None:
+        variantes = obtener_variantes_330ml_tienda()
 
     if not variantes:
         return []
@@ -194,9 +208,10 @@ def obtener_variantes_330ml_con_stock():
         for item in variantes
     ]
 
-    disponibilidad = obtener_disponibilidad_variantes(
-        variantes_ids
-    )
+    if disponibilidad is None:
+        disponibilidad = obtener_disponibilidad_variantes(
+            variantes_ids
+        )
 
     resultado = []
 
@@ -219,9 +234,21 @@ def obtener_variantes_330ml_con_stock():
 # 3. PACKS
 # ============================================================
 
-def obtener_packs_tienda():
+def obtener_packs_tienda(
+    packs=None,
+    componentes=None,
+    variantes_330=None,
+    disponibilidad=None,
+):
+    """
+    Devuelve los packs comerciales con su stock.
 
-    packs = obtener_packs_comerciales_tienda()
+    Los parámetros opcionales permiten reutilizar datos ya leídos por
+    obtener_datos_tienda() y evitar consultas repetidas.
+    """
+
+    if packs is None:
+        packs = obtener_packs_comerciales_tienda()
 
     if not packs:
         return []
@@ -231,9 +258,10 @@ def obtener_packs_tienda():
         for pack in packs
     ]
 
-    componentes = obtener_componentes_packs(
-        pack_ids
-    )
+    if componentes is None:
+        componentes = obtener_componentes_packs(
+            pack_ids
+        )
 
     componentes_por_pack = defaultdict(list)
 
@@ -249,15 +277,19 @@ def obtener_packs_tienda():
             componente["variante_id"]
         )
 
-    disponibilidad = obtener_disponibilidad_variantes(
-        list(variantes_ids)
-    )
+    if disponibilidad is None:
+        disponibilidad = obtener_disponibilidad_variantes(
+            list(variantes_ids)
+        )
+
+    if variantes_330 is None:
+        variantes_330 = obtener_variantes_330ml_tienda()
 
     # Solo los sabores comerciales visibles pueden venderse
     # mediante packs fijos en la tienda.
     variantes_330_visibles = {
         item["variante_id"]
-        for item in obtener_variantes_330ml_tienda()
+        for item in variantes_330
     }
 
     resultado = []
@@ -378,9 +410,22 @@ def obtener_packs_tienda():
 # 4. PACK PERSONALIZADO
 # ============================================================
 
-def obtener_configuracion_pack_personalizado():
+def obtener_configuracion_pack_personalizado(
+    packs=None,
+    reglas=None,
+    permitidas=None,
+    variantes_330=None,
+    disponibilidad=None,
+):
+    """
+    Devuelve la configuración de los packs personalizables.
 
-    packs = obtener_packs_comerciales_tienda()
+    Los parámetros opcionales permiten reutilizar datos ya leídos por
+    obtener_datos_tienda() y evitar consultas repetidas.
+    """
+
+    if packs is None:
+        packs = obtener_packs_comerciales_tienda()
 
     personalizados = [
         pack
@@ -396,15 +441,18 @@ def obtener_configuracion_pack_personalizado():
         for pack in personalizados
     ]
 
-    reglas = obtener_reglas_packs(
-        pack_ids
-    )
+    if reglas is None:
+        reglas = obtener_reglas_packs(
+            pack_ids
+        )
 
-    permitidas = obtener_variantes_permitidas_packs(
-        pack_ids
-    )
+    if permitidas is None:
+        permitidas = obtener_variantes_permitidas_packs(
+            pack_ids
+        )
 
-    variantes_330 = obtener_variantes_330ml_tienda()
+    if variantes_330 is None:
+        variantes_330 = obtener_variantes_330ml_tienda()
 
     variantes_por_id = {
         item["variante_id"]: item
@@ -416,9 +464,10 @@ def obtener_configuracion_pack_personalizado():
         for item in permitidas
     })
 
-    disponibilidad = obtener_disponibilidad_variantes(
-        variantes_ids
-    )
+    if disponibilidad is None:
+        disponibilidad = obtener_disponibilidad_variantes(
+            variantes_ids
+        )
 
     reglas_por_pack = defaultdict(list)
     permitidas_por_pack = defaultdict(list)
@@ -483,7 +532,7 @@ def obtener_configuracion_pack_personalizado():
 # 5. CONSUMO ACTUAL DEL CARRITO
 # ============================================================
 
-def _obtener_consumo_carrito(usuario_id):
+def _obtener_consumo_carrito(usuario_id, detalles=None, composiciones=None):
     """
     Calcula cuánto stock ya está comprometido
     visualmente dentro del carrito del usuario.
@@ -491,11 +540,15 @@ def _obtener_consumo_carrito(usuario_id):
     El carrito todavía NO reserva inventario,
     pero esto evita que el mismo usuario agregue
     cantidades superiores al stock disponible.
+
+    ``detalles`` y ``composiciones`` permiten reutilizar lo que ya
+    leyó obtener_carrito_usuario() y no repetir las mismas consultas.
     """
 
-    detalles = obtener_detalles_carrito_usuario(
-        usuario_id
-    )
+    if detalles is None:
+        detalles = obtener_detalles_carrito_usuario(
+            usuario_id
+        )
 
     consumo = defaultdict(int)
 
@@ -507,9 +560,10 @@ def _obtener_consumo_carrito(usuario_id):
         for item in detalles
     ]
 
-    composiciones = obtener_composiciones_carrito(
-        detalle_ids
-    )
+    if composiciones is None:
+        composiciones = obtener_composiciones_carrito(
+            detalle_ids
+        )
 
     composicion_por_detalle = defaultdict(list)
 
@@ -520,13 +574,14 @@ def _obtener_consumo_carrito(usuario_id):
         ].append(item)
 
     pack_ids_fijos = list({
-        item["pack_id"]
+        item.get("pack_id")
         for item in detalles
         if (
             item["tipo"] == "PACK"
-            and item["pack_id"]
-            and str(item["pack_tipo"]).upper()
-            == "FIJO"
+            and item.get("pack_id")
+            and str(
+                item.get("pack_tipo") or ""
+            ).upper() == "FIJO"
         )
     })
 
@@ -568,7 +623,7 @@ def _obtener_consumo_carrito(usuario_id):
         elif (
             detalle["tipo"] == "PACK"
             and str(
-                detalle["pack_tipo"]
+                detalle.get("pack_tipo") or ""
             ).upper() == "FIJO"
         ):
 
@@ -613,7 +668,7 @@ def _obtener_consumo_carrito(usuario_id):
 # 6. PESO TOTAL DEL CARRITO
 # ============================================================
 
-def _calcular_peso_carrito(usuario_id):
+def _calcular_peso_carrito(usuario_id, consumo=None):
     """
     Calcula el peso físico total del contenido del carrito.
 
@@ -627,11 +682,15 @@ def _calcular_peso_carrito(usuario_id):
     El peso unitario de cada variante se obtiene desde la base de datos
     mediante obtener_pesos_variantes(). Si una variante no tiene un peso
     registrado, no se inventa ningún valor: se informa como incompleta.
+
+    ``consumo`` permite reutilizar el cálculo ya hecho en la misma
+    solicitud y evitar otra lectura del carrito.
     """
 
-    consumo = _obtener_consumo_carrito(
-        usuario_id
-    )
+    if consumo is None:
+        consumo = _obtener_consumo_carrito(
+            usuario_id
+        )
 
     if not consumo:
         return {
@@ -1405,8 +1464,18 @@ def obtener_carrito_usuario(usuario_id):
     # --------------------------------------------------------
     # Se calcula desde las variantes realmente contenidas en el carrito.
     # Nunca se confía en un peso enviado desde el frontend.
+    #
+    # El consumo se calcula con los detalles y composiciones que ya
+    # están en memoria: antes se volvían a pedir a la base de datos.
+    consumo = _obtener_consumo_carrito(
+        usuario_id,
+        detalles=detalles,
+        composiciones=composiciones,
+    )
+
     peso = _calcular_peso_carrito(
-        usuario_id
+        usuario_id,
+        consumo=consumo,
     )
 
     return {
@@ -1437,19 +1506,97 @@ def obtener_carrito_usuario(usuario_id):
 # ============================================================
 
 def obtener_datos_tienda():
+    """
+    Reúne todos los datos de la tienda con el mínimo de consultas.
+
+    Antes, cada bloque volvía a pedir las mismas variantes, packs y
+    disponibilidad. Ahora se consultan una sola vez y se comparten
+    entre los cuatro bloques. El resultado es el mismo.
+    """
+
+    productos = obtener_variantes_comerciales_tienda()
+
+    variantes_330 = obtener_variantes_330ml_tienda()
+
+    packs = obtener_packs_comerciales_tienda()
+
+    pack_ids = [
+        pack["pack_id"]
+        for pack in packs
+    ]
+
+    componentes = obtener_componentes_packs(
+        pack_ids
+    )
+
+    pack_ids_personalizados = [
+        pack["pack_id"]
+        for pack in packs
+        if str(pack["tipo"]).upper() == "PERSONALIZABLE"
+    ]
+
+    reglas = obtener_reglas_packs(
+        pack_ids_personalizados
+    )
+
+    permitidas = obtener_variantes_permitidas_packs(
+        pack_ids_personalizados
+    )
+
+    # Una sola lectura de stock para todas las variantes de la página.
+    variantes_disponibilidad = {
+        producto["variante_id"]
+        for producto in productos
+    }
+
+    variantes_disponibilidad.update(
+        item["variante_id"]
+        for item in variantes_330
+    )
+
+    variantes_disponibilidad.update(
+        componente["variante_id"]
+        for componente in componentes
+    )
+
+    variantes_disponibilidad.update(
+        relacion["variante_id"]
+        for relacion in permitidas
+    )
+
+    disponibilidad = obtener_disponibilidad_variantes(
+        sorted(variantes_disponibilidad)
+    )
 
     return {
         "catalogo":
-            obtener_catalogo_tienda(),
+            obtener_catalogo_tienda(
+                productos=productos,
+                disponibilidad=disponibilidad,
+            ),
 
         "variantes_330":
-            obtener_variantes_330ml_con_stock(),
+            obtener_variantes_330ml_con_stock(
+                variantes=variantes_330,
+                disponibilidad=disponibilidad,
+            ),
 
         "packs":
-            obtener_packs_tienda(),
+            obtener_packs_tienda(
+                packs=packs,
+                componentes=componentes,
+                variantes_330=variantes_330,
+                disponibilidad=disponibilidad,
+            ),
 
         "packs_personalizados":
-            obtener_configuracion_pack_personalizado(),
+            obtener_configuracion_pack_personalizado(
+                packs=packs,
+                reglas=reglas,
+                permitidas=permitidas,
+                variantes_330=variantes_330,
+                disponibilidad=disponibilidad,
+            ),
     }
 
 # ============================================================
@@ -1593,7 +1740,7 @@ def actualizar_item_carrito(
         ):
 
             tipo_pack = str(
-                detalle["pack_tipo"]
+                detalle.get("pack_tipo")
                 or ""
             ).upper()
 
@@ -1865,7 +2012,7 @@ def preparar_snapshot_pedido(
             detalle["tipo"] == "PACK"
             and detalle["pack_id"]
             and str(
-                detalle["pack_tipo"]
+                detalle.get("pack_tipo") or ""
             ).upper() == "FIJO"
         )
     })
@@ -1908,7 +2055,7 @@ def preparar_snapshot_pedido(
         elif (
             detalle["tipo"] == "PACK"
             and str(
-                detalle["pack_tipo"]
+                detalle.get("pack_tipo") or ""
             ).upper() == "FIJO"
         ):
 

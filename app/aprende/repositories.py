@@ -187,5 +187,10 @@ def registrar_acceso(slug_solicitado, contenido_id, usuario_id, resultado):
             )
             conexion.commit()
             return True
+    except Exception:
+        # El acceso no se registró: se descarta la escritura para que
+        # una operación posterior de la misma solicitud no la confirme.
+        conexion.rollback()
+        raise
     finally:
         conexion.close()

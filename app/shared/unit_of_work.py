@@ -44,7 +44,13 @@ class UnidadTrabajo:
         self._confirmada = False
 
     def __enter__(self):
-        self.conexion = crear_conexion(self.esquemas["comercio"])
+        # Esta conexión NO se reutiliza: la unidad de trabajo necesita
+        # un commit/rollback propio y aislado de las lecturas de la
+        # solicitud.
+        self.conexion = crear_conexion(
+            self.esquemas["comercio"],
+            reutilizar=False,
+        )
         return self
 
     def confirmar(self):

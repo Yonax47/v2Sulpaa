@@ -19,7 +19,7 @@ import os
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 
 # ============================================================
@@ -75,6 +75,8 @@ from app.encuestas.routes import encuesta_bp
 
 from app.shared.decorators import login_required
 
+from app.config.database import cerrar_conexiones_solicitud
+
 
 # ============================================================
 # FÁBRICA DE LA APLICACIÓN
@@ -115,6 +117,60 @@ def create_app():
     es_produccion = entorno == "production"
 
     app.config["ES_PRODUCCION"] = es_produccion
+
+
+    # ========================================================
+    # CONEXIONES REUTILIZADAS POR SOLICITUD
+    # ========================================================
+    #
+    # Al terminar cada solicitud se cierran de verdad las conexiones
+    # que se reutilizaron mientras se atendía al usuario. Se registra
+    # en el teardown de la solicitud (antes de liberar el contexto de
+    # aplicación) y también en el del contexto, como respaldo: así
+    # ninguna conexión sobrevive a su solicitud, ni siquiera cuando
+    # varias solicitudes comparten un mismo contexto (pruebas o
+    # scripts). La función es idempotente.
+    app.teardown_request(cerrar_conexiones_solicitud)
+    app.teardown_appcontext(cerrar_conexiones_solicitud)
+
+
+    # ========================================================
+    # CACHÉ DE ARCHIVOS ESTÁTICOS
+    # ========================================================
+    #
+    # Flask responde "no-cache" por defecto, así que el navegador
+    # vuelve a preguntar por cada CSS, JS e imagen en cada página.
+    #
+    # Se permite reutilizarlos un tiempo prudente:
+    #
+    # - Imágenes: 7 días (cambian poco).
+    # - CSS y JS: 1 día (un ajuste llega rápido al usuario).
+    #
+    # No se usa "immutable" porque las rutas no llevan versión.
+
+    @app.after_request
+    def cache_archivos_estaticos(respuesta):
+
+        if not request.path.startswith("/static/"):
+            return respuesta
+
+        if respuesta.status_code != 200:
+            return respuesta
+
+        extension = os.path.splitext(
+            request.path
+        )[1].lower()
+
+        if extension in (".css", ".js"):
+            segundos = 60 * 60 * 24
+        else:
+            segundos = 60 * 60 * 24 * 7
+
+        respuesta.headers["Cache-Control"] = (
+            "public, max-age=%s" % segundos
+        )
+
+        return respuesta
 
 
     # ========================================================

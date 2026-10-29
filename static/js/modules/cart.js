@@ -121,10 +121,10 @@ Este archivo solo mejora la experiencia del usuario.
     // neutro (placeholder), nunca una imagen inventada.
 
     const IMAGEN_POR_SABOR = {
-        cafe: "img/BotellaCafe.png",
-        jamaica: "img/Botellaflordejamaica.png",
-        kion: "img/Botellakion.png",
-        limon: "img/Botellalimon.png",
+        cafe: "img/BotellaCafe.webp",
+        jamaica: "img/Botellaflordejamaica.webp",
+        kion: "img/Botellakion.webp",
+        limon: "img/Botellalimon.webp",
     };
 
     const IMAGEN_PACK_POR_SABOR = {
@@ -134,8 +134,8 @@ Este archivo solo mejora la experiencia del usuario.
         limon: "img/Pack6unidadeslimon.jpg",
     };
 
-    const IMAGEN_BARRIL = "img/Barrilsulpaa.png";
-    const IMAGEN_BOTELLA_LITRO = "img/Botellalitrosulpaa.png";
+    const IMAGEN_BARRIL = "img/Barrilsulpaa.webp";
+    const IMAGEN_BOTELLA_LITRO = "img/Botellalitrosulpaa.webp";
     const IMAGEN_PACK_MIXTO = "img/Packmixto.jpg";
 
     // Base de la carpeta static. La calculamos desde el propio

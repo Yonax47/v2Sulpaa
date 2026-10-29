@@ -56,10 +56,10 @@ import unicodedata
 
 # Botella de 330 ml con foto propia, por sabor.
 IMAGEN_BOTELLA_POR_SABOR = {
-    "cafe": "img/BotellaCafe.png",
-    "jamaica": "img/Botellaflordejamaica.png",
-    "kion": "img/Botellakion.png",
-    "limon": "img/Botellalimon.png",
+    "cafe": "img/BotellaCafe.webp",
+    "jamaica": "img/Botellaflordejamaica.webp",
+    "kion": "img/Botellakion.webp",
+    "limon": "img/Botellalimon.webp",
 }
 
 # Pack de 6 unidades con foto propia, por sabor.
@@ -71,8 +71,8 @@ IMAGEN_PACK_POR_SABOR = {
 }
 
 # Imágenes genéricas (sirven para cualquier sabor).
-IMAGEN_BARRIL = "img/Barrilsulpaa.png"
-IMAGEN_BOTELLA_LITRO = "img/Botellalitrosulpaa.png"
+IMAGEN_BARRIL = "img/Barrilsulpaa.webp"
+IMAGEN_BOTELLA_LITRO = "img/Botellalitrosulpaa.webp"
 IMAGEN_PACK_MIXTO = "img/Packmixto.jpg"
 
 
