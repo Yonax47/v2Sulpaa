@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
             toggle.setAttribute(
                 "aria-label",
                 estaVisible
-                    ? "Mostrar contraseña"
+                    ? "Ver contraseña"
                     : "Ocultar contraseña"
             );
         });

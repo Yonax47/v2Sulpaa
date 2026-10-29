@@ -201,11 +201,17 @@ class KPIsDashboardIntegracionTest(unittest.TestCase):
     def test_kpi_08_queda_pendiente_sin_solicitudes(self):
         # KPI-08 no tiene "solicitudes de programación" trazables en el
         # modelo: queda PENDIENTE hasta instrumentar ese denominador.
+        # Su lógica se conserva en el catálogo completo, pero no se
+        # publica en el panel hasta que sea verificable.
         kpi_08 = next(
-            k for k in self.resumen["kpis_funcionales"] if k["codigo"] == "KPI-08"
+            k for k in self.resumen["kpis"] if k["codigo"] == "KPI-08"
         )
         self.assertIsNone(kpi_08["valor"])
         self.assertEqual(kpi_08["estado"], "pendiente")
+        self.assertNotIn(
+            "KPI-08",
+            {k["codigo"] for k in self.resumen["kpis_funcionales"]},
+        )
 
     def test_kpi_09_hook_permanece_seguro_sin_tabla(self):
         # El hook del KPI-09 es defensivo: sin fuent present no inventa
@@ -236,7 +242,8 @@ class KPIsDashboardIntegracionTest(unittest.TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertIn(b"KPI-01", respuesta.data)
         self.assertIn(b"KPI-07", respuesta.data)
-        self.assertIn(b"KPI-08", respuesta.data)
+        # KPI-08 permanece oculto: su fuente real todavía no existe.
+        self.assertNotIn(b"KPI-08", respuesta.data)
 
 
 class ExportableViewsIntegracionTest(unittest.TestCase):

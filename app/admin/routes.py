@@ -105,7 +105,7 @@ def dashboard():
 @admin_required
 def indicadores():
     """
-    Página analítica de los diez KPI funcionales (RF-01 a RF-10).
+    Página analítica de los KPI funcionales verificados.
 
     Vista dedicada: cada indicador muestra numerador, denominador,
     fórmula, meta, estado y fuente real, y en caso de "PENDIENTE"

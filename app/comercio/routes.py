@@ -694,7 +694,50 @@ def detalle_pedido(pedido_id):
 
 
 # ============================================================
-# 12. MIS FAVORITOS
+# 12. CONFIRMACIÓN DE PEDIDO
+# ============================================================
+
+@comercio_bp.route(
+    "/pedidos/<pedido_id>/confirmacion",
+    methods=["GET"],
+)
+@login_required
+def confirmacion_pedido(pedido_id):
+    """
+    Muestra la confirmación profesional de una compra ya registrada.
+
+    Esta página es de SOLO LECTURA:
+
+    - no crea pedidos;
+    - no reserva inventario;
+    - no modifica pagos ni entregas.
+
+    Por eso, actualizarla o recargarla nunca genera un pedido
+    duplicado. La propiedad del pedido se verifica en el servicio
+    con pedido_id + usuario_id.
+    """
+
+    resultado = obtener_detalle_pedido_usuario(
+        usuario_id=session[
+            "usuario_id"
+        ],
+        pedido_id=pedido_id,
+    )
+
+    if not resultado.get(
+        "ok"
+    ):
+
+        abort(404)
+
+    return render_template(
+        "cliente/confirmacion_pedido.html",
+        pedido=resultado["pedido"],
+    )
+
+
+# ============================================================
+# 13. MIS FAVORITOS
 # ============================================================
 
 @comercio_bp.route(
@@ -721,7 +764,7 @@ def mis_favoritos():
 
 
 # ============================================================
-# 13. API — AGREGAR FAVORITO
+# 14. API — AGREGAR FAVORITO
 # ============================================================
 
 @comercio_bp.route(
@@ -760,7 +803,7 @@ def api_agregar_favorito():
 
 
 # ============================================================
-# 14. API — QUITAR FAVORITO
+# 15. API — QUITAR FAVORITO
 # ============================================================
 
 @comercio_bp.route(
@@ -796,7 +839,7 @@ def api_quitar_favorito():
 
 
 # ============================================================
-# 15. FICHA DE PRODUCTO (KPI-03)
+# 16. FICHA DE PRODUCTO (KPI-03)
 # ============================================================
 
 @comercio_bp.route(

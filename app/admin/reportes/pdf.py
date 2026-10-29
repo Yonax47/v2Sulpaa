@@ -232,7 +232,13 @@ class PdfReporteUnicode(FPDF):
         self.ln(6)
         self.set_font(_FAMILIA, "B", 10)
         self.set_text_color(*_VERDE_OSCURO)
-        self.cell(0, 8, _normalizar(f"{etiqueta}: {valor}"), ln=True)
+        self.cell(
+            0,
+            8,
+            _normalizar(f"{etiqueta}: {valor}"),
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
         if nota:
             self.set_font(_FAMILIA, "", 9)
             self.set_text_color(*_TEXTO_OSCURO)

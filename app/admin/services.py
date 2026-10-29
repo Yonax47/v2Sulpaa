@@ -1,27 +1,30 @@
 """
-Servicios del m\u00f3dulo Administrativo de SULPAA V2.
+Servicios del módulo Administrativo de SULPAA V2.
 
 Responsabilidad:
 - Orquestar las operaciones que el dashboard administrativo
-  necesita (KPI-04 instrumentado en la Etapa 1).
+  necesita.
 - No contiene SQL (eso vive en admin/repositories.py).
 - No contiene rutas (eso vive en admin/routes.py).
-- No modifica datos reales: s\u00f3lo LEE las m\u00e9tricas que
+- No modifica datos reales: sólo LEE las métricas que
   las tablas existentes ya permiten calcular.
 
-KPI instrumentado en esta Etapa 1:
+KPI verificados y visibles en el panel:
 
-- KPI-04: Disponibilidad del historial de pedidos.
+- KPI-01, KPI-02, KPI-03, KPI-04, KPI-05,
+  KPI-06, KPI-07, KPI-09 y KPI-10.
 
-KPI-01 permanece pendiente: el modelo actual no dispone de
-un estado final canónico del pedido que permita demostrar una
-finalización correcta de extremo a extremo.
+KPI-08 (Programación de entregas) queda oculto porque todavía
+no existe en la base de datos una entidad de solicitudes de
+programación que permita calcular su fórmula sin inventar datos.
+Su cálculo se conserva en el catálogo completo ``kpis`` para
+desarrollo futuro.
 
-Los dem\u00e1s 16 KPI (02-03, 05-18) quedan documentados
-como "Pendiente de instrumentaci\u00f3n" en el dashboard:
-NO se inventan valores.
+Los KPI-11 a KPI-18 son indicadores no funcionales que aún no
+están instrumentados: no se muestran en el panel.
 """
 
+from app.admin import repositories as repos
 from app.admin.repositories import (
     obtener_metrica_accesos_contenido,
     obtener_metrica_consultas_producto,
@@ -34,6 +37,22 @@ from app.admin.repositories import (
     obtener_metrica_reportes,
     obtener_metrica_satisfaccion,
     obtener_metrica_verificaciones_fisicas,
+)
+
+
+# KPI funcionales aprobados para mostrarse en el panel administrativo.
+# Si un indicador no aparece aquí, su lógica sigue calculándose en el
+# catálogo completo, pero no se publica en dashboard ni en la página KPI.
+KPI_FUNCIONALES_VISIBLES = (
+    "KPI-01",
+    "KPI-02",
+    "KPI-03",
+    "KPI-04",
+    "KPI-05",
+    "KPI-06",
+    "KPI-07",
+    "KPI-09",
+    "KPI-10",
 )
 
 
@@ -73,10 +92,10 @@ def resumen_dashboard():
     Returns:
         dict con tres secciones:
         - "kpis": catálogo completo de 18 indicadores.
-        - "kpis_funcionales": KPI-01 a KPI-10, que son los
-          indicadores visibles en este panel.
-        - "resumen": conteos derivados de los diez KPI
-          funcionales, sin valores simulados.
+        - "kpis_funcionales": únicamente los KPI verificados que se
+          muestran en el panel (ver ``KPI_FUNCIONALES_VISIBLES``).
+        - "resumen": conteos derivados de los KPI visibles, sin
+          valores simulados.
     """
 
     # ========================================================
@@ -670,7 +689,28 @@ def resumen_dashboard():
             else "no_cumple"
         )
 
-    # Los diez KPIs son instrumentados (cuentan con consulta real).
+    # ========================================================
+    # FILTRO DE KPI VISIBLES
+    # ========================================================
+    #
+    # El panel solo publica indicadores OPERATIVOS Y VERIFICADOS.
+    # Los demás se conservan en el catálogo "kpis" (lógica intacta
+    # para desarrollo futuro) pero no llegan a las plantillas.
+    # ========================================================
+
+    kpis_ocultos = [
+        kpi["codigo"]
+        for kpi in kpis_funcionales
+        if kpi["codigo"] not in KPI_FUNCIONALES_VISIBLES
+    ]
+
+    kpis_funcionales = [
+        kpi
+        for kpi in kpis_funcionales
+        if kpi["codigo"] in KPI_FUNCIONALES_VISIBLES
+    ]
+
+    # Los KPI visibles son instrumentados (cuentan con consulta real).
     # "Con evidencia" es cuántos tienen valor con denominador > 0;
     # la diferencia son "pendientes de datos" (PENDIENTE, que NO se
     # cuenta como incumplimiento).
@@ -835,6 +875,7 @@ def resumen_dashboard():
             "pendientes": len(kpis_funcionales) - con_evidencia,
             "cumplen": cumplen,
             "no_cumplen": no_cumplen,
+            "ocultos": len(kpis_ocultos),
         },
     }
 

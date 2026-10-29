@@ -118,6 +118,36 @@
 
 .admin-form-card, .admin-report-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
 .admin-form-card { padding: 1.4rem 1.5rem; max-width: 860px; }
+
+/* Formulario compartido de alta de repartidores. */
+.admin-repartidor-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+.admin-repartidor-form label {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    color: var(--color-text-secondary);
+    font-size: .76rem;
+    font-weight: 800;
+}
+.admin-repartidor-form input {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: .65rem .75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+.admin-repartidor-form .admin-button {
+    justify-self: start;
+    align-self: end;
+}
 .admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .admin-form-field { display: grid; gap: .35rem; min-width: 0; }
 .admin-form-field.is-full { grid-column: 1 / -1; }
@@ -151,6 +181,8 @@
 .admin-chart-card.is-wide .admin-detail-item span { color: var(--color-text-secondary); }
 
 @media (max-width: 640px) {
+    .admin-repartidor-form { grid-template-columns: 1fr; }
+    .admin-repartidor-form .admin-button { width: 100%; }
     .admin-form-grid, .admin-report-grid { grid-template-columns: 1fr; }
     .admin-form-field.is-full { grid-column: auto; }
     .admin-inline-form { flex-wrap: wrap; width: 100%; }

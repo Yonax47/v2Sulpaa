@@ -20,3 +20,20 @@ Thumbs.db
 
 # Archivos temporales
 *.tmp
+*.out
+
+# Resultados locales de pruebas y análisis
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.prof
+
+# Datos locales de desarrollo
+instance/
+*.sqlite3
+
+# Archivo accidental generado por herramientas MySQL locales
+query

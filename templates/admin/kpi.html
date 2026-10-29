@@ -12,7 +12,7 @@
     <!-- ========================================================
          INDICADORES KPI — PÁGINA ANALÍTICA
          ========================================================
-         Vista dedicada a los diez KPI funcionales (RF-01 a RF-10).
+         Vista dedicada a los KPI funcionales verificados.
          Reutiliza la MISMA fuente del dashboard y del reporte KPI
          (resumen_dashboard), por lo que nunca se contradice con
          ellos. Un indicador sin numerador/denominador relevante
@@ -40,12 +40,12 @@
 
                 <header class="admin-page-header">
                     <div>
-                        <span class="admin-eyebrow">Seguimiento funcional · RF-01 a RF-10</span>
+                        <span class="admin-eyebrow">Seguimiento funcional · KPI verificados</span>
                         <h1>Indicadores KPI</h1>
                         <p>
-                            Detalle de los diez indicadores funcionales: valor,
-                            numerador, denominador, fórmula, meta, estado y
-                            fuente real de cada uno.
+                            Detalle de los indicadores funcionales verificados:
+                            valor, numerador, denominador, fórmula, meta,
+                            estado y fuente real de cada uno.
                         </p>
                     </div>
                     <div class="admin-live-status">
@@ -58,7 +58,7 @@
                     <div class="admin-section-heading">
                         <div>
                             <span class="admin-section-kicker">Visión compacta</span>
-                            <h2 id="resumen-kpi">Resumen de los diez KPI</h2>
+                            <h2 id="resumen-kpi">Resumen de los {{ resumen.total }} KPI</h2>
                         </div>
                         <span class="admin-section-note">Misma fuente que el dashboard</span>
                     </div>
@@ -159,7 +159,7 @@
 
                 <footer class="admin-data-note">
                     <strong>Panel de solo lectura.</strong>
-                    Los diez KPI funcionales están instrumentados en el sistema
+                    Los KPI mostrados están instrumentados en el sistema
                     y todos se calculan con la misma capa Service que el
                     dashboard y el reporte KPI. Un indicador "Sin evidencia
                     suficiente" (PENDIENTE) no es un fallo de instrumentación:

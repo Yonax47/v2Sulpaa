@@ -1,0 +1,388 @@
+/*
+============================================================
+SULPAA V2 - CONFIRMACIÓN DE PEDIDO
+============================================================
+
+Estilos de la página que se muestra después de una compra.
+Reutiliza la base de orders.css (colores, botones y container)
+y solo añade el bloque de confirmación.
+============================================================
+*/
+
+
+/* ==========================================================
+   1. TARJETA PRINCIPAL
+   ========================================================== */
+
+.confirmation-hero {
+    position: relative;
+    overflow: hidden;
+
+    padding:
+        clamp(2.5rem, 5vw, 4.5rem)
+        0
+        clamp(2rem, 4vw, 3rem);
+
+    background:
+        radial-gradient(
+            circle at 12% 15%,
+            rgba(130, 195, 65, 0.16),
+            transparent 38%
+        ),
+        radial-gradient(
+            circle at 88% 85%,
+            rgba(1, 111, 70, 0.10),
+            transparent 36%
+        ),
+        linear-gradient(
+            135deg,
+            #fffdf8 0%,
+            #f7fbf1 55%,
+            #eaf7e9 100%
+        );
+}
+
+.confirmation-card {
+    position: relative;
+    z-index: 1;
+
+    width: min(760px, 100%);
+    margin: 0 auto;
+    padding:
+        clamp(1.8rem, 4vw, 3rem)
+        clamp(1.4rem, 4vw, 3rem);
+
+    border: 1px solid rgba(101, 170, 84, 0.22);
+    border-radius: 26px;
+
+    background: rgba(255, 255, 255, 0.94);
+
+    box-shadow:
+        0 24px 60px rgba(23, 61, 49, 0.10),
+        0 4px 14px rgba(23, 61, 49, 0.05);
+
+    text-align: center;
+}
+
+.confirmation-logo-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 0 auto 1.1rem;
+
+    padding: 0.35rem;
+
+    border-radius: 16px;
+
+    background: #076b48;
+}
+
+.confirmation-logo {
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+}
+
+.confirmation-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 74px;
+    height: 74px;
+    margin: 0 auto 1.1rem;
+
+    border-radius: 50%;
+
+    background: linear-gradient(140deg, #82c341, #3f8f4e);
+    color: #ffffff;
+
+    box-shadow: 0 12px 28px rgba(63, 143, 78, 0.32);
+}
+
+.confirmation-check svg {
+    width: 38px;
+    height: 38px;
+}
+
+.confirmation-card h1 {
+    margin: 0;
+
+    color: #163d30;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: clamp(1.7rem, 4.4vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.03em;
+}
+
+.confirmation-card p {
+    max-width: 520px;
+    margin: 0.9rem auto 0;
+
+    color: #687a72;
+
+    font-size: 0.97rem;
+    line-height: 1.75;
+}
+
+.confirmation-number {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    margin-top: 1.5rem;
+    padding: 0.85rem 1.6rem;
+
+    border: 1px dashed rgba(101, 170, 84, 0.45);
+    border-radius: 16px;
+
+    background: #f7fbf1;
+}
+
+.confirmation-number span {
+    color: #6f8a6d;
+
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.confirmation-number strong {
+    color: #2f5233;
+
+    font-size: 1.08rem;
+    letter-spacing: 0.02em;
+
+    word-break: break-word;
+}
+
+.confirmation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.8rem;
+
+    margin-top: 1.8rem;
+}
+
+/* Botón secundario: mismo tamaño que el principal, sin relleno. */
+
+.confirmation-actions .orders-btn:not(.orders-btn-primary) {
+    border: 1px solid rgba(23, 109, 73, 0.35);
+
+    background: #ffffff;
+    color: #176d49;
+}
+
+.confirmation-actions .orders-btn:not(.orders-btn-primary):hover {
+    border-color: rgba(23, 109, 73, 0.6);
+
+    background: #f4f8f0;
+    color: #105b3d;
+}
+
+
+/* ==========================================================
+   2. RESUMEN DEL PEDIDO
+   ========================================================== */
+
+.confirmation-detail {
+    padding-bottom: clamp(2.5rem, 5vw, 4rem);
+}
+
+.confirmation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+}
+
+.confirmation-panel {
+    border: 1px solid rgba(120, 60, 25, 0.12);
+    border-radius: 18px;
+
+    background: #fffdf9;
+
+    padding: 1.4rem 1.5rem;
+}
+
+.confirmation-panel h2 {
+    margin: 0 0 1rem;
+
+    color: #7a420f;
+
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.confirmation-line {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    padding: 0.8rem 0;
+
+    border-bottom: 1px dashed rgba(120, 60, 25, 0.15);
+}
+
+.confirmation-line:last-of-type {
+    border-bottom: 0;
+}
+
+.confirmation-line div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.confirmation-line div strong {
+    color: #33261a;
+    font-weight: 600;
+}
+
+.confirmation-line div span {
+    color: #9a6b45;
+    font-size: 0.82rem;
+}
+
+.confirmation-line > strong {
+    color: #7a420f;
+    white-space: nowrap;
+}
+
+.confirmation-totals {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+
+    margin-top: 1rem;
+}
+
+.confirmation-totals div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+
+    color: #6b4b33;
+    font-size: 0.9rem;
+}
+
+.confirmation-totals strong {
+    color: #33261a;
+}
+
+.confirmation-totals .confirmation-total {
+    padding-top: 0.6rem;
+
+    border-top: 1px solid rgba(120, 60, 25, 0.2);
+
+    color: #7a420f;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.confirmation-totals .confirmation-total strong {
+    color: #7a420f;
+}
+
+.confirmation-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    padding: 0.6rem 0;
+
+    border-bottom: 1px dashed rgba(120, 60, 25, 0.15);
+}
+
+.confirmation-field:last-child {
+    border-bottom: 0;
+}
+
+.confirmation-field span {
+    color: #9a6b45;
+
+    font-size: 0.72rem;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.confirmation-field strong {
+    color: #33261a;
+
+    font-size: 0.95rem;
+    line-height: 1.5;
+
+    word-break: break-word;
+}
+
+
+/* ==========================================================
+   3. RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 768px) {
+
+    .confirmation-card {
+        border-radius: 22px;
+    }
+
+    .confirmation-logo {
+        width: 76px;
+        height: 76px;
+    }
+
+    .confirmation-check {
+        width: 64px;
+        height: 64px;
+    }
+
+    .confirmation-check svg {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .orders-page .container {
+        width: calc(100% - 28px);
+    }
+
+    .confirmation-card {
+        padding: 1.6rem 1.1rem;
+        border-radius: 18px;
+    }
+
+    .confirmation-number {
+        display: flex;
+        width: 100%;
+        padding: 0.75rem 1rem;
+    }
+
+    .confirmation-number strong {
+        font-size: 1rem;
+    }
+
+    .confirmation-actions {
+        flex-direction: column;
+    }
+
+    .confirmation-actions .orders-btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .confirmation-panel {
+        padding: 1.2rem 1.1rem;
+    }
+}

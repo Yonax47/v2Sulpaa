@@ -411,29 +411,6 @@ con las pantallas de autenticación.
 }
 
 
-.auth-mobile-logo {
-    display:
-        none;
-
-    margin-bottom:
-        1.1rem;
-
-    color:
-        var(--sulpaa-green-900);
-
-    font-family:
-        Georgia,
-        "Times New Roman",
-        serif;
-
-    font-size:
-        1.6rem;
-
-    font-weight:
-        700;
-}
-
-
 .auth-form-header h2 {
     margin:
         0 0
@@ -766,8 +743,12 @@ pero reutilizamos la misma estructura si fuera necesario.
 
 
     .auth-brand-logo {
-        display:
-            none;
+        display: block;
+    }
+
+
+    .auth-brand-logo img {
+        width: 120px;
     }
 
 
@@ -805,12 +786,6 @@ pero reutilizamos la misma estructura si fuera necesario.
         padding:
             2.5rem
             2rem;
-    }
-
-
-    .auth-mobile-logo {
-        display:
-            block;
     }
 }
 
@@ -861,6 +836,11 @@ pero reutilizamos la misma estructura si fuera necesario.
         border-radius:
             0 0
             26px 26px;
+    }
+
+
+    .auth-brand-logo img {
+        width: 92px;
     }
 
 
@@ -923,12 +903,6 @@ pero reutilizamos la misma estructura si fuera necesario.
     .auth-field-full {
         grid-column:
             auto;
-    }
-
-
-    .auth-mobile-logo {
-        display:
-            none;
     }
 
 

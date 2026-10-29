@@ -2611,8 +2611,6 @@ updateSummary(0);
       const payload =
         buildCheckoutPayload();
 
-      console.log("CHECKOUT PAYLOAD:", payload);
-
       checkoutProcessing = true;
 
       if (confirmOrderButton) {
@@ -2664,26 +2662,14 @@ updateSummary(0);
           `Pedido ${data.numero_pedido} confirmado correctamente.`;
       }
 
-      alert(
-        "¡Pedido confirmado correctamente!\n\n" +
-          `Pedido: ${data.numero_pedido}\n` +
-          `Subtotal: S/ ${Number(
-            data.subtotal,
-          ).toFixed(2)}\n` +
-          `Entrega: S/ ${Number(
-            data.costo_entrega,
-          ).toFixed(2)}\n` +
-          `Total: S/ ${Number(
-            data.total,
-          ).toFixed(2)}`,
-      );
-
       /*
-       * El carrito ya quedó CONVERTIDO.
-       * Regresamos a la tienda.
+       * La compra ya quedó confirmada por el backend.
+       * Redirigimos a una página de solo lectura: si el
+       * usuario recarga, NO se vuelve a crear el pedido.
        */
 
-      window.location.href = "/tienda";
+      window.location.href =
+        `/pedidos/${encodeURIComponent(data.pedido_id)}/confirmacion`;
     } catch (error) {
       console.error(
         "Error al confirmar checkout:",
@@ -2702,11 +2688,6 @@ updateSummary(0);
           error.message ||
           "No se pudo confirmar el pedido.";
       }
-
-      alert(
-        error.message ||
-          "No se pudo confirmar el pedido.",
-      );
 
       updateConfirmOrderButton();
     }

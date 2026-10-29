@@ -700,7 +700,7 @@ class DashboardEjecutivoBloque4Test(unittest.TestCase):
             "respuestas_satisfactorias": 92,
         }
 
-    def test_diez_kpi_instrumentados(self):
+    def test_solo_kpi_verificados_quedan_visibles(self):
         metrica_kpi09 = {
             "disponible": True, "invitaciones_ok": 9,
             "pedidos_entregados": 10,
@@ -711,10 +711,13 @@ class DashboardEjecutivoBloque4Test(unittest.TestCase):
         por_codigo = {
             kpi["codigo"] for kpi in resumen["kpis_funcionales"]
         }
-        self.assertEqual(por_codigo, {f"KPI-{i:02d}" for i in range(1, 11)})
-        self.assertEqual(resumen["resumen"]["total"], 10)
-        self.assertEqual(resumen["resumen"]["instrumentados"], 10)
+        # KPI-08 queda oculto porque su denominador real no existe aún.
+        esperados = {f"KPI-{i:02d}" for i in (1, 2, 3, 4, 5, 6, 7, 9, 10)}
+        self.assertEqual(por_codigo, esperados)
+        self.assertEqual(resumen["resumen"]["total"], 9)
+        self.assertEqual(resumen["resumen"]["instrumentados"], 9)
         self.assertEqual(resumen["resumen"]["con_evidencia"], 9)
+        self.assertEqual(resumen["resumen"]["ocultos"], 1)
 
     def test_estado_por_codigo_incluye_detalle_nuevo(self):
         metrica_kpi09 = {
@@ -765,10 +768,16 @@ class DashboardEjecutivoBloque4Test(unittest.TestCase):
             kpi["codigo"]: kpi
             for kpi in resumen["kpis_funcionales"]
         }
-        for codigo in ("KPI-01", "KPI-04", "KPI-07", "KPI-08"):
+        for codigo in ("KPI-01", "KPI-04", "KPI-07"):
             self.assertIsNone(por_codigo[codigo]["valor"], codigo)
             self.assertEqual(
                 por_codigo[codigo]["estado"], "pendiente", codigo)
+        # KPI-08 conserva su cálculo en el catálogo completo.
+        catalogo = {
+            kpi["codigo"]: kpi for kpi in resumen["kpis"]
+        }
+        self.assertIsNone(catalogo["KPI-08"]["valor"])
+        self.assertEqual(catalogo["KPI-08"]["estado"], "pendiente")
 
     def test_pendiente_no_cuenta_como_no_cumple(self):
         # KPI-09 sin evidencia: nada de PENDIENTE debe inflar no_cumplen.
@@ -779,12 +788,12 @@ class DashboardEjecutivoBloque4Test(unittest.TestCase):
         pendientes = res["pendientes_de_datos"]
         self.assertEqual(
             pendientes + res["con_evidencia"], res["total"])
-        # Ninguna tarjeta reporta "no instrumentado": los 10 están
-        # instrumentados y la diferencia solo es "pendiente de datos".
-        self.assertEqual(res["instrumentados"], 10)
+        # Ninguna tarjeta reporta "no instrumentado": los KPI visibles
+        # están instrumentados y la diferencia solo es "pendiente de datos".
+        self.assertEqual(res["instrumentados"], 9)
         self.assertEqual(
             res["no_cumplen"],
-            10 - res["cumplen"] - pendientes,
+            9 - res["cumplen"] - pendientes,
         )
 
     def _reportes(self):
@@ -903,7 +912,7 @@ class SidebarSinProximamenteTest(unittest.TestCase):
             respuesta = cliente_con_sesion(self.app, ["GERENTE"]).get(
                 "/admin/dashboard")
         self.assertEqual(respuesta.status_code, 200)
-        self.assertNotIn(b"Pr\u00f3ximamente", respuesta.data)
+        self.assertNotIn("Próximamente".encode("utf-8"), respuesta.data)
 
 
 # ============================================================

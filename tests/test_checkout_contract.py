@@ -245,6 +245,12 @@ class ContratoFrontendCheckoutTest(unittest.TestCase):
         refresh = _function_source(self.source, "refreshAddressMode")
         self.assertIn("updateCarrierAgencySummary()", refresh)
 
+    def test_compra_exitosa_abre_confirmacion_sin_alerta(self):
+        confirmar = _function_source(self.source, "confirmCheckoutOrder")
+        self.assertIn("data.pedido_id", confirmar)
+        self.assertIn("/confirmacion", confirmar)
+        self.assertNotIn("alert(", confirmar)
+
 
 class ContratoOrdenCheckoutTest(unittest.TestCase):
     """Comprueba que el checkout pide primero la modalidad y luego el destino."""

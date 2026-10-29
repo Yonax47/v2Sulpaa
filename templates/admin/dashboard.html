@@ -81,7 +81,7 @@
                 <!-- ================================================
                      A. RESUMEN KPI
                      ================================================
-                     Distingue lo INSTRUMENTADO (los diez KPI cuentan
+                     Distingue lo INSTRUMENTADO (los KPI visibles cuentan
                      con consulta real definida) de lo que tiene
                      EVIDENCIA en base de datos. La diferencia son
                      "pendientes de datos": PENDIENTE, que NUNCA se
@@ -323,8 +323,8 @@
                 <!-- ================================================
                      D. ACCESO AL DETALLE ANALÍTICO
                      ================================================
-                     La página Indicadores KPI muestra los diez
-                     indicadores con numerador, denominador, fórmula,
+                     La página Indicadores KPI muestra los KPI
+                     verificados con numerador, denominador, fórmula,
                      meta, estado, fuente y evidencia requerida.
                      ================================================ -->
 
@@ -335,7 +335,7 @@
                     <div class="admin-section-heading">
                         <div>
                             <span class="admin-section-kicker">Seguimiento funcional</span>
-                            <h2 id="detalle-titulo">Estado de los diez KPI</h2>
+                            <h2 id="detalle-titulo">Estado de los {{ resumen.total }} KPI verificados</h2>
                         </div>
                         <a
                             href="{{ url_for('admin.indicadores') }}"
@@ -496,7 +496,7 @@
 
                 <footer class="admin-data-note">
                     <strong>Panel de solo lectura.</strong>
-                    Los diez KPI funcionales están instrumentados en el
+                    Los KPI mostrados están instrumentados en el
                     sistema. Un indicador queda "Sin evidencia
                     suficiente" (PENDIENTE) cuando su fuente aún no
                     registra actividad real; ese estado no se cuenta

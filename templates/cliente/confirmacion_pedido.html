@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+Pedido confirmado | SULPAA
+{% endblock %}
+
+
+{% block page_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/orders.css') }}"
+>
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/pages/order-confirmation.css') }}"
+>
+
+{% endblock %}
+
+
+{% block content %}
+
+{% include "components/navbar.html" %}
+
+
+<main class="orders-page confirmation-page">
+
+    <!-- ======================================================
+         1. MENSAJE DE COMPRA CONFIRMADA
+         ====================================================== -->
+
+    <section class="confirmation-hero">
+
+        <div class="container">
+
+            <article class="confirmation-card">
+
+                <a
+                    href="{{ url_for('inicio') }}"
+                    class="confirmation-logo-link"
+                    aria-label="Ir al inicio de SULPAA"
+                >
+                    <img
+                        src="{{ url_for('static', filename='img/logo-sulpaa.png') }}"
+                        alt="Logo SULPAA"
+                        class="confirmation-logo"
+                    >
+                </a>
+
+
+                <span class="confirmation-check" aria-hidden="true">
+
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            d="M5 12.5L9.5 17L19 7.5"
+                            stroke="currentColor"
+                            stroke-width="2.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+
+                </span>
+
+
+                <span class="orders-kicker">
+                    COMPRA CONFIRMADA
+                </span>
+
+                <h1>
+                    ¡Tu pedido se realizó correctamente!
+                </h1>
+
+                <p>
+                    Gracias por tu compra. Ya registramos tu pedido
+                    y podrás seguir su estado desde tu cuenta.
+                </p>
+
+
+                <div class="confirmation-number">
+
+                    <span>Número de pedido</span>
+
+                    <strong>{{ pedido.numero_pedido }}</strong>
+
+                </div>
+
+
+                <div class="confirmation-actions">
+
+                    <a
+                        href="{{ url_for('comercio.detalle_pedido', pedido_id=pedido.id) }}"
+                        class="orders-btn orders-btn-primary"
+                    >
+                        Ver mi pedido
+                    </a>
+
+                    <a
+                        href="{{ url_for('comercio.tienda') }}"
+                        class="orders-btn"
+                    >
+                        Volver a la tienda
+                    </a>
+
+                </div>
+
+            </article>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         2. RESUMEN REAL DEL PEDIDO
+         ====================================================== -->
+
+    <section class="orders-list confirmation-detail">
+
+        <div class="container">
+
+            <div class="confirmation-grid">
+
+                <!-- PRODUCTOS -->
+
+                <article class="confirmation-panel">
+
+                    <h2>Resumen del pedido</h2>
+
+                    {% for detalle in pedido.detalles %}
+
+                        <div class="confirmation-line">
+
+                            <div>
+
+                                <strong>
+                                    {{ detalle.nombre_articulo }}
+                                </strong>
+
+                                <span>
+                                    {{ detalle.cantidad }} × S/ {{ "%.2f"|format(detalle.precio_unitario|float) }}
+                                </span>
+
+                            </div>
+
+                            <strong>
+                                S/ {{ "%.2f"|format(detalle.subtotal_linea|float) }}
+                            </strong>
+
+                        </div>
+
+                    {% endfor %}
+
+
+                    <div class="confirmation-totals">
+
+                        <div>
+                            <span>Subtotal</span>
+                            <strong>
+                                S/ {{ "%.2f"|format(pedido.subtotal|float) }}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>Entrega</span>
+                            <strong>
+                                S/ {{ "%.2f"|format(pedido.costo_entrega|float) }}
+                            </strong>
+                        </div>
+
+                        <div class="confirmation-total">
+                            <span>Total</span>
+                            <strong>
+                                S/ {{ "%.2f"|format(pedido.total|float) }}
+                            </strong>
+                        </div>
+
+                    </div>
+
+                </article>
+
+
+                <!-- ENTREGA Y PAGO -->
+
+                <article class="confirmation-panel">
+
+                    <h2>Entrega y pago</h2>
+
+                    <div class="confirmation-field">
+
+                        <span>Número de pedido</span>
+
+                        <strong>{{ pedido.numero_pedido }}</strong>
+
+                    </div>
+
+                    <div class="confirmation-field">
+
+                        <span>Estado</span>
+
+                        <strong>{{ pedido.estado_label }}</strong>
+
+                    </div>
+
+                    {% if pedido.entrega %}
+
+                        <div class="confirmation-field">
+
+                            <span>Método de entrega</span>
+
+                            <strong>{{ pedido.entrega.tipo_entrega_label }}</strong>
+
+                        </div>
+
+                        {% if pedido.entrega.delivery %}
+
+                            <div class="confirmation-field">
+
+                                <span>Dirección de entrega</span>
+
+                                <strong>{{ pedido.entrega.delivery.direccion }}</strong>
+
+                            </div>
+
+                            {% if pedido.entrega.delivery.distrito_nombre %}
+
+                                <div class="confirmation-field">
+
+                                    <span>Distrito</span>
+
+                                    <strong>{{ pedido.entrega.delivery.distrito_nombre }}</strong>
+
+                                </div>
+
+                            {% endif %}
+
+                        {% elif pedido.entrega.recojo %}
+
+                            <div class="confirmation-field">
+
+                                <span>Punto de recojo</span>
+
+                                <strong>{{ pedido.entrega.recojo.nombre_punto }}</strong>
+
+                            </div>
+
+                            <div class="confirmation-field">
+
+                                <span>Dirección del punto</span>
+
+                                <strong>{{ pedido.entrega.recojo.direccion }}</strong>
+
+                            </div>
+
+                        {% elif pedido.entrega.transportista %}
+
+                            <div class="confirmation-field">
+
+                                <span>Transportista</span>
+
+                                <strong>{{ pedido.entrega.transportista.transportista_nombre }}</strong>
+
+                            </div>
+
+                            {% if pedido.entrega.transportista.distrito_destino_nombre %}
+
+                                <div class="confirmation-field">
+
+                                    <span>Destino</span>
+
+                                    <strong>{{ pedido.entrega.transportista.distrito_destino_nombre }}</strong>
+
+                                </div>
+
+                            {% endif %}
+
+                        {% endif %}
+
+                    {% endif %}
+
+                    {% if pedido.pago %}
+
+                        <div class="confirmation-field">
+
+                            <span>Método de pago</span>
+
+                            <strong>{{ pedido.pago.metodo_nombre }}</strong>
+
+                        </div>
+
+                        <div class="confirmation-field">
+
+                            <span>Estado del pago</span>
+
+                            <strong>{{ pedido.pago.estado_label }}</strong>
+
+                        </div>
+
+                    {% endif %}
+
+                </article>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+{% endblock %}
