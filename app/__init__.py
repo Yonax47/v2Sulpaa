@@ -57,6 +57,8 @@ from app.admin.pedidos.commands import registrar_comandos_pedidos
 from app.admin.entregas.routes import admin_entregas_bp
 from app.admin.inventario.routes import admin_inventario_bp
 from app.admin.contenido.routes import admin_contenido_bp
+from app.admin.catalogo.routes import admin_catalogo_bp
+from app.admin.catalogo.imagenes import url_imagen_catalogo
 from app.admin.caja.commands import registrar_comandos_caja
 from app.admin.caja.routes import admin_caja_bp
 from app.admin.reportes.routes import admin_reportes_bp
@@ -64,6 +66,7 @@ from app.admin.encuestas.routes import admin_encuestas_bp
 from app.admin.usuarios.routes import admin_usuarios_bp
 from app.admin.auditoria.routes import admin_auditoria_bp
 from app.admin.delivery.routes import admin_delivery_bp
+from app.admin.seguridad.routes import admin_seguridad_bp
 from app.aprende.routes import aprende_bp
 from app.repartidor.routes import repartidor_bp
 from app.encuestas.routes import encuesta_bp
@@ -74,6 +77,9 @@ from app.encuestas.routes import encuesta_bp
 # ============================================================
 
 from app.shared.decorators import login_required
+from app.shared.csrf import inicializar_csrf
+from app.config.testing import configurar_seguridad_pruebas
+from app.config.security import configurar_seguridad_accesos
 
 from app.config.database import cerrar_conexiones_solicitud
 
@@ -101,6 +107,10 @@ def create_app():
         static_folder="../static",
     )
 
+    # Las pruebas usan una sola política central. La seguridad queda activa
+    # por defecto y solo una prueba de negocio puede omitirla expresamente.
+    configurar_seguridad_pruebas(app)
+
 
     # ========================================================
     # CONFIGURACIÓN GENERAL
@@ -117,6 +127,10 @@ def create_app():
     es_produccion = entorno == "production"
 
     app.config["ES_PRODUCCION"] = es_produccion
+
+    # Los límites se cargan una sola vez. En producción el bloqueo permanece
+    # apagado hasta confirmar expresamente la cadena de proxies de Railway.
+    configurar_seguridad_accesos(app)
 
 
     # ========================================================
@@ -182,24 +196,27 @@ def create_app():
     # que la petición NO es segura y no distinguiría el
     # esquema real usado por el navegador.
     #
-    # Se confía UN solo salto (el propio PaaS); los valores
-    # reales de estas cabeceras los fija el proxy y no el
-    # cliente.
+    # No se confía ningún salto por defecto. ProxyFix solo se
+    # instala cuando staging confirmó la cadena real y las
+    # variables RAILWAY_PROXY_VALIDADO/TRUSTED_PROXY_HOPS lo
+    # expresan. Un número incorrecto permitiría que el cliente
+    # influyera en la IP usada por el bloqueo.
     #
-    # IMPORTANTE: el contenedor NUNCA se expone directamente
-    # a Internet; sólo el proxy lo hace.
+    # IMPORTANTE: antes de activarlo también se debe confirmar
+    # que el contenedor no sea accesible evitando el proxy.
     # ========================================================
 
-    if es_produccion:
+    saltos_proxy = app.config["TRUSTED_PROXY_HOPS"]
+    if app.config["RAILWAY_PROXY_VALIDADO"] and saltos_proxy:
 
         from werkzeug.middleware.proxy_fix import ProxyFix
 
         app.wsgi_app = ProxyFix(
             app.wsgi_app,
-            x_for=1,
-            x_proto=1,
-            x_host=1,
-            x_port=1,
+            x_for=saltos_proxy,
+            x_proto=saltos_proxy,
+            x_host=saltos_proxy,
+            x_port=saltos_proxy,
         )
 
 
@@ -234,6 +251,12 @@ def create_app():
 
     app.config["SECRET_KEY"] = clave_secreta
 
+    # CSRF protege todas las acciones que cambian información. Se registra
+    # después de configurar la clave secreta porque el token se guarda en la
+    # sesión firmada de Flask. No se crean excepciones por módulo: cualquier
+    # POST, PUT, PATCH o DELETE debe demostrar que nació dentro de SULPAA.
+    inicializar_csrf(app)
+
 
     # ========================================================
     # FUNCIONES DISPONIBLES EN LAS PLANTILLAS
@@ -248,6 +271,10 @@ def create_app():
     app.jinja_env.globals["imagen_producto"] = (
         resolver_imagen_producto
     )
+
+    # Convierte rutas lógicas del catálogo en una URL segura. Las imágenes
+    # antiguas siguen saliendo desde /static y las nuevas desde el volumen.
+    app.jinja_env.globals["url_imagen_catalogo"] = url_imagen_catalogo
 
 
     # ========================================================
@@ -391,6 +418,10 @@ def create_app():
     )
 
     app.register_blueprint(
+        admin_catalogo_bp
+    )
+
+    app.register_blueprint(
         admin_caja_bp
     )
 
@@ -412,6 +443,10 @@ def create_app():
 
     app.register_blueprint(
         admin_delivery_bp
+    )
+
+    app.register_blueprint(
+        admin_seguridad_bp
     )
 
     app.register_blueprint(
