@@ -245,6 +245,13 @@
                         Seguir comprando
                     </a>
 
+                    <a
+                        href="{{ url_for('comercio.descargar_constancia_pedido', pedido_id=pedido.id) }}"
+                        class="orders-btn orders-btn-download"
+                    >
+                        Descargar constancia PDF
+                    </a>
+
                 </div>
 
                 {% if pedido.encuesta and pedido.encuesta.disponible %}

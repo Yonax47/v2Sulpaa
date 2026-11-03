@@ -557,6 +557,45 @@ templates/cliente/pedidos.html
     gap: 1rem;
 }
 
+.order-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+}
+
+.order-pdf-btn,
+.orders-btn-download {
+    border-color: rgba(1, 111, 70, 0.28);
+    background: #edf7f0;
+    color: #075f40;
+}
+
+.order-pdf-btn:hover,
+.orders-btn-download:hover {
+    background: #dff0e4;
+    color: #034c32;
+}
+
+@media (max-width: 560px) {
+    .order-card-footer,
+    .order-card-actions,
+    .order-detail-hero-actions,
+    .confirmation-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .order-card-actions a,
+    .order-detail-hero-actions a,
+    .confirmation-actions a {
+        justify-content: center;
+        width: 100%;
+        text-align: center;
+    }
+}
+
 .order-card {
     overflow: hidden;
 

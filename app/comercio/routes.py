@@ -14,7 +14,10 @@ from flask import (
     session,
     abort,
     send_from_directory,
+    send_file,
 )
+
+from io import BytesIO
 
 from app.admin.catalogo.imagenes import (
     directorio_imagenes,
@@ -43,6 +46,7 @@ from app.comercio.services import (
     quitar_variante_de_favoritos,
     obtener_ficha_producto,
 )
+from app.comercio.constancias import generar_constancia_compra
 
 from app.identidad.services import (
     obtener_checkout_usuario,
@@ -725,6 +729,34 @@ def detalle_pedido(pedido_id):
         "cliente/detalle_pedido.html",
         pedido=resultado["pedido"],
     )
+
+
+@comercio_bp.route(
+    "/pedidos/<pedido_id>/constancia.pdf",
+    methods=["GET"],
+)
+@login_required
+def descargar_constancia_pedido(pedido_id):
+    """Genera bajo demanda la constancia de un pedido propio."""
+
+    resultado = generar_constancia_compra(
+        usuario_id=session["usuario_id"],
+        pedido_id=pedido_id,
+    )
+    if not resultado:
+        abort(404)
+
+    respuesta = send_file(
+        BytesIO(resultado["contenido"]),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=resultado["nombre_archivo"],
+        max_age=0,
+    )
+    respuesta.headers["Cache-Control"] = "private, no-store, max-age=0"
+    respuesta.headers["Pragma"] = "no-cache"
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
+    return respuesta
 
 
 # ============================================================

@@ -103,6 +103,13 @@ Pedido confirmado | SULPAA
                     </a>
 
                     <a
+                        href="{{ url_for('comercio.descargar_constancia_pedido', pedido_id=pedido.id) }}"
+                        class="orders-btn orders-btn-download"
+                    >
+                        Descargar constancia PDF
+                    </a>
+
+                    <a
                         href="{{ url_for('comercio.tienda') }}"
                         class="orders-btn"
                     >

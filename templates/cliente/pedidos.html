@@ -328,16 +328,24 @@ Mis pedidos | SULPAA
                                 </span>
 
 
-                                <a
-                                    href="{{ url_for(
-                                        'comercio.detalle_pedido',
-                                        pedido_id=pedido.id
-                                    ) }}"
-                                    class="order-detail-btn"
-                                >
-                                    Ver detalle
-                                    <span aria-hidden="true">→</span>
-                                </a>
+                                <div class="order-card-actions">
+                                    <a
+                                        href="{{ url_for(
+                                            'comercio.detalle_pedido',
+                                            pedido_id=pedido.id
+                                        ) }}"
+                                        class="order-detail-btn"
+                                    >
+                                        Ver detalle
+                                        <span aria-hidden="true">→</span>
+                                    </a>
+                                    <a
+                                        href="{{ url_for('comercio.descargar_constancia_pedido', pedido_id=pedido.id) }}"
+                                        class="order-detail-btn order-pdf-btn"
+                                    >
+                                        Constancia PDF
+                                    </a>
+                                </div>
 
                             </div>
 

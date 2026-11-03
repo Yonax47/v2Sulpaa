@@ -827,6 +827,33 @@ def obtener_datos_checkout_usuario(usuario_id):
     finally:
 
         conexion.close()
+
+
+def obtener_nombre_cliente_constancia(usuario_id):
+    """Devuelve solo el nombre necesario para una constancia de compra.
+
+    No proyecta correo, DNI, teléfono ni datos de facturación.
+    """
+
+    conexion = conexion_identidad()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT CONCAT_WS(
+                    ' ', p.nombres, p.apellido_paterno, p.apellido_materno
+                ) AS nombre_cliente
+                FROM usuarios u
+                INNER JOIN perfiles p ON p.usuario_id = u.id
+                WHERE u.id = %s AND u.estado = 'ACTIVO'
+                LIMIT 1
+                """,
+                (usuario_id,),
+            )
+            fila = cursor.fetchone()
+            return (fila.get("nombre_cliente") or "").strip() if fila else None
+    finally:
+        conexion.close()
 # ============================================================
 # UBICACIÓN GEOGRÁFICA
 # ============================================================
