@@ -177,6 +177,7 @@
         <span>Sesión activa</span>
         <strong>{{ session.get("correo", "") }}</strong>
         <div class="admin-session-actions">
+            <a href="{{ url_for('perfil.inicio') }}" class="admin-return-link">Mi perfil</a>
             <a href="{{ url_for('inicio') }}" class="admin-return-link">Volver al sitio</a>
             <form method="POST" action="{{ url_for('identidad.logout') }}" class="admin-logout-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

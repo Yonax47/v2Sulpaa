@@ -9,6 +9,7 @@ import os
 import requests
 
 APISPERU_BASE_URL = "https://dniruc.apisperu.com/api/v1"
+APISPERU_TIMEOUT = (3.05, 10)
 
 
 # ============================================================
@@ -47,30 +48,45 @@ def consultar_dni(dni):
         return {
             "ok": False,
             "mensaje": "El DNI debe tener 8 dígitos.",
+            "tipo_error": "INVALIDO",
         }
 
     try:
         response = requests.get(
             f"{APISPERU_BASE_URL}/dni/{dni}",
             params={"token": _obtener_token()},
-            timeout=10,
+            timeout=APISPERU_TIMEOUT,
+            # La credencial viaja en la URL. Una redirección inesperada
+            # podría enviarla a otro host; el proveedor no necesita redirigir.
+            allow_redirects=False,
         )
 
-    except requests.RequestException:
+    except (requests.RequestException, RuntimeError):
         return {
             "ok": False,
             "mensaje": (
                 "No fue posible comunicarse "
                 "con el servicio de consulta."
             ),
+            "tipo_error": "NO_DISPONIBLE",
         }
 
     if response.status_code != 200:
+        # 401/403/429 indican un problema del servicio o de la credencial,
+        # no un DNI inexistente. Solo 404/400 se tratan como documento no
+        # encontrado para no culpar al usuario de una caída del proveedor.
+        no_disponible = (
+            response.status_code >= 500
+            or response.status_code in (401, 403, 429)
+        )
         return {
             "ok": False,
             "mensaje": (
                 "No se pudieron obtener "
                 "los datos del DNI."
+            ),
+            "tipo_error": (
+                "NO_DISPONIBLE" if no_disponible else "INVALIDO"
             ),
         }
 
@@ -84,6 +100,24 @@ def consultar_dni(dni):
                 "El servicio devolvió "
                 "una respuesta inválida."
             ),
+            "tipo_error": "NO_DISPONIBLE",
+        }
+
+    if not isinstance(datos, dict):
+        return {
+            "ok": False,
+            "mensaje": (
+                "El servicio devolvió "
+                "una respuesta inválida."
+            ),
+            "tipo_error": "NO_DISPONIBLE",
+        }
+
+    if datos.get("success") is False:
+        return {
+            "ok": False,
+            "mensaje": "No se encontró un DNI válido.",
+            "tipo_error": "INVALIDO",
         }
 
     return {
@@ -123,16 +157,18 @@ def consultar_ruc(ruc):
         response = requests.get(
             f"{APISPERU_BASE_URL}/ruc/{ruc}",
             params={"token": _obtener_token()},
-            timeout=10,
+            timeout=APISPERU_TIMEOUT,
+            allow_redirects=False,
         )
 
-    except requests.RequestException:
+    except (requests.RequestException, RuntimeError):
         return {
             "ok": False,
             "mensaje": (
                 "No fue posible comunicarse "
                 "con el servicio de consulta."
             ),
+            "tipo_error": "NO_DISPONIBLE",
         }
 
     if response.status_code != 200:
@@ -141,6 +177,12 @@ def consultar_ruc(ruc):
             "mensaje": (
                 "No se pudieron obtener "
                 "los datos del RUC."
+            ),
+            "tipo_error": (
+                "NO_DISPONIBLE"
+                if response.status_code >= 500
+                or response.status_code in (401, 403, 429)
+                else "INVALIDO"
             ),
         }
 
@@ -154,6 +196,17 @@ def consultar_ruc(ruc):
                 "El servicio devolvió "
                 "una respuesta inválida."
             ),
+            "tipo_error": "NO_DISPONIBLE",
+        }
+
+    if not isinstance(datos, dict):
+        return {
+            "ok": False,
+            "mensaje": (
+                "El servicio devolvió "
+                "una respuesta inválida."
+            ),
+            "tipo_error": "NO_DISPONIBLE",
         }
 
     # APIsPERU responde success=false cuando el RUC no existe.

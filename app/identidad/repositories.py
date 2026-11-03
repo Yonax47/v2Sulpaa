@@ -7,6 +7,8 @@ relacionadas con usuarios y perfiles.
 No debe contener lógica de negocio ni código de rutas Flask.
 """
 
+import uuid
+
 from app.config.database import conexion_identidad
 from app.identidad.access_control import evaluar_fallo_contador
 
@@ -524,11 +526,14 @@ def crear_usuario_y_perfil(
     apellido_materno: str | None,
     dni: str | None,
     telefono: str,
+    rol_codigo: str = "CLIENTE",
 ):
     """
-    Crea usuario y perfil dentro de una única transacción.
+    Crea usuario, perfil y rol inicial dentro de una única transacción.
 
-    Si alguna inserción falla, ninguna de las dos queda registrada.
+    Si el rol no existe/está inactivo o alguna inserción falla, no queda una
+    cuenta parcial. El rol se resuelve por código dentro de esta misma
+    transacción; no se modifican vínculos de cuentas existentes.
     """
     conexion = conexion_identidad()
 
@@ -593,6 +598,31 @@ def crear_usuario_y_perfil(
                     dni,
                     telefono,
                 ),
+            )
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM roles
+                WHERE codigo = %s AND estado = 'ACTIVO'
+                LIMIT 1
+                """,
+                (rol_codigo,),
+            )
+            rol = cursor.fetchone()
+            if not rol:
+                raise RuntimeError(
+                    "No existe un rol activo para completar el registro."
+                )
+
+            cursor.execute(
+                """
+                INSERT INTO usuario_roles (
+                    id, usuario_id, rol_id, asignado_por_usuario_id, estado
+                )
+                VALUES (%s, %s, %s, NULL, 'ACTIVO')
+                """,
+                (str(uuid.uuid4()), usuario_id, rol["id"]),
             )
 
         conexion.commit()
@@ -1074,7 +1104,7 @@ def listar_direcciones_usuario(usuario_id):
 def guardar_datos_facturacion(
     facturacion_id,
     usuario_id,
-    tipo,
+    tipo_contribuyente,
     dni=None,
     ruc=None,
     nombre_facturacion=None,
@@ -1085,6 +1115,10 @@ def guardar_datos_facturacion(
 ):
     """
     Guarda los datos de facturación verificados del usuario.
+
+    ``tipo_contribuyente`` corresponde a la semántica histórica de la columna
+    ``datos_facturacion.tipo``: únicamente ``PERSONA`` o ``EMPRESA``. No debe
+    recibir el tipo de comprobante ``BOLETA``/``FACTURA``.
 
     Si el mismo documento ya existe como registro activo,
     se actualiza en lugar de crear un duplicado.
@@ -1104,7 +1138,7 @@ def guardar_datos_facturacion(
             # 1. Buscar un registro existente
             # ------------------------------------------------
 
-            if tipo == "PERSONA":
+            if tipo_contribuyente == "PERSONA":
 
                 cursor.execute(
                     """
@@ -1124,7 +1158,7 @@ def guardar_datos_facturacion(
                     ),
                 )
 
-            elif tipo == "EMPRESA":
+            elif tipo_contribuyente == "EMPRESA":
 
                 cursor.execute(
                     """
@@ -1212,7 +1246,7 @@ def guardar_datos_facturacion(
                     INSERT INTO datos_facturacion (
                         id,
                         usuario_id,
-                        tipo,
+                        tipo_contribuyente,
                         dni,
                         ruc,
                         nombre_facturacion,

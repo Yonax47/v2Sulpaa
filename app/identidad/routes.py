@@ -48,7 +48,9 @@ from app.identidad.services import (
     validar_ruc_facturacion,
     registrar_facturacion_checkout,
     obtener_roles_usuario,
+    verificar_dni_registro,
 )
+from app.shared.rate_limit import consumir_limite
 
 
 # ============================================================
@@ -90,24 +92,30 @@ def registro():
 
     if request.method == "POST":
 
+        permitido, _ = consumir_limite(
+            f"registro:{obtener_ip_cliente(request)}",
+            maximo=5,
+            ventana_segundos=600,
+        )
+        if not permitido:
+            flash(
+                "Se realizaron demasiados intentos. "
+                "Espera unos minutos antes de volver a intentarlo.",
+                "danger",
+            )
+            return render_template(
+                "auth/registro.html", datos_formulario={}
+            ), 429
+
         # ----------------------------------------------------
         # Datos no sensibles que podemos volver a mostrar
         # si ocurre un error.
         # ----------------------------------------------------
 
+        # Los nombres y apellidos NO se conservan desde el navegador: solo
+        # pueden provenir de la consulta backend al reenviar el formulario.
+        # Así un intento manipulado no reaparece como si fuera válido.
         datos_formulario = {
-            "nombres": request.form.get(
-                "nombres",
-                "",
-            ),
-            "apellido_paterno": request.form.get(
-                "apellido_paterno",
-                "",
-            ),
-            "apellido_materno": request.form.get(
-                "apellido_materno",
-                "",
-            ),
             "dni": request.form.get(
                 "dni",
                 "",
@@ -132,13 +140,17 @@ def registro():
                 "password",
                 "",
             ),
-            nombres=datos_formulario["nombres"],
-            apellido_paterno=datos_formulario[
-                "apellido_paterno"
-            ],
-            apellido_materno=datos_formulario[
-                "apellido_materno"
-            ],
+            # Se envían por compatibilidad de firma, pero el servicio los
+            # ignora y vuelve a obtener la identidad desde APIsPERU.
+            nombres=request.form.get("nombres", ""),
+            apellido_paterno=request.form.get(
+                "apellido_paterno",
+                "",
+            ),
+            apellido_materno=request.form.get(
+                "apellido_materno",
+                "",
+            ),
             dni=datos_formulario["dni"],
             telefono=datos_formulario["telefono"],
         )
@@ -174,6 +186,41 @@ def registro():
         "auth/registro.html",
         datos_formulario=datos_formulario,
     )
+
+
+@identidad_bp.route(
+    "/api/registro/verificar-dni",
+    methods=["POST"],
+)
+def verificar_dni_para_registro():
+    """Consulta APIsPERU sin exponer credenciales ni afirmar titularidad."""
+    permitido, reintentar_en = consumir_limite(
+        f"dni-registro:{obtener_ip_cliente(request)}",
+        maximo=5,
+        ventana_segundos=600,
+    )
+    if not permitido:
+        return jsonify({
+            "ok": False,
+            "estado": "ERROR",
+            "mensaje": "Demasiadas consultas. Intenta nuevamente más tarde.",
+            "reintentar_en": reintentar_en,
+        }), 429
+
+    datos = request.get_json(silent=True) or {}
+    if not isinstance(datos, dict):
+        return jsonify({
+            "ok": False,
+            "estado": "INVALIDO",
+            "mensaje": "La solicitud de verificación no es válida.",
+        }), 400
+
+    resultado = verificar_dni_registro(datos.get("dni"))
+    respuesta = jsonify(resultado)
+    # La respuesta contiene nombres asociados a un documento: no debe quedar
+    # almacenada en cachés de navegador ni en proxies intermedios.
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200 if resultado.get("ok") else 400
 
 
 # ============================================================
@@ -615,7 +662,9 @@ def guardar_facturacion_checkout():
 
     resultado = registrar_facturacion_checkout(
         usuario_id=session["usuario_id"],
-        tipo=datos.get("tipo"),
+        tipo_comprobante=(
+            datos.get("tipo_comprobante") or datos.get("tipo")
+        ),
         documento=datos.get("documento"),
     )
 

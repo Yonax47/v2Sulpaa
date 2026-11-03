@@ -91,225 +91,82 @@ def registrar_usuario(
     dni: str | None,
     telefono: str,
 ):
-    """
-    Registra un nuevo usuario comprador.
-
-    Flujo:
-    1. Normaliza datos.
-    2. Valida formatos.
-    3. Evita duplicados.
-    4. Genera UUID.
-    5. Protege la contraseña con bcrypt.
-    6. Guarda usuario y perfil en una transacción.
-    """
-
-    # ========================================================
-    # 1. NORMALIZACIÓN
-    # ========================================================
-
+    """Registra una cuenta usando exclusivamente la identidad de APIsPERU."""
     correo = (correo or "").strip().lower()
+    dni = str(dni or "").strip()
+    telefono = normalizar_telefono(telefono)
 
-    nombres = (nombres or "").strip()
-
-    apellido_paterno = (
-        apellido_paterno or ""
-    ).strip()
-
-    apellido_materno = (
-        apellido_materno.strip()
-        if apellido_materno
-        else None
-    )
-
-    dni = (
-        dni.strip()
-        if dni
-        else None
-    )
-
-    telefono = normalizar_telefono(
-        telefono
-    )
-
-
-    # ========================================================
-    # 2. VALIDACIÓN DE NOMBRES
-    # ========================================================
-
-    valido, mensaje = validar_nombre(
-        nombres,
-        "Los nombres",
-        obligatorio=True,
-    )
-
+    valido, mensaje = validar_dni(dni, obligatorio=True)
     if not valido:
-        return {
-            "ok": False,
-            "mensaje": mensaje,
-        }
-
-
-    valido, mensaje = validar_nombre(
-        apellido_paterno,
-        "El apellido paterno",
-        obligatorio=True,
-    )
-
+        return {"ok": False, "mensaje": mensaje}
+    valido, mensaje = validar_telefono_peru(telefono, obligatorio=True)
     if not valido:
-        return {
-            "ok": False,
-            "mensaje": mensaje,
-        }
-
-
-    valido, mensaje = validar_nombre(
-        apellido_materno,
-        "El apellido materno",
-        obligatorio=False,
-    )
-
+        return {"ok": False, "mensaje": mensaje}
+    valido, mensaje = validar_correo(correo)
     if not valido:
-        return {
-            "ok": False,
-            "mensaje": mensaje,
-        }
-
-
-    # ========================================================
-    # 3. DNI
-    # ========================================================
-
-    valido, mensaje = validar_dni(
-        dni,
-        obligatorio=False,
-    )
-
+        return {"ok": False, "mensaje": mensaje}
+    valido, mensaje = validar_password(password)
     if not valido:
+        return {"ok": False, "mensaje": mensaje}
+
+    # La respuesta no distingue correo o DNI para reducir enumeración.
+    if buscar_usuario_por_correo(correo) or buscar_perfil_por_dni(dni):
         return {
             "ok": False,
-            "mensaje": mensaje,
+            "mensaje": "No fue posible completar el registro con esos datos.",
         }
 
-
-    # ========================================================
-    # 4. TELÉFONO
-    # ========================================================
-
-    valido, mensaje = validar_telefono_peru(
-        telefono,
-        obligatorio=True,
-    )
-
-    if not valido:
+    # Se consulta otra vez al enviar el formulario. Los nombres recibidos del
+    # navegador se ignoran deliberadamente.
+    verificacion = verificar_dni_registro(dni, comprobar_duplicado=False)
+    if not verificacion.get("ok"):
         return {
             "ok": False,
-            "mensaje": mensaje,
+            "mensaje": verificacion.get("mensaje")
+            or "No fue posible verificar el DNI.",
         }
+    persona = verificacion["persona"]
+    nombres = persona["nombres"]
+    apellido_paterno = persona["apellido_paterno"]
+    apellido_materno = persona.get("apellido_materno") or None
 
+    for valor, etiqueta, obligatorio in (
+        (nombres, "Los nombres", True),
+        (apellido_paterno, "El apellido paterno", True),
+        (apellido_materno, "El apellido materno", False),
+    ):
+        valido, mensaje = validar_nombre(valor, etiqueta, obligatorio=obligatorio)
+        if not valido:
+            return {"ok": False, "mensaje": mensaje}
 
-    # ========================================================
-    # 5. CORREO
-    # ========================================================
-
-    valido, mensaje = validar_correo(
-        correo
-    )
-
-    if not valido:
-        return {
-            "ok": False,
-            "mensaje": mensaje,
-        }
-
-
-    # ========================================================
-    # 6. CONTRASEÑA
-    # ========================================================
-
-    valido, mensaje = validar_password(
-        password
-    )
-
-    if not valido:
-        return {
-            "ok": False,
-            "mensaje": mensaje,
-        }
-
-
-    # ========================================================
-    # 7. DUPLICADOS
-    # ========================================================
-
-    usuario_existente = buscar_usuario_por_correo(
-        correo
-    )
-
-    if usuario_existente:
-        return {
-            "ok": False,
-            "mensaje": (
-                "Ya existe una cuenta registrada "
-                "con ese correo."
-            ),
-        }
-
-
-    if dni:
-
-        perfil_existente = buscar_perfil_por_dni(
-            dni
-        )
-
-        if perfil_existente:
-            return {
-                "ok": False,
-                "mensaje": (
-                    "El DNI ya se encuentra registrado."
-                ),
-            }
-
-
-    # ========================================================
-    # 8. UUID
-    # ========================================================
-
-    usuario_id = str(
-        uuid.uuid4()
-    )
-
-    perfil_id = str(
-        uuid.uuid4()
-    )
-
-
-    # ========================================================
-    # 9. CONTRASEÑA SEGURA
-    # ========================================================
-
+    usuario_id = str(uuid.uuid4())
+    perfil_id = str(uuid.uuid4())
     password_hash = bcrypt.hashpw(
         password.encode("utf-8"),
         bcrypt.gensalt(),
     ).decode("utf-8")
-
-
-    # ========================================================
-    # 10. PERSISTENCIA
-    # ========================================================
-
-    crear_usuario_y_perfil(
-        usuario_id=usuario_id,
-        perfil_id=perfil_id,
-        correo=correo,
-        password_hash=password_hash,
-        nombres=nombres,
-        apellido_paterno=apellido_paterno,
-        apellido_materno=apellido_materno,
-        dni=dni,
-        telefono=telefono,
-    )
-
-
+    try:
+        crear_usuario_y_perfil(
+            usuario_id=usuario_id,
+            perfil_id=perfil_id,
+            correo=correo,
+            password_hash=password_hash,
+            nombres=nombres,
+            apellido_paterno=apellido_paterno,
+            apellido_materno=apellido_materno,
+            dni=dni,
+            telefono=telefono,
+            rol_codigo="CLIENTE",
+        )
+    except Exception:
+        # Las excepciones SQL de unicidad pueden incluir correo o DNI en su
+        # texto. No se adjunta la excepción para evitar datos personales en
+        # logs; el cliente recibe el mismo mensaje no enumerable.
+        logger.error("No se pudo completar un registro de usuario")
+        return {
+            "ok": False,
+            "mensaje": "No fue posible completar el registro con esos datos.",
+        }
     return {
         "ok": True,
         "mensaje": "Usuario registrado correctamente.",
@@ -618,6 +475,7 @@ def registrar_direccion_usuario(
     alias=None,
     latitud=None,
     longitud=None,
+    es_principal=True,
 ):
     """
     Valida y registra una dirección del cliente.
@@ -722,7 +580,7 @@ def registrar_direccion_usuario(
         alias=alias,
         direccion=direccion,
         referencia=referencia,
-        es_principal=True,
+        es_principal=bool(es_principal),
         latitud=latitud,
         longitud=longitud,
     )
@@ -738,6 +596,67 @@ def registrar_direccion_usuario(
 # ============================================================
 # VALIDACIÓN DE DNI CON APISPERU
 # ============================================================
+
+
+def verificar_dni_registro(dni, comprobar_duplicado=True):
+    """Obtiene los nombres oficiales requeridos para crear una cuenta.
+
+    La consulta solo comprueba que el documento exista y devuelve los datos
+    asociados por el proveedor. No autentica que el solicitante sea su titular.
+    """
+    dni = str(dni or "").strip()
+    valido, mensaje = validar_dni(dni, obligatorio=True)
+    if not valido:
+        return {"ok": False, "mensaje": mensaje, "estado": "INVALIDO"}
+
+    if comprobar_duplicado and buscar_perfil_por_dni(dni):
+        return {
+            "ok": False,
+            "mensaje": "No fue posible verificar el DNI ingresado.",
+            "estado": "INVALIDO",
+        }
+
+    resultado = consultar_dni(dni)
+    if not resultado.get("ok"):
+        no_disponible = resultado.get("tipo_error") == "NO_DISPONIBLE"
+        return {
+            "ok": False,
+            "mensaje": (
+                "El servicio de consulta de DNI no está disponible. "
+                "Intenta nuevamente más tarde."
+                if no_disponible
+                else "No fue posible verificar el DNI ingresado."
+            ),
+            "estado": "ERROR" if no_disponible else "INVALIDO",
+        }
+
+    persona = {
+        "dni": str(resultado.get("dni") or "").strip(),
+        "nombres": str(resultado.get("nombres") or "").strip(),
+        "apellido_paterno": str(
+            resultado.get("apellido_paterno") or ""
+        ).strip(),
+        "apellido_materno": str(
+            resultado.get("apellido_materno") or ""
+        ).strip(),
+    }
+    if persona["dni"] != dni or not persona["nombres"] \
+            or not persona["apellido_paterno"]:
+        return {
+            "ok": False,
+            "mensaje": "El servicio no devolvió datos suficientes del DNI.",
+            "estado": "ERROR",
+        }
+    return {
+        "ok": True,
+        "mensaje": "DNI consultado correctamente.",
+        "estado": "VERIFICADO",
+        "persona": persona,
+        "aviso": (
+            "La consulta confirma datos asociados al DNI, pero no demuestra "
+            "que quien realiza el registro sea su titular."
+        ),
+    }
 
 def _normalizar_texto_identidad(texto):
     """
@@ -1236,11 +1155,19 @@ def validar_ruc_facturacion(ruc):
 # Implementación rama: serna
 # ============================================================
 
+TIPO_CONTRIBUYENTE_POR_COMPROBANTE = {
+    "BOLETA": "PERSONA",
+    "FACTURA": "EMPRESA",
+}
+
+
 def registrar_facturacion_checkout(
     usuario_id,
-    tipo,
-    documento,
+    tipo=None,
+    documento=None,
     conexion=None,
+    *,
+    tipo_comprobante=None,
 ):
     """
     Verifica nuevamente el documento desde el backend
@@ -1254,16 +1181,22 @@ def registrar_facturacion_checkout(
     guardado participa de esa misma transacción y NO se
     confirma por separado. Sin conexión, se conserva el
     comportamiento autónomo de siempre.
+    ``BOLETA``/``FACTURA`` son tipos de comprobante. La columna histórica
+    ``datos_facturacion.tipo`` almacena, en cambio, el tipo de contribuyente
+    ``PERSONA``/``EMPRESA``. ``tipo`` se conserva como alias para los clientes
+    existentes; el contrato nuevo debe usar ``tipo_comprobante``.
     """
 
-    tipo = (tipo or "").strip().upper()
+    tipo_comprobante = str(
+        tipo_comprobante if tipo_comprobante is not None else tipo or ""
+    ).strip().upper()
     documento = (documento or "").strip()
 
     # --------------------------------------------------------
     # BOLETA
     # --------------------------------------------------------
 
-    if tipo == "BOLETA":
+    if tipo_comprobante == "BOLETA":
 
         resultado = validar_dni_con_perfil(
             usuario_id=usuario_id,
@@ -1282,7 +1215,9 @@ def registrar_facturacion_checkout(
         resultado_id = guardar_datos_facturacion(
             facturacion_id=facturacion_id,
             usuario_id=usuario_id,
-            tipo="PERSONA",
+            tipo_contribuyente=(
+                TIPO_CONTRIBUYENTE_POR_COMPROBANTE[tipo_comprobante]
+            ),
             dni=persona["dni"],
             ruc=None,
             nombre_facturacion=persona["nombre_completo"],
@@ -1300,13 +1235,15 @@ def registrar_facturacion_checkout(
                 resultado_id,
             "tipo":
                 "BOLETA",
+            "tipo_comprobante": "BOLETA",
+            "tipo_contribuyente": "PERSONA",
         }
 
     # --------------------------------------------------------
     # FACTURA
     # --------------------------------------------------------
 
-    if tipo == "FACTURA":
+    if tipo_comprobante == "FACTURA":
 
         resultado = validar_ruc_facturacion(
             documento
@@ -1324,7 +1261,9 @@ def registrar_facturacion_checkout(
         resultado_id = guardar_datos_facturacion(
             facturacion_id=facturacion_id,
             usuario_id=usuario_id,
-            tipo="EMPRESA",
+            tipo_contribuyente=(
+                TIPO_CONTRIBUYENTE_POR_COMPROBANTE[tipo_comprobante]
+            ),
             dni=None,
             ruc=empresa["ruc"],
             nombre_facturacion=None,
@@ -1344,6 +1283,8 @@ def registrar_facturacion_checkout(
                 resultado_id,
             "tipo":
                 "FACTURA",
+            "tipo_comprobante": "FACTURA",
+            "tipo_contribuyente": "EMPRESA",
         }
 
     # --------------------------------------------------------

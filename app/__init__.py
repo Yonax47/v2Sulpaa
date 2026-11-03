@@ -69,6 +69,7 @@ from app.admin.delivery.routes import admin_delivery_bp
 from app.admin.seguridad.routes import admin_seguridad_bp
 from app.aprende.routes import aprende_bp
 from app.repartidor.routes import repartidor_bp
+from app.perfil.routes import perfil_bp
 from app.encuestas.routes import encuesta_bp
 
 
@@ -459,6 +460,10 @@ def create_app():
 
     app.register_blueprint(
         repartidor_bp
+    )
+
+    app.register_blueprint(
+        perfil_bp
     )
 
     # El backfill queda disponible como comando Flask repetible y verificable;

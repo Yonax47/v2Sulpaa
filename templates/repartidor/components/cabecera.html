@@ -11,6 +11,7 @@
             </span>
             <span class="repartidor-sesion">
                 <span class="repartidor-usuario">{{ session.get("correo", "") }}</span>
+                <a href="{{ url_for('perfil.inicio') }}" class="repartidor-profile-link">Mi perfil</a>
                 <form method="POST" action="{{ url_for('identidad.logout') }}" class="repartidor-logout-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="repartidor-logout-button">Cerrar sesión</button>

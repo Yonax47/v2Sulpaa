@@ -982,3 +982,22 @@ pero reutilizamos la misma estructura si fuera necesario.
             0.01ms !important;
     }
 }
+.auth-dni-row {
+    align-items: stretch;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.auth-dni-status {
+    margin-top: 0.5rem;
+}
+
+.auth-dni-status.is-loading { color: #8a6419; }
+.auth-dni-status.is-verified { color: #177245; font-weight: 700; }
+.auth-dni-status.is-invalid,
+.auth-dni-status.is-error { color: #a52a2a; font-weight: 700; }
+
+@media (max-width: 560px) {
+    .auth-dni-row { grid-template-columns: 1fr; }
+}

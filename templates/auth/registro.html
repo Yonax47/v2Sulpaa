@@ -208,6 +208,7 @@ Crear cuenta | SULPAA
                     class="auth-form"
                     id="registro-form"
                     autocomplete="on"
+                    data-dni-verification-url="{{ url_for('identidad.verificar_dni_para_registro') }}"
                 >
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
@@ -246,7 +247,8 @@ Crear cuenta | SULPAA
                                 title="Solo se permiten letras, espacios, apóstrofes y guiones."
 
                                 data-validation="nombre"
-
+                                readonly
+                                aria-readonly="true"
                                 required
                             >
 
@@ -286,7 +288,8 @@ Crear cuenta | SULPAA
                                 title="Solo se permiten letras, espacios, apóstrofes y guiones."
 
                                 data-validation="nombre"
-
+                                readonly
+                                aria-readonly="true"
                                 required
                             >
 
@@ -324,6 +327,8 @@ Crear cuenta | SULPAA
                                 title="Solo se permiten letras, espacios, apóstrofes y guiones."
 
                                 data-validation="nombre"
+                                readonly
+                                aria-readonly="true"
                             >
 
                         </div>
@@ -337,11 +342,10 @@ Crear cuenta | SULPAA
                              Regla:
                              exactamente 8 números.
 
-                             El DNI permanece opcional según
-                             nuestra lógica actual de registro.
+                             Es obligatorio y se consulta desde backend.
                         -->
 
-                        <div class="form-group">
+                        <div class="form-group auth-field-full">
 
                             <label
                                 for="dni"
@@ -350,26 +354,33 @@ Crear cuenta | SULPAA
                                 DNI
                             </label>
 
-                            <input
-                                type="text"
-                                id="dni"
-                                name="dni"
-                                class="form-control"
-                                placeholder="8 dígitos"
-
-                                value="{{ datos_formulario.get('dni', '') }}"
-
-                                inputmode="numeric"
-
-                                minlength="8"
-                                maxlength="8"
-
-                                pattern="[0-9]{8}"
-
-                                title="El DNI debe contener exactamente 8 números."
-
-                                data-validation="dni"
-                            >
+                            <div class="auth-dni-row">
+                                <input
+                                    type="text"
+                                    id="dni"
+                                    name="dni"
+                                    class="form-control"
+                                    placeholder="8 dígitos"
+                                    value="{{ datos_formulario.get('dni', '') }}"
+                                    inputmode="numeric"
+                                    minlength="8"
+                                    maxlength="8"
+                                    pattern="[0-9]{8}"
+                                    title="El DNI debe contener exactamente 8 números."
+                                    data-validation="dni"
+                                    required
+                                >
+                                <button type="button" class="btn btn-secondary" id="verificar-dni">
+                                    Verificar DNI
+                                </button>
+                            </div>
+                            <p class="form-help auth-dni-status" id="dni-status" role="status" aria-live="polite">
+                                Ingresa tu DNI y verifica los datos antes de registrarte.
+                            </p>
+                            <small class="form-help">
+                                Consultaremos los datos asociados al documento mediante APIsPERU.
+                                Esta consulta no demuestra que quien se registra sea el titular del DNI.
+                            </small>
 
                         </div>
 
@@ -584,6 +595,10 @@ Crear cuenta | SULPAA
 -->
 <script
     src="{{ url_for('static', filename='js/modules/auth.js') }}"
+    defer
+></script>
+<script
+    src="{{ url_for('static', filename='js/modules/registration-dni.js') }}"
     defer
 ></script>
 

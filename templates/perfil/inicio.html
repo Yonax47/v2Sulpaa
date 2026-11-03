@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Mi perfil | SULPAA{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/profile.css') }}">
+{% endblock %}
+
+{% block content %}
+{% include "components/navbar.html" %}
+<main class="profile-page">
+    <header class="profile-hero">
+        <div class="container">
+            <span class="profile-eyebrow">Tu cuenta SULPAA</span>
+            <h1>Mi perfil</h1>
+            <p>Administra tus datos de contacto, direcciones y preferencias de facturación.</p>
+        </div>
+    </header>
+
+    <div class="container profile-layout">
+        <nav class="profile-tabs" aria-label="Secciones del perfil">
+            <a href="#datos-personales">Datos personales</a>
+            <a href="#direcciones">Direcciones</a>
+            <a href="#facturacion">Facturación</a>
+            <a href="#seguridad">Seguridad</a>
+        </nav>
+
+        <section class="profile-card" id="datos-personales">
+            <div class="profile-heading">
+                <div><span>Identidad</span><h2>Datos personales</h2></div>
+                <span class="profile-badge {{ 'is-verified' if perfil.correo_verificado else 'is-pending' }}">
+                    Correo {{ 'verificado' if perfil.correo_verificado else 'pendiente de verificación' }}
+                </span>
+            </div>
+            <div class="profile-data-grid">
+                <div><span>Nombres</span><strong>{{ perfil.nombres }}</strong></div>
+                <div><span>Apellido paterno</span><strong>{{ perfil.apellido_paterno }}</strong></div>
+                <div><span>Apellido materno</span><strong>{{ perfil.apellido_materno or '—' }}</strong></div>
+                <div><span>DNI protegido</span><strong>{{ perfil.dni }}</strong></div>
+                <div class="is-wide"><span>Correo protegido</span><strong>{{ perfil.correo }}</strong></div>
+            </div>
+            <p class="profile-note">Los nombres y el DNI no pueden editarse libremente. El correo podrá cambiarse mediante un flujo verificado en una fase posterior.</p>
+            <form method="POST" action="{{ url_for('perfil.actualizar_telefono') }}" class="profile-inline-form" data-profile-form data-validate-phone>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label><span>Teléfono</span><input type="tel" name="telefono" value="{{ perfil.telefono or '' }}" inputmode="numeric" pattern="9[0-9]{8}" minlength="9" maxlength="9" autocomplete="tel" required><small class="profile-field-error" data-field-error="telefono"></small></label>
+                <button class="profile-button is-primary" type="submit">Actualizar teléfono</button>
+                <p class="profile-form-status" data-form-status role="status" aria-live="polite"></p>
+            </form>
+        </section>
+
+        <section class="profile-card" id="direcciones">
+            <div class="profile-heading"><div><span>Entregas</span><h2>Direcciones</h2></div></div>
+            {% if direcciones %}
+                <div class="profile-list">
+                    {% for item in direcciones %}
+                    <article class="profile-list-item">
+                        <div>
+                            <div class="profile-item-title"><strong>{{ item.alias }}</strong>{% if item.es_principal %}<span class="profile-badge is-verified">Principal</span>{% endif %}</div>
+                            <p>{{ item.direccion }}</p>
+                            <small>{{ item.distrito_nombre }}, {{ item.provincia_nombre }}, {{ item.departamento_nombre }}{% if item.referencia %} · {{ item.referencia }}{% endif %}</small>
+                        </div>
+                        <div class="profile-actions">
+                            {% if not item.es_principal %}
+                            <form method="POST" action="{{ url_for('perfil.direccion_principal', direccion_id=item.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="profile-button is-secondary">Hacer principal</button></form>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('perfil.desactivar_direccion', direccion_id=item.id) }}" data-confirmar="¿Desactivar esta dirección?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="profile-button is-ghost">Desactivar</button></form>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            {% else %}<p class="profile-empty">Todavía no registraste direcciones.</p>{% endif %}
+
+            <details class="profile-disclosure">
+                <summary>Agregar dirección</summary>
+                <form method="POST" action="{{ url_for('perfil.crear_direccion') }}" class="profile-form" data-location-form data-profile-form>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label><span>Alias</span><input name="alias" maxlength="50" placeholder="Casa, trabajo…" required></label>
+                    <label><span>Departamento</span><select data-departamento required><option value="">Selecciona</option>{% for item in departamentos %}<option value="{{ item.id }}">{{ item.nombre }}</option>{% endfor %}</select></label>
+                    <label><span>Provincia</span><select data-provincia required disabled><option value="">Selecciona</option></select></label>
+                    <label><span>Distrito</span><select name="distrito_id" data-distrito required disabled><option value="">Selecciona</option></select></label>
+                    <label class="is-wide"><span>Dirección</span><input name="direccion" maxlength="255" minlength="5" required></label>
+                    <label class="is-wide"><span>Referencia</span><input name="referencia" maxlength="255"></label>
+                    <label class="profile-check is-wide"><input type="checkbox" name="es_principal" value="1"> Usar como dirección principal</label>
+                    <p class="profile-form-status is-wide" data-form-status role="status" aria-live="polite">{% if not direcciones %}La primera dirección se guardará como principal.{% endif %}</p>
+                    <button class="profile-button is-primary" type="submit">Guardar dirección</button>
+                </form>
+            </details>
+        </section>
+
+        <section class="profile-card" id="facturacion">
+            <div class="profile-heading"><div><span>Comprobantes</span><h2>Facturación</h2></div></div>
+            {% if facturacion %}
+                <div class="profile-list">
+                {% for item in facturacion %}
+                    <article class="profile-list-item">
+                        <div><div class="profile-item-title"><strong>{{ 'Boleta' if item.tipo == 'PERSONA' else 'Factura' }}</strong>{% if item.es_predeterminado %}<span class="profile-badge is-verified">Predeterminada</span>{% endif %}</div><p>{{ item.nombre_facturacion or item.razon_social }}</p><small>{{ item.dni or item.ruc }}{% if item.direccion_fiscal %} · {{ item.direccion_fiscal }}{% endif %}</small></div>
+                        <div class="profile-actions">
+                            {% if not item.es_predeterminado %}<form method="POST" action="{{ url_for('perfil.facturacion_predeterminada', facturacion_id=item.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="profile-button is-secondary" type="submit">Usar por defecto</button></form>{% endif %}
+                            <form method="POST" action="{{ url_for('perfil.desactivar_facturacion', facturacion_id=item.id) }}" data-confirmar="¿Desactivar estos datos de facturación?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="profile-button is-ghost" type="submit">Desactivar</button></form>
+                        </div>
+                    </article>
+                {% endfor %}
+                </div>
+            {% else %}<p class="profile-empty">Todavía no guardaste datos de facturación.</p>{% endif %}
+            <details class="profile-disclosure">
+                <summary>Agregar datos de facturación</summary>
+                <form method="POST" action="{{ url_for('perfil.crear_facturacion') }}" class="profile-inline-form" data-billing-form data-profile-form>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label><span>Tipo de comprobante</span><select name="tipo_comprobante" data-billing-type><option value="BOLETA">Boleta</option><option value="FACTURA">Factura</option></select></label>
+                    <label><span>DNI o RUC</span><input name="documento" data-billing-document inputmode="numeric" minlength="8" maxlength="11" autocomplete="off" required><small class="profile-field-error" data-field-error="documento"></small></label>
+                    <button class="profile-button is-primary" type="submit">Verificar y guardar</button>
+                    <p class="profile-form-status" data-form-status role="status" aria-live="polite"></p>
+                </form>
+                <p class="profile-note">El documento se verifica nuevamente desde el servidor mediante APIsPERU. La consulta no demuestra titularidad del documento.</p>
+            </details>
+        </section>
+
+        <section class="profile-card" id="seguridad">
+            <div class="profile-heading"><div><span>Próximamente</span><h2>Seguridad</h2></div></div>
+            <p>El cambio seguro de correo y contraseña se habilitará después de incorporar verificación de correo y comprobación de la contraseña actual.</p>
+            <div class="profile-actions"><button class="profile-button is-secondary" disabled>Cambiar correo</button><button class="profile-button is-secondary" disabled>Cambiar contraseña</button></div>
+        </section>
+    </div>
+</main>
+{% endblock %}
+
+{% block page_js %}<script src="{{ url_for('static', filename='js/modules/profile.js') }}" defer></script>{% endblock %}

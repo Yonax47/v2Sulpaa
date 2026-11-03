@@ -3198,7 +3198,7 @@ def confirmar_checkout_con_entrega(
             resultado_facturacion = (
                 registrar_facturacion_checkout(
                     usuario_id=usuario_id,
-                    tipo=tipo_comprobante,
+                    tipo_comprobante=tipo_comprobante,
                     documento=documento_facturacion,
                     conexion=conexion,
                 )
