@@ -17,19 +17,14 @@ SIEMPRE en ``finally``; esquemas validados desde variables de entorno.
 import os
 import re
 
-from app.config.database import conexion_comercio
+from app.config.database import conexion_comercio, nombre_esquema
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def _esquema(nombre_variable):
-    """Devuelve un nombre de esquema MySQL validado desde entorno."""
-    valor = str(os.getenv(nombre_variable) or "").strip()
-    if not valor or not _IDENTIFICADOR_SQL.fullmatch(valor):
-        raise RuntimeError(
-            f"La variable {nombre_variable} no contiene un esquema MySQL válido."
-        )
-    return valor
+    """Resuelve el esquema correcto sin mezclar producción y pruebas."""
+    return nombre_esquema(nombre_variable)
 
 
 def listar_contenido_publicado():

@@ -13,7 +13,7 @@ persiste la auditoría.
 import os
 import re
 
-from app.config.database import conexion_operaciones
+from app.config.database import conexion_operaciones, nombre_esquema
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -26,11 +26,7 @@ def registrar_solicitud_reporte(*, tipo_reporte, formato, parametros,
     Nunca genera otro reporte ni consulta reportes: solo audita. Evita
     la recursión que afectaría al propio KPI-05.
     """
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
-    if not operaciones or not _IDENTIFICADOR_SQL.fullmatch(operaciones):
-        raise RuntimeError(
-            "DB_OPERACIONES no contiene un esquema MySQL válido."
-        )
+    operaciones = nombre_esquema("DB_OPERACIONES")
 
     conexion = conexion_operaciones()
     try:

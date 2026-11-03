@@ -11,7 +11,7 @@ Reglas de arquitectura:
 - Los servicios serán responsables de aplicar las reglas de negocio.
 """
 
-from app.config.database import conexion_operaciones
+from app.config.database import conexion_operaciones, nombre_esquema
 import uuid
 
 
@@ -1316,13 +1316,8 @@ def obtener_historial_pago(
 # ============================================================
 
 def _esquema_identidad():
-    """Devuelve el nombre validado del esquema identidad para JOIN seguros."""
-    import os
-    import re
-    nombre = str(os.getenv("DB_IDENTIDAD") or "").strip()
-    if not nombre or not re.fullmatch(r"[A-Za-z0-9_]+", nombre):
-        raise RuntimeError("La variable DB_IDENTIDAD no contiene un esquema válido.")
-    return nombre
+    """Resuelve Identidad y aplica la barrera del entorno TEST."""
+    return nombre_esquema("DB_IDENTIDAD")
 
 
 def obtener_entrega_pedido(

@@ -24,19 +24,14 @@ import os
 import re
 import uuid
 
-from app.config.database import conexion_inventario
+from app.config.database import conexion_inventario, nombre_esquema
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def _esquema(nombre_variable):
-    """Devuelve un nombre de esquema validado desde entorno."""
-    valor = str(os.getenv(nombre_variable) or "").strip()
-    if not valor or not _IDENTIFICADOR_SQL.fullmatch(valor):
-        raise RuntimeError(
-            f"La variable {nombre_variable} no contiene un esquema MySQL válido."
-        )
-    return valor
+    """Resuelve el esquema correcto sin mezclar producción y pruebas."""
+    return nombre_esquema(nombre_variable)
 
 
 # ============================================================

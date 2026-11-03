@@ -61,19 +61,15 @@ from app.config.database import (
     conexion_comercio,
     conexion_inventario,
     conexion_operaciones,
+    nombre_esquema,
 )
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def _esquema(nombre_variable):
-    """Devuelve un nombre de esquema MySQL validado desde entorno."""
-    valor = str(os.getenv(nombre_variable) or "").strip()
-    if not valor or not _IDENTIFICADOR_SQL.fullmatch(valor):
-        raise RuntimeError(
-            f"La variable {nombre_variable} no contiene un esquema MySQL válido."
-        )
-    return valor
+    """Resuelve el esquema correcto sin mezclar producción y pruebas."""
+    return nombre_esquema(nombre_variable)
 
 
 # ============================================================
@@ -255,8 +251,8 @@ def obtener_metrica_pedidos_procesados():
     import os
     import re
 
-    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    comercio = nombre_esquema("DB_COMERCIO")
+    operaciones = nombre_esquema("DB_OPERACIONES")
     if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
         raise RuntimeError("DB_COMERCIO no contiene un esquema válido.")
     if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
@@ -439,7 +435,7 @@ def obtener_metrica_kpi09():
     import os
     import re
 
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    operaciones = nombre_esquema("DB_OPERACIONES")
     if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
         raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
 
@@ -521,7 +517,7 @@ def obtener_metrica_satisfaccion():
     import os
     import re
 
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    operaciones = nombre_esquema("DB_OPERACIONES")
     if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
         raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
 
@@ -643,7 +639,7 @@ def obtener_metrica_reportes():
     import os
     import re
 
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    operaciones = nombre_esquema("DB_OPERACIONES")
     if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
         raise RuntimeError("DB_OPERACIONES no contiene un esquema válido.")
 
@@ -1004,8 +1000,8 @@ def obtener_metrica_accesos_contenido():
 def obtener_ventas_cobradas(desde=None, hasta=None):
     from app.config.database import conexion_comercio, conexion_operaciones
     import os, re
-    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    comercio = nombre_esquema("DB_COMERCIO")
+    operaciones = nombre_esquema("DB_OPERACIONES")
     if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
         raise RuntimeError("DB_COMERCIO no contiene un esquema valido.")
     if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
@@ -1031,7 +1027,7 @@ def obtener_ventas_cobradas(desde=None, hasta=None):
 def obtener_top_productos_vendidos(desde=None, hasta=None, limit=10, dimension='variante'):
     from app.config.database import conexion_comercio
     import os, re
-    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
+    comercio = nombre_esquema("DB_COMERCIO")
     if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
         raise RuntimeError("DB_COMERCIO no contiene un esquema valido.")
     conn = conexion_comercio()
@@ -1074,8 +1070,8 @@ def obtener_top_productos_vendidos_cobrados(desde=None, hasta=None, limit=10):
     """
     from app.config.database import conexion_comercio, conexion_operaciones
     import os, re
-    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
+    comercio = nombre_esquema("DB_COMERCIO")
+    operaciones = nombre_esquema("DB_OPERACIONES")
     if not re.fullmatch(r"[A-Za-z0-9_]+", comercio) or not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
         raise RuntimeError("DB_COMERCIO o DB_OPERACIONES no contienen un esquema valido.")
     conn = conexion_comercio()
@@ -1135,10 +1131,7 @@ def obtener_caja_movimientos_resumen(desde=None, hasta=None):
         conn.close()
 def obtener_evolucion_ventas_diarias(desde=None, hasta=None):
     from app.config.database import conexion_comercio
-    import os, re
-    comercio = str(os.getenv('DB_COMERCIO') or '').strip()
-    if not re.fullmatch(r'[A-Za-z0-9_]+', comercio):
-        raise RuntimeError('DB_COMERCIO invalido')
+    comercio = nombre_esquema("DB_COMERCIO")
     conn = conexion_comercio()
     try:
         with conn.cursor() as cursor:
@@ -1174,9 +1167,8 @@ def obtener_entregas_por_estado(desde=None, hasta=None):
         conn.close()
 def obtener_ventas_cobradas_por_dia(desde=None, hasta=None):
     from app.config.database import conexion_comercio, conexion_operaciones
-    import os, re
-    comercio=str(os.getenv('DB_COMERCIO')or'').strip(); operaciones=str(os.getenv('DB_OPERACIONES')or'').strip()
-    if not re.fullmatch(r'[A-Za-z0-9_]+',comercio) or not re.fullmatch(r'[A-Za-z0-9_]+',operaciones): raise RuntimeError('inv')
+    comercio = nombre_esquema("DB_COMERCIO")
+    operaciones = nombre_esquema("DB_OPERACIONES")
     conn=conexion_comercio()
     try:
         with conn.cursor() as cursor:
@@ -1191,9 +1183,8 @@ def obtener_ventas_cobradas_por_dia(desde=None, hasta=None):
         conn.close()
 def obtener_ingresos_por_producto_cobrado(desde=None, hasta=None, limit=10):
     from app.config.database import conexion_comercio, conexion_operaciones
-    import os, re
-    comercio=str(os.getenv('DB_COMERCIO')or'').strip(); operaciones=str(os.getenv('DB_OPERACIONES')or'').strip()
-    if not re.fullmatch(r'[A-Za-z0-9_]+',comercio) or not re.fullmatch(r'[A-Za-z0-9_]+',operaciones): raise RuntimeError('inv')
+    comercio = nombre_esquema("DB_COMERCIO")
+    operaciones = nombre_esquema("DB_OPERACIONES")
     conn=conexion_comercio()
     try:
         with conn.cursor() as cursor:
@@ -1208,9 +1199,7 @@ def obtener_ingresos_por_producto_cobrado(desde=None, hasta=None, limit=10):
         conn.close()
 def obtener_pedidos_por_estado_agrupado(desde=None, hasta=None):
     from app.config.database import conexion_comercio
-    import os, re
-    comercio=str(os.getenv('DB_COMERCIO')or'').strip()
-    if not re.fullmatch(r'[A-Za-z0-9_]+',comercio): raise RuntimeError('inv')
+    comercio = nombre_esquema("DB_COMERCIO")
     conn=conexion_comercio()
     try:
         with conn.cursor() as cursor:

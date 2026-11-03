@@ -1,31 +1,15 @@
 """Unidad de trabajo para operaciones atómicas entre esquemas SULPAA."""
 
-import os
-import re
-
-from app.config.database import crear_conexion
-
-
-_IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
-
-
-def _nombre_esquema(variable):
-    """Lee y valida un esquema configurado, nunca recibido desde HTTP."""
-    nombre = str(os.getenv(variable) or "").strip()
-    if not nombre or not _IDENTIFICADOR_SQL.fullmatch(nombre):
-        raise RuntimeError(
-            f"La variable {variable} no contiene un esquema MySQL válido."
-        )
-    return nombre
+from app.config.database import crear_conexion, nombre_esquema
 
 
 def esquemas_sulpaa():
     """Devuelve los nombres confiables usados en SQL entre esquemas."""
     return {
-        "comercio": _nombre_esquema("DB_COMERCIO"),
-        "operaciones": _nombre_esquema("DB_OPERACIONES"),
-        "identidad": _nombre_esquema("DB_IDENTIDAD"),
-        "inventario": _nombre_esquema("DB_INVENTARIO"),
+        "comercio": nombre_esquema("DB_COMERCIO"),
+        "operaciones": nombre_esquema("DB_OPERACIONES"),
+        "identidad": nombre_esquema("DB_IDENTIDAD"),
+        "inventario": nombre_esquema("DB_INVENTARIO"),
     }
 
 

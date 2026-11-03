@@ -11,35 +11,89 @@ solo lectura y no modifica el registro histórico.
 """
 
 import json
-import os
-import re
+from app.config.database import conexion_operaciones, nombre_esquema
 
-from app.config.database import conexion_operaciones
-
-_IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
-
-# Claves que NUNCA deben guardarse en la auditoría.
-_CLAVES_SENSIBLES = (
+# Nombres exactos que NUNCA deben guardarse en la auditoría. Se mantienen
+# separados de las reglas por prefijo/sufijo para no eliminar campos
+# operativos legítimos como ``codigo_seguimiento`` o ``metodo_pago``.
+_CLAVES_SENSIBLES = frozenset({
     "password",
     "password_hash",
+    "passwd",
     "contrasena",
     "contraseña",
+    "credential",
+    "credentials",
     "token",
+    "csrf_token",
+    "_csrf_token",
+    "access_token",
+    "refresh_token",
+    "auth_token",
+    "authentication_token",
+    "token_hash",
+    "api_key",
+    "apikey",
+    "private_key",
+    "secret_key",
+    "client_secret",
     "secret",
     "clave",
     "authorization",
     "cookie",
-)
+    "session",
+    "session_id",
+})
+
+
+def _es_clave_sensible(clave):
+    """Reconoce nombres habituales de credenciales sin mirar su valor.
+
+    Se normalizan mayúsculas y guiones para cubrir formularios, JSON y datos
+    provenientes de proveedores distintos. Además de la lista exacta, se
+    protegen variantes como ``usuario_password`` o ``proveedor_api_key``.
+    """
+
+    nombre = str(clave or "").strip().lower().replace("-", "_")
+    if nombre in _CLAVES_SENSIBLES:
+        return True
+    return (
+        nombre.startswith((
+            "password_",
+            "passwd_",
+            "contrasena_",
+            "contraseña_",
+            "token_",
+            "secret_",
+            "private_key_",
+            "clave_privada_",
+            "api_key_",
+            "authorization_",
+            "cookie_",
+            "session_",
+            "credential_",
+            "credentials_",
+        ))
+        or nombre.endswith((
+            "_password",
+            "_passwd",
+            "_contrasena",
+            "_contraseña",
+            "_token",
+            "_token_hash",
+            "_api_key",
+            "_private_key",
+            "_clave_privada",
+            "_secret",
+            "_credential",
+            "_credentials",
+        ))
+    )
 
 
 def _esquema(variable):
-    """Lee y valida un esquema configurado, nunca recibido por HTTP."""
-    nombre = str(os.getenv(variable) or "").strip()
-    if not nombre or not _IDENTIFICADOR_SQL.fullmatch(nombre):
-        raise RuntimeError(
-            "La variable %s no contiene un esquema MySQL válido." % variable
-        )
-    return nombre
+    """Resuelve el esquema correcto sin mezclar producción y pruebas."""
+    return nombre_esquema(variable)
 
 
 def _limpiar(datos):
@@ -49,7 +103,7 @@ def _limpiar(datos):
     if isinstance(datos, dict):
         limpio = {}
         for clave, valor in datos.items():
-            if str(clave).lower() in _CLAVES_SENSIBLES:
+            if _es_clave_sensible(clave):
                 continue
             limpio[clave] = _limpiar(valor)
         return limpio

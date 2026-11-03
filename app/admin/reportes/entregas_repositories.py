@@ -12,25 +12,18 @@ El rango de fechas filtra por ``e.creado_en`` (fecha de registro real).
 import os
 import re
 
-from app.config.database import conexion_operaciones
+from app.config.database import conexion_operaciones, nombre_esquema
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def _esquemas_validos():
-    operaciones = str(os.getenv("DB_OPERACIONES") or "").strip()
-    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
-    identidad = str(os.getenv("DB_IDENTIDAD") or "").strip()
-    for nombre, valor in (
-        ("DB_OPERACIONES", operaciones),
-        ("DB_COMERCIO", comercio),
-        ("DB_IDENTIDAD", identidad),
-    ):
-        if not valor or not _IDENTIFICADOR_SQL.fullmatch(valor):
-            raise RuntimeError(
-                f"{nombre} no contiene un esquema MySQL válido."
-            )
-    return operaciones, comercio, identidad
+    """Devuelve los tres esquemas del reporte desde una fuente segura."""
+    return (
+        nombre_esquema("DB_OPERACIONES"),
+        nombre_esquema("DB_COMERCIO"),
+        nombre_esquema("DB_IDENTIDAD"),
+    )
 
 
 def listar_entregas_reporte(desde=None, hasta=None):

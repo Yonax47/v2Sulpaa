@@ -19,18 +19,14 @@ obligatorio, monto > 0 y categoría EGRESO activa (validado en Service).
 import os
 import re
 
-from app.config.database import conexion_operaciones
+from app.config.database import conexion_operaciones, nombre_esquema
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def _esquema():
-    valor = str(os.getenv("DB_OPERACIONES") or "").strip()
-    if not valor or not _IDENTIFICADOR_SQL.fullmatch(valor):
-        raise RuntimeError(
-            "DB_OPERACIONES no contiene un esquema MySQL válido."
-        )
-    return valor
+    """Resuelve Operaciones y aplica la barrera del entorno TEST."""
+    return nombre_esquema("DB_OPERACIONES")
 
 
 def listar_categorias(tipo=None, solo_activas=True):

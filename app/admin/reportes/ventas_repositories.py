@@ -9,16 +9,14 @@ fuentes únicas ya existentes.
 import os
 import re
 
-from app.config.database import conexion_comercio
+from app.config.database import conexion_comercio, nombre_esquema
 
 _IDENTIFICADOR_SQL = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def obtener_datos_ventas(desde=None, hasta=None):
     """Lista pedidos del período (número, estado, total) para el reporte."""
-    comercio = str(os.getenv("DB_COMERCIO") or "").strip()
-    if not comercio or not _IDENTIFICADOR_SQL.fullmatch(comercio):
-        raise RuntimeError("DB_COMERCIO no contiene un esquema MySQL válido.")
+    comercio = nombre_esquema("DB_COMERCIO")
 
     where = []
     parametros = []
