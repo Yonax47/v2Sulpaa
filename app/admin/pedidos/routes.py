@@ -50,12 +50,26 @@ def listado():
         "fecha_hasta": request.args.get("fecha_hasta", ""),
     }
     try:
-        pedidos = listar_pedidos_admin(filtros)
+        resultado = listar_pedidos_admin(
+            filtros,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
+        )
     except ReglaPedidoError as error:
         flash(str(error), "danger")
-        pedidos = []
+        resultado = {"elementos": [], "paginacion": None}
+    if not isinstance(resultado, dict) or "elementos" not in resultado:
+        resultado = {"elementos": resultado or [], "paginacion": None}
+    paginacion = resultado["paginacion"]
+    if paginacion:
+        paginacion.update(
+            endpoint="admin_pedidos.listado", filtros=filtros
+        )
     return render_template(
-        "admin/pedidos/lista.html", pedidos=pedidos, filtros=filtros
+        "admin/pedidos/lista.html",
+        pedidos=resultado["elementos"],
+        paginacion=paginacion,
+        filtros=filtros,
     )
 
 

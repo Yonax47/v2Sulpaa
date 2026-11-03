@@ -77,14 +77,26 @@ def listado():
         "estado": request.args.get("estado", ""),
         "tipo": request.args.get("tipo", ""),
     }
-    entregas = []
+    resultado = {"elementos": [], "paginacion": None}
     try:
-        entregas = listar_entregas(filtros)
+        resultado = listar_entregas(
+            filtros,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
+        )
     except ReglaEntregaError as error:
         flash(str(error), "danger")
+    if not isinstance(resultado, dict) or "elementos" not in resultado:
+        resultado = {"elementos": resultado or [], "paginacion": None}
+    paginacion = resultado["paginacion"]
+    if paginacion:
+        paginacion.update(
+            endpoint="admin_entregas.listado", filtros=filtros
+        )
     return render_template(
         "admin/entregas/lista.html",
-        entregas=entregas,
+        entregas=resultado["elementos"],
+        paginacion=paginacion,
         filtros=filtros,
     )
 

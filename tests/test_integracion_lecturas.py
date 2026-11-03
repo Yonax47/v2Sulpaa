@@ -22,7 +22,7 @@ class LecturasRealesTest(unittest.TestCase):
         cls.app.config.update(
             TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
         )
-        pedidos = listar_pedidos_admin({})
+        pedidos = listar_pedidos_admin({})["elementos"]
         if not pedidos:
             raise unittest.SkipTest("No existen pedidos reales para integrar.")
         cls.pedido = pedidos[0]
@@ -167,7 +167,7 @@ class LecturasRealesTest(unittest.TestCase):
         """Demuestra rollback real de escrituras calificadas entre esquemas."""
         candidato = next(
             (
-                pedido for pedido in listar_pedidos_admin({})
+                pedido for pedido in listar_pedidos_admin({})["elementos"]
                 if pedido["estado"] == "CREADO"
                 and pedido.get("entrega_estado") == "PENDIENTE"
             ),

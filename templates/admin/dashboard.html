@@ -15,6 +15,8 @@
 
 {% block content %}
 
+    {% set filtros_ventas = filtros_ventas|default({"periodo": "dia", "desde": "", "hasta": ""}, true) %}
+
     <!-- ========================================================
          PANEL ADMINISTRATIVO — RESUMEN EJECUTIVO
          ========================================================
@@ -403,7 +405,7 @@
                      ================================================
                      Se apoya en obtener_resumen_gerencial(): ventas
                      cobradas, top de productos cobrados, ingresos por
-                     producto, evolución diaria, flujo de caja y
+                     producto, evolución por período, flujo de caja y
                      pedidos por estado. Las gráficas solo se dibujan
                      cuando hay datos reales. Chart.js es local.
                      ================================================ -->
@@ -422,7 +424,38 @@
                         </span>
                     </div>
 
+                    <form method="GET" class="admin-order-filters admin-sales-filters" aria-label="Período de ventas cobradas">
+                        <label class="admin-filter-field">
+                            <span>Agrupar por</span>
+                            <select name="periodo">
+                                <option value="dia"{% if filtros_ventas.periodo == "dia" %} selected{% endif %}>Día</option>
+                                <option value="mes"{% if filtros_ventas.periodo == "mes" %} selected{% endif %}>Mes</option>
+                                <option value="anio"{% if filtros_ventas.periodo == "anio" %} selected{% endif %}>Año</option>
+                            </select>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Pagado desde</span>
+                            <input type="date" name="desde" value="{{ filtros_ventas.desde }}">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Pagado hasta</span>
+                            <input type="date" name="hasta" value="{{ filtros_ventas.hasta }}">
+                        </label>
+                        <div class="admin-filter-actions">
+                            <button type="submit" class="admin-button is-primary">Actualizar</button>
+                            <a href="{{ url_for('admin.dashboard') }}" class="admin-button is-secondary">Limpiar</a>
+                        </div>
+                    </form>
+                    <p class="admin-section-note">
+                        Las agrupaciones usan la fecha y hora almacenada por MariaDB en <code>pagos.pagado_en</code>, sin conversión implícita de zona horaria.
+                    </p>
+
                     <div class="admin-kpi-grid">
+                        <article class="admin-kpi-card">
+                            <span class="admin-kpi-label">Pedidos registrados</span>
+                            <strong class="admin-kpi-value">{{ gerencial.estados_financieros.pedidos_registrados|default(0) }}</strong>
+                            <small>Total histórico</small>
+                        </article>
                         <article class="admin-kpi-card">
                             <span class="admin-kpi-label">Ventas cobradas (pedidos)</span>
                             <strong class="admin-kpi-value">
@@ -438,6 +471,16 @@
                                     and gerencial.ventas_cobradas.ingresos_cobrados is defined
                                     else 0) }}
                             </small>
+                        </article>
+                        <article class="admin-kpi-card">
+                            <span class="admin-kpi-label">Pedidos cancelados</span>
+                            <strong class="admin-kpi-value">{{ gerencial.estados_financieros.pedidos_cancelados|default(0) }}</strong>
+                            <small>Total histórico</small>
+                        </article>
+                        <article class="admin-kpi-card">
+                            <span class="admin-kpi-label">Pedidos con pago reembolsado</span>
+                            <strong class="admin-kpi-value">{{ gerencial.estados_financieros.pedidos_reembolsados|default(0) }}</strong>
+                            <small>Estado actual; el esquema no registra fecha de reembolso</small>
                         </article>
                         <article class="admin-kpi-card">
                             <span class="admin-kpi-label">Ingresos de caja (ACTIVO)</span>
@@ -474,10 +517,10 @@
                             </p>
                         </article>
                         <article class="admin-chart-card">
-                            <h3>Ventas cobradas por día</h3>
-                            <canvas id="chart-evol-ventas" aria-label="Evolución diaria de ventas cobradas"></canvas>
+                            <h3>Ventas cobradas por {{ {"dia": "día", "mes": "mes", "anio": "año"}.get(gerencial.periodo, "día") }}</h3>
+                            <canvas id="chart-evol-ventas" aria-label="Evolución de ventas efectivamente cobradas"></canvas>
                             <p class="admin-chart-empty" id="chart-evol-ventas-vacio" hidden>
-                                Sin ventas cobradas por día todavía.
+                                No existen pagos cobrados para el período seleccionado.
                             </p>
                         </article>
                         <article class="admin-chart-card">
@@ -640,27 +683,49 @@
                 }
             }
 
-            var ventasPorDia = gerencial.ventas_cobradas_por_dia || [];
+            var serieVentas = gerencial.ventas_cobradas_serie || [];
             var canvasEvol = document.getElementById("chart-evol-ventas");
             if (canvasEvol) {
-                if (ventasPorDia.length) {
+                if (serieVentas.length) {
                     new Chart(canvasEvol, {
                         type: "line",
                         data: {
-                            labels: ventasPorDia.map(function (d) { return String(d.fecha); }),
+                            labels: serieVentas.map(function (d) { return d.etiqueta; }),
                             datasets: [{
                                 label: "Ingresos cobrados (S/)",
-                                data: ventasPorDia.map(function (p) { return aNumero(p.total); }),
+                                data: serieVentas.map(function (d) { return aNumero(d.ingresos); }),
                                 borderColor: "rgba(31, 122, 82, 1)",
                                 backgroundColor: "rgba(31, 122, 82, 0.15)",
                                 fill: true,
-                                tension: 0.3
+                                tension: 0.3,
+                                yAxisID: "yIngresos"
+                            }, {
+                                label: "Ventas cobradas",
+                                data: serieVentas.map(function (d) { return aNumero(d.ventas); }),
+                                borderColor: "rgba(70, 130, 180, 1)",
+                                backgroundColor: "rgba(70, 130, 180, 0.15)",
+                                tension: 0.3,
+                                yAxisID: "yVentas"
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: { legend: { display: false } }
+                            plugins: { legend: { position: "bottom" } },
+                            scales: {
+                                yIngresos: {
+                                    beginAtZero: true,
+                                    position: "left",
+                                    title: { display: true, text: "S/ cobrados" }
+                                },
+                                yVentas: {
+                                    beginAtZero: true,
+                                    position: "right",
+                                    grid: { drawOnChartArea: false },
+                                    ticks: { precision: 0 },
+                                    title: { display: true, text: "Ventas" }
+                                }
+                            }
                         }
                     });
                 } else {

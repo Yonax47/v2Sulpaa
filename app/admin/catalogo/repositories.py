@@ -110,7 +110,36 @@ def _config_simple(recurso):
     return configuracion
 
 
-def listar_simples(recurso, estado=None, busqueda=None):
+def _limites(limite, offset):
+    return int(limite), int(offset)
+
+
+def contar_simples(recurso, estado=None, busqueda=None):
+    """Cuenta filas de un catálogo simple con filtros parametrizados."""
+    configuracion = _config_simple(recurso)
+    esquema = _esquema()
+    condiciones = []
+    parametros = []
+    if estado:
+        condiciones.append("estado = %s")
+        parametros.append(estado)
+    if busqueda:
+        condiciones.append("nombre LIKE %s")
+        parametros.append(f"%{busqueda}%")
+    where_sql = "WHERE " + " AND ".join(condiciones) if condiciones else ""
+    conexion = _lectura()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM {esquema}.{configuracion['tabla']} {where_sql}",
+                tuple(parametros),
+            )
+            return int((cursor.fetchone() or {}).get("total") or 0)
+    finally:
+        conexion.close()
+
+
+def listar_simples(recurso, estado=None, busqueda=None, limite=25, offset=0):
     """Lista categorías, sabores o presentaciones con filtros opcionales."""
 
     configuracion = _config_simple(recurso)
@@ -138,8 +167,10 @@ def listar_simples(recurso, estado=None, busqueda=None):
         SELECT *
         FROM {esquema}.{tabla}
         {where_sql}
-        ORDER BY {configuracion['orden']}
+        ORDER BY {configuracion['orden']}, id ASC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend(_limites(limite, offset))
 
     conexion = _lectura()
     try:
@@ -315,7 +346,34 @@ def referencias_activas_simple(recurso, registro_id):
 # PRODUCTOS
 # ============================================================
 
-def listar_productos(estado=None, busqueda=None, categoria_id=None):
+def contar_productos(estado=None, busqueda=None, categoria_id=None):
+    esquema = _esquema()
+    condiciones = []
+    parametros = []
+    if estado:
+        condiciones.append("p.estado = %s")
+        parametros.append(estado)
+    if busqueda:
+        condiciones.append("(p.nombre LIKE %s OR p.slug LIKE %s)")
+        parametros.extend([f"%{busqueda}%", f"%{busqueda}%"])
+    if categoria_id:
+        condiciones.append("p.categoria_id = %s")
+        parametros.append(categoria_id)
+    where_sql = "WHERE " + " AND ".join(condiciones) if condiciones else ""
+    conexion = _lectura()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM {esquema}.productos AS p {where_sql}",
+                tuple(parametros),
+            )
+            return int((cursor.fetchone() or {}).get("total") or 0)
+    finally:
+        conexion.close()
+
+
+def listar_productos(estado=None, busqueda=None, categoria_id=None,
+                      limite=25, offset=0):
     """Lista productos con su categoría y conteo real de variantes."""
 
     esquema = _esquema()
@@ -367,8 +425,10 @@ def listar_productos(estado=None, busqueda=None, categoria_id=None):
         INNER JOIN {esquema}.categorias AS c
             ON c.id = p.categoria_id
         {where_sql}
-        ORDER BY p.nombre ASC
+        ORDER BY p.nombre ASC, p.id ASC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend(_limites(limite, offset))
 
     conexion = _lectura()
     try:
@@ -676,7 +736,34 @@ def _sql_imagen_actual():
     """
 
 
-def listar_variantes(estado=None, busqueda=None, producto_id=None):
+def contar_variantes(estado=None, busqueda=None, producto_id=None):
+    esquema = _esquema()
+    condiciones = []
+    parametros = []
+    if estado:
+        condiciones.append("v.estado = %s")
+        parametros.append(estado)
+    if busqueda:
+        condiciones.append("(v.sku LIKE %s OR v.nombre_comercial LIKE %s)")
+        parametros.extend([f"%{busqueda}%", f"%{busqueda}%"])
+    if producto_id:
+        condiciones.append("v.producto_id = %s")
+        parametros.append(producto_id)
+    where_sql = "WHERE " + " AND ".join(condiciones) if condiciones else ""
+    conexion = _lectura()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM {esquema}.variantes AS v {where_sql}",
+                tuple(parametros),
+            )
+            return int((cursor.fetchone() or {}).get("total") or 0)
+    finally:
+        conexion.close()
+
+
+def listar_variantes(estado=None, busqueda=None, producto_id=None,
+                      limite=25, offset=0):
     """Lista variantes con producto, sabor, presentación, precio e imagen."""
 
     esquema = _esquema()
@@ -741,8 +828,10 @@ def listar_variantes(estado=None, busqueda=None, producto_id=None):
         LEFT JOIN {esquema}.articulos_venta AS av
             ON av.variante_id = v.id
         {where_sql}
-        ORDER BY p.nombre ASC, v.nombre_comercial ASC
+        ORDER BY p.nombre ASC, v.nombre_comercial ASC, v.id ASC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend(_limites(limite, offset))
 
     conexion = _lectura()
     try:
@@ -1403,7 +1492,48 @@ def listar_precios_por_vencer(dias=30):
 # IMÁGENES DEL CATÁLOGO
 # ============================================================
 
-def listar_imagenes(estado=None, busqueda=None, producto_id=None, variante_id=None):
+def contar_imagenes(estado=None, busqueda=None, producto_id=None,
+                    variante_id=None):
+    esquema = _esquema()
+    condiciones = []
+    parametros = []
+    if estado:
+        condiciones.append("ic.estado = %s")
+        parametros.append(estado)
+    if producto_id:
+        condiciones.append("ic.producto_id = %s")
+        parametros.append(producto_id)
+    if variante_id:
+        condiciones.append("ic.variante_id = %s")
+        parametros.append(variante_id)
+    if busqueda:
+        condiciones.append(
+            "(ic.ruta LIKE %s OR ic.texto_alternativo LIKE %s "
+            "OR p.nombre LIKE %s OR v.nombre_comercial LIKE %s)"
+        )
+        patron = f"%{busqueda}%"
+        parametros.extend([patron, patron, patron, patron])
+    where_sql = "WHERE " + " AND ".join(condiciones) if condiciones else ""
+    conexion = _lectura()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) AS total
+                FROM {esquema}.imagenes_catalogo AS ic
+                LEFT JOIN {esquema}.productos AS p ON p.id = ic.producto_id
+                LEFT JOIN {esquema}.variantes AS v ON v.id = ic.variante_id
+                {where_sql}
+                """,
+                tuple(parametros),
+            )
+            return int((cursor.fetchone() or {}).get("total") or 0)
+    finally:
+        conexion.close()
+
+
+def listar_imagenes(estado=None, busqueda=None, producto_id=None, variante_id=None,
+                    limite=25, offset=0):
     """Lista imágenes con el nombre del producto o variante asociado."""
 
     esquema = _esquema()
@@ -1450,8 +1580,10 @@ def listar_imagenes(estado=None, busqueda=None, producto_id=None, variante_id=No
         LEFT JOIN {esquema}.productos AS pv
             ON pv.id = v.producto_id
         {where_sql}
-        ORDER BY ic.es_principal DESC, ic.orden ASC, ic.creado_en DESC
+        ORDER BY ic.es_principal DESC, ic.orden ASC, ic.creado_en DESC, ic.id ASC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend(_limites(limite, offset))
 
     conexion = _lectura()
     try:
@@ -1647,7 +1779,30 @@ def cambiar_estado_imagen(imagen_id, estado):
 # PACKS
 # ============================================================
 
-def listar_packs(estado=None, busqueda=None):
+def contar_packs(estado=None, busqueda=None):
+    esquema = _esquema()
+    condiciones = []
+    parametros = []
+    if estado:
+        condiciones.append("pk.estado = %s")
+        parametros.append(estado)
+    if busqueda:
+        condiciones.append("(pk.nombre LIKE %s OR pk.slug LIKE %s)")
+        parametros.extend([f"%{busqueda}%", f"%{busqueda}%"])
+    where_sql = "WHERE " + " AND ".join(condiciones) if condiciones else ""
+    conexion = _lectura()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM {esquema}.packs AS pk {where_sql}",
+                tuple(parametros),
+            )
+            return int((cursor.fetchone() or {}).get("total") or 0)
+    finally:
+        conexion.close()
+
+
+def listar_packs(estado=None, busqueda=None, limite=25, offset=0):
     """Lista packs con su artículo, precio vigente y conteos."""
 
     esquema = _esquema()
@@ -1698,8 +1853,10 @@ def listar_packs(estado=None, busqueda=None):
         LEFT JOIN {esquema}.articulos_venta AS av
             ON av.pack_id = pk.id
         {where_sql}
-        ORDER BY pk.nombre ASC
+        ORDER BY pk.nombre ASC, pk.id ASC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend(_limites(limite, offset))
 
     conexion = _lectura()
     try:

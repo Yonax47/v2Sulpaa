@@ -1,0 +1,15 @@
+{% if paginacion and paginacion.total %}
+    <nav class="admin-pagination" aria-label="Paginación de resultados">
+        <span class="admin-pagination-summary">
+            {{ paginacion.total }} resultados · Página {{ paginacion.pagina }} de {{ paginacion.paginas }}
+        </span>
+        <div class="admin-pagination-actions">
+            {% if paginacion.tiene_anterior %}
+                <a class="admin-button is-secondary" rel="prev" href="{{ url_for(paginacion.endpoint, page=paginacion.pagina-1, per_page=paginacion.por_pagina, **paginacion.filtros) }}">Anterior</a>
+            {% endif %}
+            {% if paginacion.tiene_siguiente %}
+                <a class="admin-button is-secondary" rel="next" href="{{ url_for(paginacion.endpoint, page=paginacion.pagina+1, per_page=paginacion.por_pagina, **paginacion.filtros) }}">Siguiente</a>
+            {% endif %}
+        </div>
+    </nav>
+{% endif %}

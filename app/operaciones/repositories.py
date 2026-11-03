@@ -1751,15 +1751,9 @@ def obtener_entrega_pedido(
 # ============================================================
 
 
-def listar_entregas_admin(conexion, esquemas, estado=None, tipo=None,
-                          busqueda=None):
-    """Lista entregas con su pedido, cliente y pago para la operativa."""
-    operaciones = esquemas["operaciones"]
-    comercio = esquemas["comercio"]
-    identidad = esquemas["identidad"]
+def _filtros_entregas_admin(estado=None, tipo=None, busqueda=None):
     condiciones = []
     parametros = []
-
     if estado:
         condiciones.append("e.estado = %s")
         parametros.append(estado)
@@ -1776,6 +1770,38 @@ def listar_entregas_admin(conexion, esquemas, estado=None, tipo=None,
         parametros.extend([termino, termino, termino])
 
     where = " WHERE " + " AND ".join(condiciones) if condiciones else ""
+    return where, parametros
+
+
+def contar_entregas_admin(conexion, esquemas, estado=None, tipo=None,
+                          busqueda=None):
+    """Cuenta entregas con los filtros operativos vigentes."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    where, parametros = _filtros_entregas_admin(estado, tipo, busqueda)
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM {operaciones}.entregas AS e
+            INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+            INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
+            LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
+            {where}
+            """,
+            tuple(parametros),
+        )
+        return int((cursor.fetchone() or {}).get("total") or 0)
+
+
+def listar_entregas_admin(conexion, esquemas, estado=None, tipo=None,
+                          busqueda=None, limite=25, offset=0):
+    """Lista una página de entregas con pedido, cliente y pago."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    where, parametros = _filtros_entregas_admin(estado, tipo, busqueda)
     consulta = f"""
         SELECT
             e.id, e.pedido_id, e.tipo_entrega, e.estado,
@@ -1800,8 +1826,10 @@ def listar_entregas_admin(conexion, esquemas, estado=None, tipo=None,
         LEFT JOIN {operaciones}.metodos_pago AS mp
             ON mp.id = pa.metodo_pago_id
         {where}
-        ORDER BY e.creado_en DESC, p.numero_pedido DESC
+        ORDER BY e.creado_en DESC, e.id DESC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend([int(limite), int(offset)])
     with conexion.cursor() as cursor:
         cursor.execute(consulta, tuple(parametros))
         return cursor.fetchall()

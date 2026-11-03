@@ -6,15 +6,10 @@ Operaciones pertenece a la capa Service.
 """
 
 
-def listar_pedidos(conexion, esquemas, busqueda=None, estado=None,
-                   fecha_desde=None, fecha_hasta=None):
-    """Lista pedidos reales con su cliente, pago y entrega asociados."""
-    comercio = esquemas["comercio"]
-    operaciones = esquemas["operaciones"]
-    identidad = esquemas["identidad"]
+def _filtros_pedidos(busqueda=None, estado=None, fecha_desde=None,
+                     fecha_hasta=None):
     condiciones = []
     parametros = []
-
     if busqueda:
         termino = f"%{busqueda}%"
         condiciones.append(
@@ -30,10 +25,43 @@ def listar_pedidos(conexion, esquemas, busqueda=None, estado=None,
         condiciones.append("DATE(p.creado_en) >= %s")
         parametros.append(fecha_desde)
     if fecha_hasta:
-        condiciones.append("DATE(p.creado_en) <= %s")
+        condiciones.append("p.creado_en < DATE_ADD(%s, INTERVAL 1 DAY)")
         parametros.append(fecha_hasta)
-
     where = " WHERE " + " AND ".join(condiciones) if condiciones else ""
+    return where, parametros
+
+
+def contar_pedidos(conexion, esquemas, busqueda=None, estado=None,
+                   fecha_desde=None, fecha_hasta=None):
+    """Cuenta pedidos con los mismos filtros del listado paginado."""
+    comercio = esquemas["comercio"]
+    identidad = esquemas["identidad"]
+    where, parametros = _filtros_pedidos(
+        busqueda, estado, fecha_desde, fecha_hasta
+    )
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM {comercio}.pedidos AS p
+            INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
+            LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
+            {where}
+            """,
+            tuple(parametros),
+        )
+        return int((cursor.fetchone() or {}).get("total") or 0)
+
+
+def listar_pedidos(conexion, esquemas, busqueda=None, estado=None,
+                   fecha_desde=None, fecha_hasta=None, limite=25, offset=0):
+    """Lista una página de pedidos con cliente, pago y entrega asociados."""
+    comercio = esquemas["comercio"]
+    operaciones = esquemas["operaciones"]
+    identidad = esquemas["identidad"]
+    where, parametros = _filtros_pedidos(
+        busqueda, estado, fecha_desde, fecha_hasta
+    )
     consulta = f"""
         SELECT
             p.id, p.numero_pedido, p.usuario_id, p.total, p.moneda,
@@ -55,10 +83,17 @@ def listar_pedidos(conexion, esquemas, busqueda=None, estado=None,
             )
         LEFT JOIN {operaciones}.metodos_pago AS mp
             ON mp.id = pa.metodo_pago_id
-        LEFT JOIN {operaciones}.entregas AS e ON e.pedido_id = p.id
+        LEFT JOIN {operaciones}.entregas AS e
+            ON e.id = (
+                SELECT e2.id FROM {operaciones}.entregas AS e2
+                WHERE e2.pedido_id = p.id
+                ORDER BY e2.creado_en DESC, e2.id DESC LIMIT 1
+            )
         {where}
-        ORDER BY p.creado_en DESC, p.numero_pedido DESC
+        ORDER BY p.creado_en DESC, p.id DESC
+        LIMIT %s OFFSET %s
     """
+    parametros.extend([int(limite), int(offset)])
     with conexion.cursor() as cursor:
         cursor.execute(consulta, tuple(parametros))
         return cursor.fetchall()
@@ -98,7 +133,12 @@ def obtener_cabecera_pedido(conexion, esquemas, pedido_id):
             )
         LEFT JOIN {operaciones}.metodos_pago AS mp
             ON mp.id = pa.metodo_pago_id
-        LEFT JOIN {operaciones}.entregas AS e ON e.pedido_id = p.id
+        LEFT JOIN {operaciones}.entregas AS e
+            ON e.id = (
+                SELECT e2.id FROM {operaciones}.entregas AS e2
+                WHERE e2.pedido_id = p.id
+                ORDER BY e2.creado_en DESC, e2.id DESC LIMIT 1
+            )
         WHERE p.id = %s
         LIMIT 1
     """

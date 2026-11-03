@@ -32,7 +32,7 @@
                 </div>
                 <div class="admin-live-status">
                     <span class="admin-live-dot" aria-hidden="true"></span>
-                    {{ pedidos|length }} resultados
+                    {{ paginacion.total if paginacion else 0 }} resultados
                 </div>
             </header>
 
@@ -112,6 +112,7 @@
                         </table>
                     </div>
                 </section>
+                {% include "admin/components/pagination.html" %}
             {% else %}
                 <section class="admin-empty-state">
                     <span aria-hidden="true">□</span>

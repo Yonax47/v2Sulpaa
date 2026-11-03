@@ -54,18 +54,31 @@ def listado():
         "q": request.args.get("q", ""),
         "bajo_minimo": request.args.get("bajo_minimo") == "1",
     }
-    existencias = []
+    resultado = {"elementos": [], "paginacion": None}
     try:
-        existencias = listar_existencias(
+        resultado = listar_existencias(
             session.get("roles"),
             busqueda=filtros["q"],
             solo_bajo_minimo=filtros["bajo_minimo"],
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
         )
     except ErrorInventario as error:
         flash(str(error), "danger")
+    if not isinstance(resultado, dict) or "elementos" not in resultado:
+        resultado = {"elementos": resultado or [], "paginacion": None}
+    paginacion = resultado["paginacion"]
+    if paginacion:
+        paginacion.update(
+            endpoint="admin_inventario.listado", filtros={
+                "q": filtros["q"],
+                "bajo_minimo": "1" if filtros["bajo_minimo"] else "",
+            }
+        )
     return render_template(
         "admin/inventario/lista.html",
-        existencias=existencias,
+        existencias=resultado["elementos"],
+        paginacion=paginacion,
         filtros=filtros,
     )
 

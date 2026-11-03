@@ -11,6 +11,7 @@ from app.comercio.pedido_states import (
     transicion_permitida,
 )
 from app.shared.unit_of_work import UnidadTrabajo
+from app.shared.pagination import crear_paginacion
 
 
 ROLES_OPERACION_PEDIDOS = frozenset({
@@ -111,7 +112,7 @@ def _acciones_disponibles(estado, roles):
     return []
 
 
-def listar_pedidos_admin(filtros):
+def listar_pedidos_admin(filtros, pagina=1, por_pagina=25):
     """Prepara el listado administrativo a partir de datos reales."""
     filtros = filtros or {}
     busqueda = str(filtros.get("q") or "").strip()[:120]
@@ -125,6 +126,15 @@ def listar_pedidos_admin(filtros):
         raise ReglaPedidoError("La fecha inicial no puede superar la final.")
 
     with UnidadTrabajo() as unidad:
+        total = repositories.contar_pedidos(
+            unidad.conexion,
+            unidad.esquemas,
+            busqueda=busqueda or None,
+            estado=estado or None,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+        )
+        paginacion = crear_paginacion(total, pagina, por_pagina)
         pedidos = repositories.listar_pedidos(
             unidad.conexion,
             unidad.esquemas,
@@ -132,6 +142,8 @@ def listar_pedidos_admin(filtros):
             estado=estado or None,
             fecha_desde=fecha_desde,
             fecha_hasta=fecha_hasta,
+            limite=paginacion["por_pagina"],
+            offset=paginacion["offset"],
         )
         # La lectura no necesita commit; el contexto cerrará con rollback inocuo.
 
@@ -146,7 +158,7 @@ def listar_pedidos_admin(filtros):
         pedido["tipo_entrega_label"] = _etiqueta(
             pedido.get("tipo_entrega"), ETIQUETAS_TIPO_ENTREGA
         )
-    return pedidos
+    return {"elementos": pedidos, "paginacion": paginacion}
 
 
 def obtener_detalle_admin(pedido_id, roles):

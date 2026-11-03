@@ -45,6 +45,7 @@ from app.admin.catalogo.validaciones import (
     validar_reglas_pack,
 )
 from app.inventario.services import obtener_disponibilidad_variantes
+from app.shared.pagination import crear_paginacion
 
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,18 @@ ETIQUETAS_RECURSO = {
     "sabores": "Sabor",
     "presentaciones": "Presentación",
 }
+
+
+def _listar_paginado(contador, listador, pagina, por_pagina, **filtros):
+    """Ejecuta conteo y SELECT limitado con una página ya normalizada."""
+    total = contador(**filtros)
+    paginacion = crear_paginacion(total, pagina, por_pagina)
+    elementos = listador(
+        **filtros,
+        limite=paginacion["por_pagina"],
+        offset=paginacion["offset"],
+    )
+    return {"elementos": elementos, "paginacion": paginacion}
 
 ETIQUETAS_TIPO_UNIDAD = {
     "ML": "Mililitros",
@@ -233,7 +246,8 @@ def _slug_unico(tabla, base, excluir_id=None):
     return candidato
 
 
-def listar_catalogo_simple(roles, recurso, estado=None, busqueda=None):
+def listar_catalogo_simple(roles, recurso, estado=None, busqueda=None,
+                           pagina=1, por_pagina=25):
     """Lista categorías, sabores o presentaciones con filtros válidos."""
 
     _validar_acceso(roles)
@@ -242,10 +256,14 @@ def listar_catalogo_simple(roles, recurso, estado=None, busqueda=None):
     if estado not in (None, "", *ESTADOS):
         raise ErrorCatalogo("El estado indicado no es válido.")
 
-    return repos.listar_simples(
-        recurso,
-        estado=(estado or None),
-        busqueda=(str(busqueda or "").strip() or None),
+    filtros = {
+        "recurso": recurso,
+        "estado": estado or None,
+        "busqueda": str(busqueda or "").strip() or None,
+    }
+    return _listar_paginado(
+        repos.contar_simples, repos.listar_simples,
+        pagina, por_pagina, **filtros
     )
 
 
@@ -418,7 +436,8 @@ def cambiar_estado_catalogo_simple(
 # PRODUCTOS
 # ============================================================
 
-def listar_productos(roles, estado=None, busqueda=None, categoria_id=None):
+def listar_productos(roles, estado=None, busqueda=None, categoria_id=None,
+                      pagina=1, por_pagina=25):
     """Lista productos con su categoría y conteo de variantes."""
 
     _validar_acceso(roles)
@@ -426,7 +445,8 @@ def listar_productos(roles, estado=None, busqueda=None, categoria_id=None):
     if estado not in (None, "", *ESTADOS):
         raise ErrorCatalogo("El estado indicado no es válido.")
 
-    return repos.listar_productos(
+    return _listar_paginado(
+        repos.contar_productos, repos.listar_productos, pagina, por_pagina,
         estado=(estado or None),
         busqueda=(str(busqueda or "").strip() or None),
         categoria_id=(categoria_id or None),
@@ -652,7 +672,8 @@ def cambiar_estado_producto(
 # VARIANTES
 # ============================================================
 
-def listar_variantes(roles, estado=None, busqueda=None, producto_id=None):
+def listar_variantes(roles, estado=None, busqueda=None, producto_id=None,
+                      pagina=1, por_pagina=25):
     """Lista variantes con precio vigente, imagen y estados relacionados."""
 
     _validar_acceso(roles)
@@ -660,7 +681,8 @@ def listar_variantes(roles, estado=None, busqueda=None, producto_id=None):
     if estado not in (None, "", *ESTADOS):
         raise ErrorCatalogo("El estado indicado no es válido.")
 
-    return repos.listar_variantes(
+    return _listar_paginado(
+        repos.contar_variantes, repos.listar_variantes, pagina, por_pagina,
         estado=(estado or None),
         busqueda=(str(busqueda or "").strip() or None),
         producto_id=(producto_id or None),
@@ -1179,6 +1201,8 @@ def listar_imagenes(
     busqueda=None,
     producto_id=None,
     variante_id=None,
+    pagina=1,
+    por_pagina=25,
 ):
     """Lista las imágenes del catálogo con su destino."""
 
@@ -1187,7 +1211,8 @@ def listar_imagenes(
     if estado not in (None, "", *ESTADOS):
         raise ErrorCatalogo("El estado indicado no es válido.")
 
-    return repos.listar_imagenes(
+    return _listar_paginado(
+        repos.contar_imagenes, repos.listar_imagenes, pagina, por_pagina,
         estado=(estado or None),
         busqueda=(str(busqueda or "").strip() or None),
         producto_id=(producto_id or None),
@@ -1419,7 +1444,7 @@ def cambiar_estado_imagen(
 # PACKS
 # ============================================================
 
-def listar_packs(roles, estado=None, busqueda=None):
+def listar_packs(roles, estado=None, busqueda=None, pagina=1, por_pagina=25):
     """Lista packs con su precio vigente y conteo de relaciones."""
 
     _validar_acceso(roles)
@@ -1427,7 +1452,8 @@ def listar_packs(roles, estado=None, busqueda=None):
     if estado not in (None, "", *ESTADOS):
         raise ErrorCatalogo("El estado indicado no es válido.")
 
-    return repos.listar_packs(
+    return _listar_paginado(
+        repos.contar_packs, repos.listar_packs, pagina, por_pagina,
         estado=(estado or None),
         busqueda=(str(busqueda or "").strip() or None),
     )

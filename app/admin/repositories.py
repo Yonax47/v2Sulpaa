@@ -997,28 +997,90 @@ def obtener_metrica_accesos_contenido():
 # METRICAS COMERCIALES Y FINANCIERAS (DASHBOARD GERENCIAL)
 # ========================================================
 
-def obtener_ventas_cobradas(desde=None, hasta=None):
-    from app.config.database import conexion_comercio, conexion_operaciones
-    import os, re
+
+def _filtros_fecha_cobro(desde=None, hasta=None, alias="cobro"):
+    """Construye filtros indexables sobre la fecha efectiva de pago."""
+    condiciones = []
+    parametros = []
+    if desde:
+        condiciones.append(f"{alias}.pagado_en >= %s")
+        parametros.append(desde)
+    if hasta:
+        condiciones.append(
+            f"{alias}.pagado_en < DATE_ADD(%s, INTERVAL 1 DAY)"
+        )
+        parametros.append(hasta)
+    return condiciones, parametros
+
+
+def _subconsulta_primer_cobro(operaciones):
+    """Una fila por pedido pagado para no duplicar una venta.
+
+    El flujo vigente impide crear un segundo pago para el mismo pedido y no
+    admite pagos parciales. La agrupación es una defensa para datos legados o
+    anómalos: conserva la primera fecha cobrada y el importe se toma una sola
+    vez del total comercial del pedido.
+    """
+    return f"""
+        SELECT pedido_id, MIN(pagado_en) AS pagado_en
+        FROM {operaciones}.pagos
+        WHERE estado = 'PAGADO' AND pagado_en IS NOT NULL
+        GROUP BY pedido_id
+    """
+
+
+def obtener_resumen_pedidos_financiero():
+    """Distingue pedidos registrados, cancelados y pagos reembolsados.
+
+    Los reembolsos se muestran como estado actual global porque el esquema no
+    dispone de una fecha específica de reembolso; no se les atribuye
+    artificialmente ``pagado_en``.
+    """
     comercio = nombre_esquema("DB_COMERCIO")
     operaciones = nombre_esquema("DB_OPERACIONES")
-    if not re.fullmatch(r"[A-Za-z0-9_]+", comercio):
-        raise RuntimeError("DB_COMERCIO no contiene un esquema valido.")
-    if not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
-        raise RuntimeError("DB_OPERACIONES no contiene un esquema valido.")
     conn = conexion_comercio()
     try:
         with conn.cursor() as cursor:
-            where = ["pe.estado != 'CANCELADO'", "pg.estado = 'PAGADO'"]
-            params = []
-            if desde:
-                where.append("DATE(pe.creado_en) >= %s")
-                params.append(desde)
-            if hasta:
-                where.append("DATE(pe.creado_en) <= %s")
-                params.append(hasta)
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) AS pedidos_registrados,
+                       COALESCE(SUM(pe.estado = 'CANCELADO'), 0)
+                           AS pedidos_cancelados,
+                       (SELECT COUNT(DISTINCT pg.pedido_id)
+                        FROM {operaciones}.pagos AS pg
+                        WHERE pg.estado = 'REEMBOLSADO') AS pedidos_reembolsados
+                FROM {comercio}.pedidos AS pe
+                """
+            )
+            fila = cursor.fetchone() or {}
+        return {
+            "pedidos_registrados": int(fila.get("pedidos_registrados") or 0),
+            "pedidos_cancelados": int(fila.get("pedidos_cancelados") or 0),
+            "pedidos_reembolsados": int(fila.get("pedidos_reembolsados") or 0),
+        }
+    finally:
+        conn.close()
+
+def obtener_ventas_cobradas(desde=None, hasta=None):
+    comercio = nombre_esquema("DB_COMERCIO")
+    operaciones = nombre_esquema("DB_OPERACIONES")
+    cobros = _subconsulta_primer_cobro(operaciones)
+    filtros, params = _filtros_fecha_cobro(desde, hasta)
+    where = ["pe.estado != 'CANCELADO'", *filtros]
+    conn = conexion_comercio()
+    try:
+        with conn.cursor() as cursor:
             cond = " AND ".join(where)
-            cursor.execute(f"""SELECT COUNT(DISTINCT pe.id) AS pedidos_cobrados, COALESCE(SUM(pe.total), 0) AS ingresos_cobrados FROM {comercio}.pedidos pe JOIN {operaciones}.pagos pg ON pg.pedido_id = pe.id WHERE {cond}""", params)
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) AS pedidos_cobrados,
+                       COALESCE(SUM(pe.total), 0) AS ingresos_cobrados
+                FROM {comercio}.pedidos AS pe
+                INNER JOIN ({cobros}) AS cobro ON cobro.pedido_id = pe.id
+                WHERE {cond}
+                """,
+                params,
+            )
             fila = cursor.fetchone()
         return {"pedidos_cobrados": int(fila["pedidos_cobrados"] or 0), "ingresos_cobrados": float(fila["ingresos_cobrados"] or 0.0)}
     finally:
@@ -1068,29 +1130,20 @@ def obtener_top_productos_vendidos_cobrados(desde=None, hasta=None, limit=10):
     Mide lo realmente cobrado (no lo pedido). El ingreso se toma de la
     linea del pedido y las unidades de la composicion real.
     """
-    from app.config.database import conexion_comercio, conexion_operaciones
-    import os, re
     comercio = nombre_esquema("DB_COMERCIO")
     operaciones = nombre_esquema("DB_OPERACIONES")
-    if not re.fullmatch(r"[A-Za-z0-9_]+", comercio) or not re.fullmatch(r"[A-Za-z0-9_]+", operaciones):
-        raise RuntimeError("DB_COMERCIO o DB_OPERACIONES no contienen un esquema valido.")
+    cobros = _subconsulta_primer_cobro(operaciones)
     conn = conexion_comercio()
     try:
         with conn.cursor() as cursor:
-            where = ["pe.estado != 'CANCELADO'", "pg.estado = 'PAGADO'"]
-            params = []
-            if desde:
-                where.append("DATE(pe.creado_en) >= %s")
-                params.append(desde)
-            if hasta:
-                where.append("DATE(pe.creado_en) <= %s")
-                params.append(hasta)
+            filtros, params = _filtros_fecha_cobro(desde, hasta)
+            where = ["pe.estado != 'CANCELADO'", *filtros]
             cond = " AND ".join(where)
             sql = f"""SELECT v2.sku, v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion,
                          SUM(pd.cantidad * pc.cantidad) AS unidades_vendidas,
                          SUM(pd.subtotal_linea) AS ingresos_linea
                   FROM {comercio}.pedidos pe
-                  JOIN {operaciones}.pagos pg ON pg.pedido_id = pe.id
+                   JOIN ({cobros}) cobro ON cobro.pedido_id = pe.id
                   JOIN {comercio}.pedido_detalles pd ON pd.pedido_id = pe.id
                   JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id = pd.id
                   JOIN {comercio}.variantes v2 ON v2.id = pc.variante_id
@@ -1165,35 +1218,65 @@ def obtener_entregas_por_estado(desde=None, hasta=None):
             return cursor.fetchall()
     finally:
         conn.close()
-def obtener_ventas_cobradas_por_dia(desde=None, hasta=None):
-    from app.config.database import conexion_comercio, conexion_operaciones
+def obtener_serie_ventas_cobradas(agrupacion="dia", desde=None, hasta=None):
+    """Agrupa pedidos cobrados por día, mes o año usando ``pagado_en``."""
     comercio = nombre_esquema("DB_COMERCIO")
     operaciones = nombre_esquema("DB_OPERACIONES")
-    conn=conexion_comercio()
+    expresiones = {
+        "dia": "DATE_FORMAT(cobro.pagado_en, '%Y-%m-%d')",
+        "mes": "DATE_FORMAT(cobro.pagado_en, '%Y-%m')",
+        "anio": "DATE_FORMAT(cobro.pagado_en, '%Y')",
+    }
+    expresion = expresiones.get(agrupacion)
+    if not expresion:
+        raise ValueError("La agrupación de ventas no es válida.")
+    cobros = _subconsulta_primer_cobro(operaciones)
+    filtros, params = _filtros_fecha_cobro(desde, hasta)
+    where = ["pe.estado != 'CANCELADO'", *filtros]
+    conn = conexion_comercio()
     try:
         with conn.cursor() as cursor:
-            where=["pe.estado!='CANCELADO'","pg.estado='PAGADO'"]
-            params=[]
-            if desde: where.append("DATE(pe.creado_en)>= %s"); params.append(desde)
-            if hasta: where.append("DATE(pe.creado_en)<= %s"); params.append(hasta)
-            cond=' AND '.join(where)
-            cursor.execute(f"SELECT DATE(pe.creado_en) AS fecha, COUNT(DISTINCT pe.id) AS pedidos, COALESCE(SUM(pe.total),0) AS total FROM {comercio}.pedidos pe JOIN {operaciones}.pagos pg ON pg.pedido_id=pe.id WHERE {cond} GROUP BY DATE(pe.creado_en) ORDER BY fecha", params)
+            condicion = " AND ".join(where)
+            cursor.execute(
+                f"""
+                SELECT {expresion} AS periodo,
+                       COUNT(*) AS ventas,
+                       COALESCE(SUM(pe.total), 0) AS ingresos
+                FROM {comercio}.pedidos AS pe
+                INNER JOIN ({cobros}) AS cobro ON cobro.pedido_id = pe.id
+                WHERE {condicion}
+                GROUP BY {expresion}
+                ORDER BY periodo ASC
+                """,
+                params,
+            )
             return cursor.fetchall()
     finally:
         conn.close()
+
+
+def obtener_ventas_cobradas_por_dia(desde=None, hasta=None):
+    """Compatibilidad con consumidores anteriores de la serie diaria."""
+    filas = obtener_serie_ventas_cobradas("dia", desde, hasta)
+    return [
+        {
+            "fecha": fila["periodo"],
+            "pedidos": fila["ventas"],
+            "total": fila["ingresos"],
+        }
+        for fila in filas
+    ]
 def obtener_ingresos_por_producto_cobrado(desde=None, hasta=None, limit=10):
-    from app.config.database import conexion_comercio, conexion_operaciones
     comercio = nombre_esquema("DB_COMERCIO")
     operaciones = nombre_esquema("DB_OPERACIONES")
+    cobros = _subconsulta_primer_cobro(operaciones)
     conn=conexion_comercio()
     try:
         with conn.cursor() as cursor:
-            where=["pe.estado!='CANCELADO'","pg.estado='PAGADO'"]
-            params=[]
-            if desde: where.append("DATE(pe.creado_en)>= %s"); params.append(desde)
-            if hasta: where.append("DATE(pe.creado_en)<= %s"); params.append(hasta)
+            filtros, params = _filtros_fecha_cobro(desde, hasta)
+            where=["pe.estado!='CANCELADO'", *filtros]
             cond=' AND '.join(where)
-            cursor.execute(f"SELECT v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion, SUM(pd.subtotal_linea) AS ingresos_linea FROM {comercio}.pedidos pe JOIN {operaciones}.pagos pg ON pg.pedido_id=pe.id JOIN {comercio}.pedido_detalles pd ON pd.pedido_id=pe.id JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id=pd.id JOIN {comercio}.variantes v2 ON v2.id=pc.variante_id LEFT JOIN {comercio}.productos p ON p.id=v2.producto_id LEFT JOIN {comercio}.sabores s ON s.id=v2.sabor_id LEFT JOIN {comercio}.presentaciones pr ON pr.id=v2.presentacion_id WHERE {cond} GROUP BY v2.id,v2.nombre_comercial,p.nombre,s.nombre,pr.nombre ORDER BY ingresos_linea DESC LIMIT %s", params+[int(limit)])
+            cursor.execute(f"SELECT v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion, SUM(pd.subtotal_linea) AS ingresos_linea FROM {comercio}.pedidos pe JOIN ({cobros}) cobro ON cobro.pedido_id=pe.id JOIN {comercio}.pedido_detalles pd ON pd.pedido_id=pe.id JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id=pd.id JOIN {comercio}.variantes v2 ON v2.id=pc.variante_id LEFT JOIN {comercio}.productos p ON p.id=v2.producto_id LEFT JOIN {comercio}.sabores s ON s.id=v2.sabor_id LEFT JOIN {comercio}.presentaciones pr ON pr.id=v2.presentacion_id WHERE {cond} GROUP BY v2.id,v2.nombre_comercial,p.nombre,s.nombre,pr.nombre ORDER BY ingresos_linea DESC LIMIT %s", params+[int(limit)])
             return cursor.fetchall()
     finally:
         conn.close()

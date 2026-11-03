@@ -26,7 +26,7 @@ def _ejecutar(operacion, *argumentos, **opciones):
         raise ReglaEntregaError(str(error)) from error
 
 
-def listar_entregas(filtros):
+def listar_entregas(filtros, pagina=1, por_pagina=25):
     """Lista entregas reales con etiquetas de presentación."""
     filtros = filtros or {}
     return _ejecutar(
@@ -34,6 +34,8 @@ def listar_entregas(filtros):
         estado=filtros.get("estado"),
         tipo=filtros.get("tipo"),
         busqueda=filtros.get("q"),
+        pagina=pagina,
+        por_pagina=por_pagina,
     )
 
 

@@ -230,20 +230,36 @@ def _urls_simples(recurso):
     }
 
 
+def _datos_paginados(resultado, endpoint, filtros):
+    """Prepara el contrato común para el partial de navegación."""
+    if not isinstance(resultado, dict) or "elementos" not in resultado:
+        return resultado or [], None
+    paginacion = resultado.get("paginacion")
+    if paginacion:
+        paginacion.update(endpoint=endpoint, filtros=filtros)
+    return resultado["elementos"], paginacion
+
+
 def _listar_simple(recurso):
     """Lista un catálogo simple con sus filtros."""
 
     estado = request.args.get("estado", "")
     busqueda = request.args.get("q", "")
 
-    registros = []
+    resultado = {"elementos": [], "paginacion": None}
     try:
-        registros = listar_catalogo_simple(
-            _roles(), recurso, estado=estado, busqueda=busqueda
+        resultado = listar_catalogo_simple(
+            _roles(), recurso, estado=estado, busqueda=busqueda,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
         )
     except ErrorCatalogo as error:
         flash(str(error), "danger")
 
+    registros, paginacion = _datos_paginados(
+        resultado, _urls_simples(recurso)["lista"],
+        {"estado": estado, "q": busqueda},
+    )
     return render_template(
         "admin/catalogo/simple_lista.html",
         recurso=recurso,
@@ -254,6 +270,7 @@ def _listar_simple(recurso):
             "presentaciones": "Presentaciones",
         }[recurso],
         registros=registros,
+        paginacion=paginacion,
         estado=estado,
         busqueda=busqueda,
         urls=_urls_simples(recurso),
@@ -494,22 +511,29 @@ def productos():
     categoria_id = request.args.get("categoria_id", "")
     busqueda = request.args.get("q", "")
 
-    productos_lista = []
+    resultado = {"elementos": [], "paginacion": None}
     selectores = {"categorias": []}
     try:
-        productos_lista = listar_productos(
+        resultado = listar_productos(
             _roles(),
             estado=estado,
             busqueda=busqueda,
             categoria_id=categoria_id or None,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
         )
         selectores = obtener_selectores(_roles())
     except ErrorCatalogo as error:
         flash(str(error), "danger")
 
+    productos_lista, paginacion = _datos_paginados(
+        resultado, "admin_catalogo.productos",
+        {"estado": estado, "categoria_id": categoria_id, "q": busqueda},
+    )
     return render_template(
         "admin/catalogo/productos_lista.html",
         productos=productos_lista,
+        paginacion=paginacion,
         categorias=selectores.get("categorias") or [],
         estado=estado,
         categoria_id=categoria_id,
@@ -626,22 +650,29 @@ def variantes():
     producto_id = request.args.get("producto_id", "")
     busqueda = request.args.get("q", "")
 
-    variantes_lista = []
+    resultado = {"elementos": [], "paginacion": None}
     productos_selector = []
     try:
-        variantes_lista = listar_variantes(
+        resultado = listar_variantes(
             _roles(),
             estado=estado,
             busqueda=busqueda,
             producto_id=producto_id or None,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
         )
         productos_selector = obtener_selectores(_roles())["productos"]
     except ErrorCatalogo as error:
         flash(str(error), "danger")
 
+    variantes_lista, paginacion = _datos_paginados(
+        resultado, "admin_catalogo.variantes",
+        {"estado": estado, "producto_id": producto_id, "q": busqueda},
+    )
     return render_template(
         "admin/catalogo/variantes_lista.html",
         variantes=variantes_lista,
+        paginacion=paginacion,
         productos=productos_selector,
         estado=estado,
         producto_id=producto_id,
@@ -865,17 +896,24 @@ def imagenes():
     estado = request.args.get("estado", "")
     busqueda = request.args.get("q", "")
 
-    imagenes_lista = []
+    resultado = {"elementos": [], "paginacion": None}
     try:
-        imagenes_lista = listar_imagenes(
-            _roles(), estado=estado, busqueda=busqueda
+        resultado = listar_imagenes(
+            _roles(), estado=estado, busqueda=busqueda,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
         )
     except ErrorCatalogo as error:
         flash(str(error), "danger")
 
+    imagenes_lista, paginacion = _datos_paginados(
+        resultado, "admin_catalogo.imagenes",
+        {"estado": estado, "q": busqueda},
+    )
     return render_template(
         "admin/catalogo/imagenes_lista.html",
         imagenes=imagenes_lista,
+        paginacion=paginacion,
         estado=estado,
         busqueda=busqueda,
         admin_activo="catalogo",
@@ -1001,17 +1039,24 @@ def packs():
     estado = request.args.get("estado", "")
     busqueda = request.args.get("q", "")
 
-    packs_lista = []
+    resultado = {"elementos": [], "paginacion": None}
     try:
-        packs_lista = listar_packs(
-            _roles(), estado=estado, busqueda=busqueda
+        resultado = listar_packs(
+            _roles(), estado=estado, busqueda=busqueda,
+            pagina=request.args.get("page"),
+            por_pagina=request.args.get("per_page"),
         )
     except ErrorCatalogo as error:
         flash(str(error), "danger")
 
+    packs_lista, paginacion = _datos_paginados(
+        resultado, "admin_catalogo.packs",
+        {"estado": estado, "q": busqueda},
+    )
     return render_template(
         "admin/catalogo/packs_lista.html",
         packs=packs_lista,
+        paginacion=paginacion,
         estado=estado,
         busqueda=busqueda,
         admin_activo="catalogo",

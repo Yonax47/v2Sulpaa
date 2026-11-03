@@ -38,7 +38,43 @@ def _esquema(nombre_variable):
 # LECTURA DE EXISTENCIAS ENRIQUECIDAS
 # ============================================================
 
-def listar_existencias_detalladas(busqueda=None, solo_bajo_minimo=False):
+def _filtros_existencias(busqueda=None, solo_bajo_minimo=False):
+    condiciones = []
+    parametros = []
+    if solo_bajo_minimo:
+        condiciones.append("ex.stock_fisico < ex.stock_minimo")
+    if busqueda:
+        condiciones.append("(v.sku LIKE %s OR v.nombre_comercial LIKE %s)")
+        patron = f"%{busqueda}%"
+        parametros.extend([patron, patron])
+    where_sql = "WHERE " + " AND ".join(condiciones) if condiciones else ""
+    return where_sql, parametros
+
+
+def contar_existencias_detalladas(busqueda=None, solo_bajo_minimo=False):
+    """Cuenta existencias usando exactamente los filtros del listado."""
+    inventario = _esquema("DB_INVENTARIO")
+    comercio = _esquema("DB_COMERCIO")
+    where_sql, parametros = _filtros_existencias(busqueda, solo_bajo_minimo)
+    conexion = conexion_inventario()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT COUNT(*) AS total
+                FROM {inventario}.existencias AS ex
+                LEFT JOIN {comercio}.variantes AS v ON v.id = ex.variante_id
+                {where_sql}
+                """,
+                tuple(parametros),
+            )
+            return int((cursor.fetchone() or {}).get("total") or 0)
+    finally:
+        conexion.close()
+
+
+def listar_existencias_detalladas(busqueda=None, solo_bajo_minimo=False,
+                                  limite=None, offset=0):
     """
     Lista el inventario real enriquecido con catálogo Comercio.
 
@@ -56,24 +92,7 @@ def listar_existencias_detalladas(busqueda=None, solo_bajo_minimo=False):
     inventario = _esquema("DB_INVENTARIO")
     comercio = _esquema("DB_COMERCIO")
 
-    condiciones = []
-    parametros = []
-
-    if solo_bajo_minimo:
-        condiciones.append("ex.stock_fisico < ex.stock_minimo")
-
-    if busqueda:
-        condiciones.append(
-            "(v.sku LIKE %s OR v.nombre_comercial LIKE %s)"
-        )
-        patron = f"%{busqueda}%"
-        parametros.extend([patron, patron])
-
-    where_sql = (
-        ("WHERE " + " AND ".join(condiciones))
-        if condiciones
-        else ""
-    )
+    where_sql, parametros = _filtros_existencias(busqueda, solo_bajo_minimo)
 
     consulta = f"""
         SELECT
@@ -103,8 +122,12 @@ def listar_existencias_detalladas(busqueda=None, solo_bajo_minimo=False):
         {where_sql}
         ORDER BY
             v.nombre_comercial ASC,
-            ex.stock_fisico ASC
+            ex.stock_fisico ASC,
+            ex.id ASC
+        {"LIMIT %s OFFSET %s" if limite is not None else ""}
     """
+    if limite is not None:
+        parametros.extend([int(limite), int(offset)])
 
     conexion = conexion_inventario()
 

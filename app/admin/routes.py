@@ -16,7 +16,7 @@ que el dump de identidad define con acceso total al
 panel administrativo.
 """
 
-from flask import Blueprint, redirect, render_template, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.shared.decorators import (
     admin_required,
@@ -83,10 +83,17 @@ def dashboard():
 
     resumen = resumen_dashboard()
 
+    filtros_ventas = {
+        "periodo": request.args.get("periodo", "dia"),
+        "desde": request.args.get("desde", ""),
+        "hasta": request.args.get("hasta", ""),
+    }
     try:
-        gerencial = obtener_resumen_gerencial()
-    except Exception:
-        gerencial = {}
+        gerencial = obtener_resumen_gerencial(**filtros_ventas)
+    except ValueError as error:
+        flash(str(error), "danger")
+        filtros_ventas = {"periodo": "dia", "desde": "", "hasta": ""}
+        gerencial = obtener_resumen_gerencial(**filtros_ventas)
     return render_template(
         "admin/dashboard.html",
         kpis=resumen["kpis_funcionales"],
@@ -94,6 +101,7 @@ def dashboard():
         operativo=resumen["operativo"],
         graficos=resumen["graficos"],
         gerencial=gerencial,
+        filtros_ventas=filtros_ventas,
     )
 
 

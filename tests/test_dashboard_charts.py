@@ -33,7 +33,7 @@ class DashboardChartsTest(unittest.TestCase):
     def test_gerencial_has_required_keys(self):
         from app.admin import services
         g = services.obtener_resumen_gerencial()
-        for k in ['top_productos_cobrados', 'ingresos_por_producto', 'ventas_cobradas_por_dia', 'pedidos_por_estado', 'caja_resumen']:
+        for k in ['top_productos_cobrados', 'ingresos_por_producto', 'ventas_cobradas_serie', 'pedidos_por_estado', 'caja_resumen']:
             self.assertIn(k, g)
 
 
@@ -112,24 +112,54 @@ class DashboardRenderAisladoTest(unittest.TestCase):
         from unittest.mock import patch
 
         gerencial_falso = {
+            "estados_financieros": {
+                "pedidos_registrados": 1,
+                "pedidos_cancelados": 0,
+                "pedidos_reembolsados": 0,
+            },
             "ventas_cobradas": {"pedidos_cobrados": 1, "ingresos_cobrados": 10.0},
             "top_productos_cobrados": [],
             "ingresos_por_producto": [],
-            "ventas_cobradas_por_dia": [{"fecha": "2026-10-16", "total": 10.0}],
+            "ventas_cobradas_serie": [{
+                "periodo": "2026-10-16",
+                "etiqueta": "16/10/2026",
+                "ventas": 1,
+                "ingresos": 10.0,
+            }],
+            "periodo": "dia",
             "pedidos_por_estado": [],
             "caja_resumen": {"ingresos": 10.0, "egresos": 0.0},
+        }
+        resumen_falso = {
+            "kpis_funcionales": [],
+            "resumen": {
+                "total": 0, "instrumentados": 0, "con_evidencia": 0,
+                "pendientes_de_datos": 0, "cumplen": 0, "no_cumplen": 0,
+            },
+            "operativo": {
+                "pedidos_iniciados": 0, "pedidos_completados": 0,
+                "entregas": 0, "productos_con_stock_bajo": 0,
+                "ingresos": 0, "egresos": 0, "flujo_neto": 0,
+                "encuestas_completadas": 0, "satisfaccion_promedio": None,
+            },
+            "graficos": {
+                "flujo_caja": [], "kpi09": None, "satisfaccion": None,
+            },
         }
         with patch(
             "app.admin.routes.obtener_resumen_gerencial",
             return_value=gerencial_falso,
+        ), patch(
+            "app.admin.routes.resumen_dashboard",
+            return_value=resumen_falso,
         ):
             respuesta = self.client.get("/admin/dashboard")
 
         self.assertEqual(respuesta.status_code, 200)
         html = respuesta.get_data(as_text=True)
-        self.assertIn("2026-10-16", html)
-        self.assertIn("return String(d.fecha)", html)
-        self.assertNotIn("return String(p.fecha)", html)
+        self.assertIn("16/10/2026", html)
+        self.assertIn("return d.etiqueta", html)
+        self.assertNotIn("return p.etiqueta", html)
 
 
 if __name__ == '__main__':

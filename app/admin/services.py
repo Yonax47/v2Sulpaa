@@ -24,6 +24,8 @@ Los KPI-11 a KPI-18 son indicadores no funcionales que aún no
 están instrumentados: no se muestran en el panel.
 """
 
+from datetime import date
+
 from app.admin import repositories as repos
 from app.admin.repositories import (
     obtener_metrica_accesos_contenido,
@@ -884,16 +886,65 @@ def resumen_dashboard():
 # ========================================================
 
 
-def obtener_resumen_gerencial(desde=None, hasta=None):
+_MESES_CORTOS = (
+    "", "ene", "feb", "mar", "abr", "may", "jun",
+    "jul", "ago", "sep", "oct", "nov", "dic",
+)
+
+
+def _fecha_gerencial(valor, nombre):
+    """Valida una fecha ISO recibida por el filtro del dashboard."""
+    if not valor:
+        return None
+    try:
+        return date.fromisoformat(str(valor))
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{nombre} no es válida.") from error
+
+
+def _normalizar_serie_ventas(filas, periodo):
+    """Convierte decimales y crea etiquetas legibles para Chart.js."""
+    serie = []
+    for fila in filas or []:
+        clave = str(fila.get("periodo") or "")
+        etiqueta = clave
+        if periodo == "dia" and len(clave) == 10:
+            anio, mes, dia = clave.split("-")
+            etiqueta = f"{dia}/{mes}/{anio}"
+        elif periodo == "mes" and len(clave) == 7:
+            anio, mes = clave.split("-")
+            etiqueta = f"{_MESES_CORTOS[int(mes)]} {anio}"
+        serie.append({
+            "periodo": clave,
+            "etiqueta": etiqueta,
+            "ventas": int(fila.get("ventas") or 0),
+            "ingresos": round(float(fila.get("ingresos") or 0), 2),
+        })
+    return serie
+
+
+def obtener_resumen_gerencial(desde=None, hasta=None, periodo="dia"):
+    periodo = str(periodo or "dia").strip().lower()
+    if periodo not in {"dia", "mes", "anio"}:
+        raise ValueError("El período del gráfico no es válido.")
+    desde = _fecha_gerencial(desde, "La fecha inicial")
+    hasta = _fecha_gerencial(hasta, "La fecha final")
+    if desde and hasta and desde > hasta:
+        raise ValueError("La fecha inicial no puede superar la fecha final.")
+
     resumen = {}
+    try:
+        resumen['estados_financieros'] = repos.obtener_resumen_pedidos_financiero()
+    except Exception:
+        resumen['estados_financieros'] = {
+            'pedidos_registrados': 0,
+            'pedidos_cancelados': 0,
+            'pedidos_reembolsados': 0,
+        }
     try:
         resumen['ventas_cobradas'] = repos.obtener_ventas_cobradas(desde, hasta)
     except Exception:
         resumen['ventas_cobradas'] = {'pedidos_cobrados': 0, 'ingresos_cobrados': 0.0}
-    try:
-        resumen['top_productos'] = repos.obtener_top_productos_vendidos(desde, hasta, limit=10)
-    except Exception:
-        resumen['top_productos'] = []
     try:
         resumen['top_productos_cobrados'] = repos.obtener_top_productos_vendidos_cobrados(desde, hasta, limit=10)
     except Exception:
@@ -903,13 +954,12 @@ def obtener_resumen_gerencial(desde=None, hasta=None):
     except Exception:
         resumen['ingresos_por_producto'] = []
     try:
-        resumen['ventas_cobradas_por_dia'] = repos.obtener_ventas_cobradas_por_dia(desde, hasta)
+        filas = repos.obtener_serie_ventas_cobradas(periodo, desde, hasta)
+        resumen['ventas_cobradas_serie'] = _normalizar_serie_ventas(
+            filas, periodo
+        )
     except Exception:
-        resumen['ventas_cobradas_por_dia'] = []
-    try:
-        resumen['evolucion_diaria'] = repos.obtener_evolucion_ventas_diarias(desde, hasta)
-    except Exception:
-        resumen['evolucion_diaria'] = []
+        resumen['ventas_cobradas_serie'] = []
     try:
         resumen['pedidos_por_estado'] = repos.obtener_pedidos_por_estado_agrupado(desde, hasta)
     except Exception:
@@ -918,12 +968,12 @@ def obtener_resumen_gerencial(desde=None, hasta=None):
         except Exception:
             resumen['pedidos_por_estado'] = []
     try:
-        resumen['entregas_por_estado'] = repos.obtener_entregas_por_estado(desde, hasta)
-    except Exception:
-        resumen['entregas_por_estado'] = []
-    try:
         resumen['caja_resumen'] = repos.obtener_caja_movimientos_resumen(desde, hasta)
     except Exception:
         resumen['caja_resumen'] = {'ingresos': 0.0, 'egresos': 0.0, 'total': 0}
+    resumen['periodo'] = periodo
+    resumen['filtros'] = {
+        'desde': desde.isoformat() if desde else '',
+        'hasta': hasta.isoformat() if hasta else '',
+    }
     return resumen
-

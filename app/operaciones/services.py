@@ -2986,7 +2986,8 @@ def registrar_repartidor(actor_id, roles, correo, password, nombres,
     }
 
 
-def listar_entregas_operativa(estado=None, tipo=None, busqueda=None):
+def listar_entregas_operativa(estado=None, tipo=None, busqueda=None,
+                              pagina=1, por_pagina=25):
     """Listado operativo real de entregas (solo lectura, sin commit)."""
     estado = str(estado or "").strip().upper() or None
     tipo = str(tipo or "").strip().upper() or None
@@ -3001,9 +3002,17 @@ def listar_entregas_operativa(estado=None, tipo=None, busqueda=None):
         raise ReglaOperativaError("El filtro de tipo no es válido.")
 
     with UnidadTrabajo() as unidad:
+        total = _repos.contar_entregas_admin(
+            unidad.conexion, unidad.esquemas,
+            estado=estado, tipo=tipo, busqueda=busqueda,
+        )
+        from app.shared.pagination import crear_paginacion
+        paginacion = crear_paginacion(total, pagina, por_pagina)
         entregas = _repos.listar_entregas_admin(
             unidad.conexion, unidad.esquemas,
             estado=estado, tipo=tipo, busqueda=busqueda,
+            limite=paginacion["por_pagina"],
+            offset=paginacion["offset"],
         )
     for entrega in entregas:
         entrega["estado_label"] = _etiqueta_estado_entrega(
@@ -3015,7 +3024,7 @@ def listar_entregas_operativa(estado=None, tipo=None, busqueda=None):
         entrega["pago_estado_label"] = _etiqueta_pago(
             entrega["pago_estado"]
         )
-    return entregas
+    return {"elementos": entregas, "paginacion": paginacion}
 
 
 def obtener_detalle_entrega_operativa(entrega_id):

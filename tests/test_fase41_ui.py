@@ -76,7 +76,8 @@ class GraficosFase41Test(unittest.TestCase):
         gerencial = {
             "ventas_cobradas": {"pedidos_cobrados": 1, "ingresos_cobrados": 25},
             "top_productos_cobrados": [], "ingresos_por_producto": [],
-            "ventas_cobradas_por_dia": [], "pedidos_por_estado": [],
+            "ventas_cobradas_serie": [], "pedidos_por_estado": [],
+            "estados_financieros": {}, "periodo": "dia",
             "caja_resumen": {"ingresos": 25, "egresos": 0},
         }
         with app.test_request_context("/"):

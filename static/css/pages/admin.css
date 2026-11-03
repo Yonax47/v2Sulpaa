@@ -734,3 +734,36 @@ body {
         transition: none;
     }
 }
+.admin-pagination {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-top: 1rem;
+}
+
+.admin-pagination-summary {
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.9rem;
+}
+
+.admin-pagination-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .admin-pagination,
+    .admin-pagination-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-pagination-actions .admin-button {
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+    }
+}

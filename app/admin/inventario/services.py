@@ -21,6 +21,7 @@ REAL del sistema, aplicando las reglas del Bloque 3:
 import logging
 
 from app.admin.inventario.repositories import (
+    contar_existencias_detalladas,
     listar_existencias_detalladas,
     obtener_existencia_detalle,
     listar_movimientos,
@@ -29,6 +30,7 @@ from app.admin.inventario.repositories import (
     registrar_verificacion_fisica,
     registrar_movimiento_stock,
 )
+from app.shared.pagination import crear_paginacion
 
 logger = logging.getLogger(__name__)
 
@@ -62,16 +64,26 @@ def _puede_leer(roles):
 # LECTURAS
 # ============================================================
 
-def listar_existencias(roles, busqueda=None, solo_bajo_minimo=False):
+def listar_existencias(roles, busqueda=None, solo_bajo_minimo=False,
+                       pagina=1, por_pagina=25):
     """Lista existencias reales si el usuario tiene permiso de lectura."""
     if not _puede_leer(roles):
         raise ErrorInventario(
             "No tienes permisos para consultar el inventario."
         )
-    return listar_existencias_detalladas(
-        busqueda=busqueda or None,
+    busqueda = str(busqueda or "").strip()[:120] or None
+    total = contar_existencias_detalladas(
+        busqueda=busqueda,
         solo_bajo_minimo=bool(solo_bajo_minimo),
     )
+    paginacion = crear_paginacion(total, pagina, por_pagina)
+    elementos = listar_existencias_detalladas(
+        busqueda=busqueda or None,
+        solo_bajo_minimo=bool(solo_bajo_minimo),
+        limite=paginacion["por_pagina"],
+        offset=paginacion["offset"],
+    )
+    return {"elementos": elementos, "paginacion": paginacion}
 
 
 def obtener_detalle_existencia(roles, existencia_id):

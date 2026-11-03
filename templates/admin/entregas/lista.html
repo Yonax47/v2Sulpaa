@@ -30,7 +30,7 @@
                 </div>
                 <div class="admin-live-status">
                     <span class="admin-live-dot" aria-hidden="true"></span>
-                    {{ entregas|length }} resultados
+                    {{ paginacion.total if paginacion else 0 }} resultados
                 </div>
                 <a href="{{ url_for('admin_entregas.repartidores') }}" class="admin-button is-secondary">Repartidores</a>
             </header>
@@ -103,6 +103,7 @@
                         </table>
                     </div>
                 </section>
+                {% include "admin/components/pagination.html" %}
             {% else %}
                 <section class="admin-empty-state">
                     <span aria-hidden="true">➤</span>
