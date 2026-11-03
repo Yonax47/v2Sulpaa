@@ -35,7 +35,7 @@
                 <a class="admin-button is-primary" href="{{ url_for(urls.nuevo) }}">Nuevo {{ etiqueta|lower }}</a>
             </header>
 
-            {% include "admin/catalogo/_mensajes.html" %}
+
             {% include "admin/catalogo/_tabs.html" %}
 
             <form method="GET" action="{{ url_for(urls.lista) }}" class="admin-order-filters" role="search">

@@ -35,15 +35,7 @@
                 <a href="{{ url_for('admin_entregas.repartidores') }}" class="admin-button is-secondary">Repartidores</a>
             </header>
 
-            {% with mensajes = get_flashed_messages(with_categories=true) %}
-                {% if mensajes %}
-                    <div class="admin-alert-stack" aria-live="polite">
-                        {% for categoria, mensaje in mensajes %}
-                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+
 
             <form method="GET" class="admin-order-filters" aria-label="Filtros de entregas">
                 <label class="admin-filter-field admin-filter-search">

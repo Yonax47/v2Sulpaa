@@ -5,7 +5,7 @@
 <input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true"><div class="admin-layout">{% include "admin/components/sidebar.html" %}<label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
 <main class="admin-main"><div class="admin-mobile-bar"><label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label><strong>Imagen</strong><span class="admin-mobile-spacer" aria-hidden="true"></span></div>
 <div class="admin-content"><a href="{{ url_for('admin_catalogo.imagenes') }}" class="admin-back-link">← Volver a imágenes</a><header class="admin-page-header"><div><span class="admin-eyebrow">Catálogo</span><h1>{{ "Editar imagen" if imagen else "Nueva imagen" }}</h1><p>Usa un archivo persistente o una ruta estática existente.</p></div></header>
-{% include "admin/catalogo/_mensajes.html" %}{% include "admin/catalogo/_tabs.html" %}
+{% include "admin/catalogo/_tabs.html" %}
 <div class="catalog-split">
 {% if imagen %}<aside class="admin-detail-card"><h2>Vista previa</h2><div class="catalog-image-preview catalog-image-preview-large"><img src="{{ url_imagen_catalogo(imagen.ruta) }}" alt="{{ imagen.texto_alternativo or '' }}"></div><p class="catalog-code">{{ imagen.ruta }}</p></aside>{% endif %}
 <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin_catalogo.imagen', imagen_id=imagen.id) if imagen else url_for('admin_catalogo.nueva_imagen') }}" class="catalog-form-card">

@@ -29,15 +29,7 @@
             {% endif %}
         </div>
 
-        {% with mensajes = get_flashed_messages(with_categories=true) %}
-            {% if mensajes %}
-                <div class="encuesta-alerts">
-                    {% for categoria, mensaje in mensajes %}
-                        <div class="encuesta-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+
 
         {% if ya_respondida %}
             <div class="encuesta-gracias">

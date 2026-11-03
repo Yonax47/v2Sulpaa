@@ -21,7 +21,7 @@
                 <div><span class="admin-eyebrow">SKU</span><h1>{{ variante.nombre_comercial if variante else "Nueva variante" }}</h1><p>La publicación exige producto, sabor, presentación y precio vigentes.</p></div>
                 {% if variante %}<span class="catalog-badge is-{{ 'active' if variante.estado == 'ACTIVO' else 'inactive' }}">{{ variante.estado|capitalize }}</span>{% endif %}
             </header>
-            {% include "admin/catalogo/_mensajes.html" %}
+
             {% include "admin/catalogo/_tabs.html" %}
 
             {% if stock %}

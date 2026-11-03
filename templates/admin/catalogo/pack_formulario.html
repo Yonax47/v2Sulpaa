@@ -5,7 +5,7 @@
 <input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true"><div class="admin-layout">{% include "admin/components/sidebar.html" %}<label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
 <main class="admin-main"><div class="admin-mobile-bar"><label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label><strong>Pack</strong><span class="admin-mobile-spacer" aria-hidden="true"></span></div>
 <div class="admin-content"><a href="{{ url_for('admin_catalogo.packs') }}" class="admin-back-link">← Volver a packs</a><header class="admin-page-header"><div><span class="admin-eyebrow">Catálogo</span><h1>{{ pack.nombre if pack else "Nuevo pack" }}</h1><p>El stock se calcula desde Inventario; aquí solo se define la composición.</p></div>{% if pack %}<span class="catalog-badge is-{{ 'active' if pack.estado == 'ACTIVO' else 'inactive' }}">{{ pack.estado|capitalize }}</span>{% endif %}</header>
-{% include "admin/catalogo/_mensajes.html" %}{% include "admin/catalogo/_tabs.html" %}
+{% include "admin/catalogo/_tabs.html" %}
 {% if stock %}<section class="catalog-stock-bar"><div><span>Tipo</span><strong>{{ stock.tipo|capitalize }}</strong></div><div><span>Packs disponibles</span><strong>{{ stock.packs_disponibles if stock.packs_disponibles is not none else 'Según elección' }}</strong></div><p>Dato calculado en tiempo real. No crea existencias para el pack.</p></section>{% endif %}
 
 <form method="POST" action="{{ url_for('admin_catalogo.pack', pack_id=pack.pack_id) if pack else url_for('admin_catalogo.nuevo_pack') }}" class="catalog-form-card">

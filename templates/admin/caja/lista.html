@@ -36,15 +36,7 @@
                 </div>
             </header>
 
-            {% with mensajes = get_flashed_messages(with_categories=true) %}
-                {% if mensajes %}
-                    <div class="admin-alert-stack" aria-live="polite">
-                        {% for categoria, mensaje in mensajes %}
-                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+
 
             <section class="admin-summary" aria-labelledby="resumen-caja">
                 <div class="admin-summary-grid">
@@ -234,10 +226,13 @@
         <script>
             (function () {
                 var lienzo = document.getElementById("chart-caja-flujo");
-                if (!lienzo || !window.Chart) { return; }
+                if (!lienzo) { return; }
+                if (!window.Chart) {
+                    window.SulpaaCharts.showLoadError(document);
+                    return;
+                }
 
-                var serie = [];
-                try { serie = JSON.parse({{ serie_flujo | tojson }}) || []; } catch (e) { serie = []; }
+                var serie = {{ serie_flujo | tojson }} || [];
                 if (!serie.length) { return; }
 
                 new Chart(lienzo, {

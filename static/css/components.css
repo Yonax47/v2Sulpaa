@@ -204,6 +204,90 @@ No colocar aquí estilos exclusivos de una pantalla.
         #8c3434;
 }
 
+/* Notificaciones globales reutilizables. Se muestran sobre el contenido para
+   que funcionen igual en autenticación, tienda y paneles administrativos. */
+.sulpaa-toast-region {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    width: min(390px, calc(100vw - 2rem));
+    display: grid;
+    gap: 0.7rem;
+    pointer-events: none;
+}
+
+.sulpaa-toast {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) 2rem;
+    align-items: start;
+    gap: 0.65rem;
+    padding: 0.9rem;
+    border: 1px solid var(--color-border);
+    border-left-width: 4px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+}
+
+.sulpaa-toast.is-success { border-left-color: var(--color-success); }
+.sulpaa-toast.is-danger { border-left-color: var(--color-danger); }
+.sulpaa-toast.is-warning { border-left-color: var(--color-warning); }
+.sulpaa-toast.is-info { border-left-color: var(--color-info); }
+
+.sulpaa-toast-icon {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-surface-soft);
+    font-weight: 850;
+}
+
+.sulpaa-toast.is-success .sulpaa-toast-icon { color: var(--color-success); }
+.sulpaa-toast.is-danger .sulpaa-toast-icon { color: var(--color-danger); }
+.sulpaa-toast.is-warning .sulpaa-toast-icon { color: #8a6500; }
+.sulpaa-toast.is-info .sulpaa-toast-icon { color: var(--color-info); }
+
+.sulpaa-toast p {
+    margin: 0.3rem 0 0;
+    overflow-wrap: anywhere;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.sulpaa-toast-close {
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.sulpaa-toast-close:hover,
+.sulpaa-toast-close:focus-visible {
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    outline: 2px solid rgba(43, 130, 76, 0.2);
+}
+
+@media (max-width: 520px) {
+    .sulpaa-toast-region {
+        top: 0.65rem;
+        right: 0.65rem;
+        width: calc(100vw - 1.3rem);
+    }
+}
+
 
 /* ==========================================================
    5. TARJETAS

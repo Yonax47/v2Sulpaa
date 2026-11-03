@@ -232,7 +232,10 @@
 
         if (!window.SulpaaCart) {
 
-            alert("El carrito aún no está listo. Vuelve a intentarlo.");
+            window.SulpaaToast.show(
+                "El carrito aún no está listo. Vuelve a intentarlo.",
+                "warning"
+            );
             return;
         }
 

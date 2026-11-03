@@ -32,9 +32,7 @@
                 <div class="admin-live-status"><span class="admin-live-dot" aria-hidden="true"></span>{{ total }} bloqueos</div>
             </header>
 
-            {% with mensajes = get_flashed_messages(with_categories=true) %}
-                {% if mensajes %}<div class="admin-alert-stack" aria-live="polite">{% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}</div>{% endif %}
-            {% endwith %}
+
 
             <section class="admin-summary" aria-label="Indicadores de seguridad">
                 <div class="admin-summary-grid">

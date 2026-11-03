@@ -227,7 +227,10 @@ Mis favoritos | SULPAA
 
             if (!window.SulpaaCart) {
 
-                alert("El carrito aún no está listo. Vuelve a intentarlo.");
+                window.SulpaaToast.show(
+                    "El carrito aún no está listo. Vuelve a intentarlo.",
+                    "warning"
+                );
                 return;
             }
 
@@ -277,14 +280,20 @@ Mis favoritos | SULPAA
 
             } else {
 
-                alert(datos.mensaje || "No se pudo quitar el favorito.");
+                window.SulpaaToast.show(
+                    datos.mensaje || "No se pudo quitar el favorito.",
+                    "danger"
+                );
                 boton.disabled = false;
 
             }
 
         } catch (error) {
 
-            alert("Ocurrió un error de conexión. Inténtalo de nuevo.");
+            window.SulpaaToast.show(
+                "Ocurrió un error de conexión. Inténtalo de nuevo.",
+                "danger"
+            );
             boton.disabled = false;
 
         }

@@ -186,36 +186,7 @@ Crear cuenta | SULPAA
                      - Datos inválidos
                 -->
 
-                {% with mensajes = get_flashed_messages(with_categories=true) %}
 
-                    {% if mensajes %}
-
-                        <div
-                            class="auth-alerts"
-                            aria-live="polite"
-                        >
-
-                            {% for categoria, mensaje in mensajes %}
-
-                                <div
-                                    class="alert
-                                    {% if categoria == 'success' %}
-                                        alert-success
-                                    {% else %}
-                                        alert-danger
-                                    {% endif %}"
-                                    role="alert"
-                                >
-                                    {{ mensaje }}
-                                </div>
-
-                            {% endfor %}
-
-                        </div>
-
-                    {% endif %}
-
-                {% endwith %}
 
 
 

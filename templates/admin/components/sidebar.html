@@ -185,3 +185,16 @@
         </div>
     </div>
 </aside>
+
+{# Acceso directo visible en la barra móvil; conserva POST y CSRF. #}
+<form
+    method="POST"
+    action="{{ url_for('identidad.logout') }}"
+    class="admin-mobile-logout-form"
+>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="admin-mobile-logout-button">
+        <span aria-hidden="true">↪</span>
+        <span class="admin-mobile-logout-label">Cerrar sesión</span>
+    </button>
+</form>

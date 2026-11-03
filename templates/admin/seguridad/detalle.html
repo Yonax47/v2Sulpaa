@@ -19,7 +19,7 @@
             <a class="admin-back-link" href="{{ url_for('admin_seguridad.accesos') }}">← Volver al centro de seguridad</a>
             <header class="admin-page-header admin-order-detail-header"><div><span class="admin-eyebrow">Episodio #{{ bloqueo.id }}</span><h1>{{ (bloqueo.correo_objetivo or "Sin correo indicado") if bloqueo.tipo == "CUENTA_IP" else "Bloqueo general de IP" }}</h1><p>Dirección asociada: <code>{{ bloqueo.direccion_ip }}</code></p></div><span class="security-state is-{{ bloqueo.estado|lower }} is-large">{{ bloqueo.estado }}</span></header>
 
-            {% with mensajes = get_flashed_messages(with_categories=true) %}{% if mensajes %}<div class="admin-alert-stack" aria-live="polite">{% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+
 
             <div class="admin-detail-grid security-detail-grid">
                 <section class="admin-detail-card"><h2>Evaluación</h2><dl class="admin-detail-list"><div><dt>Tipo</dt><dd>{{ "Cuenta + IP" if bloqueo.tipo == "CUENTA_IP" else "Límite general por IP" }}</dd></div><div><dt>Intentos</dt><dd>{{ bloqueo.intentos_al_bloquear }}</dd></div><div><dt>Primer intento</dt><dd>{{ bloqueo.primer_intento_en.strftime('%d/%m/%Y %H:%M:%S') }}</dd></div><div><dt>Último intento</dt><dd>{{ bloqueo.ultimo_intento_en.strftime('%d/%m/%Y %H:%M:%S') }}</dd></div></dl></section>

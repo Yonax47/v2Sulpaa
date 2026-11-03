@@ -517,7 +517,10 @@
     <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <script>
         (function () {
-            if (!window.Chart) { return; }
+            if (!window.Chart) {
+                window.SulpaaCharts.showLoadError(document);
+                return;
+            }
 
             function aNumero(valor) {
                 var numero = Number(valor);
@@ -532,8 +535,7 @@
             }
 
             // --- Gráficos operativos existentes (flujo mensual y KPI-09) ---
-            var flujo = [];
-            try { flujo = JSON.parse({{ graficos.flujo_caja | tojson }}) || []; } catch (e) { flujo = []; }
+            var flujo = {{ graficos.flujo_caja | tojson }} || [];
 
             var flujoCanvas = document.getElementById("chart-flujo-caja");
             if (flujoCanvas && flujo.length) {
@@ -559,8 +561,7 @@
                 });
             }
 
-            var kpi09 = null;
-            try { kpi09 = JSON.parse({{ graficos.kpi09 | tojson }}); } catch (e) { kpi09 = null; }
+            var kpi09 = {{ graficos.kpi09 | tojson }};
 
             var kpi09Canvas = document.getElementById("chart-kpi09");
             if (kpi09Canvas && kpi09) {
@@ -583,8 +584,7 @@
             }
 
             // --- Resumen gerencial (datos reales cobrados) ---
-            var gerencial = {};
-            try { gerencial = JSON.parse({{ gerencial | tojson }}) || {}; } catch (e) { gerencial = {}; }
+            var gerencial = {{ gerencial | tojson }} || {};
 
             var topCobrados = gerencial.top_productos_cobrados || [];
             var canvasTop = document.getElementById("chart-top-cobrados");

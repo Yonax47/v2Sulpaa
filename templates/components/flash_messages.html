@@ -1,0 +1,36 @@
+{# Mensajes globales. ``error`` se conserva como alias de ``danger``. #}
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+        <div
+            class="sulpaa-toast-region"
+            data-toast-region
+            aria-live="polite"
+            aria-relevant="additions"
+        >
+            {% for categoria, mensaje in mensajes %}
+                {% set tipo = 'danger' if categoria in ('danger', 'error') else categoria %}
+                {% if tipo not in ('success', 'danger', 'warning', 'info') %}
+                    {% set tipo = 'info' %}
+                {% endif %}
+                <div
+                    class="sulpaa-toast is-{{ tipo }}"
+                    data-toast
+                    data-toast-type="{{ tipo }}"
+                    {% if tipo in ('success', 'info') %}data-toast-autoclose="6000"{% endif %}
+                    role="{{ 'alert' if tipo in ('danger', 'warning') else 'status' }}"
+                >
+                    <span class="sulpaa-toast-icon" aria-hidden="true">
+                        {% if tipo == 'success' %}✓{% elif tipo == 'danger' %}!{% elif tipo == 'warning' %}⚠{% else %}i{% endif %}
+                    </span>
+                    <p>{{ mensaje }}</p>
+                    <button
+                        type="button"
+                        class="sulpaa-toast-close"
+                        data-toast-close
+                        aria-label="Cerrar notificación"
+                    >×</button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}

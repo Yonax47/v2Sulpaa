@@ -31,13 +31,7 @@
                 <span class="admin-state is-{{ pedido.estado|lower }} is-large">{{ pedido.estado_label }}</span>
             </header>
 
-            {% with mensajes = get_flashed_messages(with_categories=true) %}
-                {% if mensajes %}
-                    <div class="admin-alert-stack" aria-live="polite">
-                        {% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+
 
             {% if pedido.acciones %}
                 <section class="admin-action-panel" aria-labelledby="acciones-titulo">

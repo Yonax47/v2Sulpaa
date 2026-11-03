@@ -36,15 +36,7 @@
                 </div>
             </header>
 
-            {% with mensajes = get_flashed_messages(with_categories=true) %}
-                {% if mensajes %}
-                    <div class="admin-alert-stack" aria-live="polite">
-                        {% for categoria, mensaje in mensajes %}
-                            <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+
 
             <div class="admin-action-panel" style="border-left-color: var(--sulpaa-green-700)">
                 <div>

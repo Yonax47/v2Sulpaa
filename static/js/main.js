@@ -65,3 +65,124 @@
         }
     });
 }());
+
+(function inicializarNotificacionesSulpaa() {
+    "use strict";
+
+    const TIPOS = new Set(["success", "danger", "warning", "info"]);
+
+    function normalizarTipo(tipo) {
+        const valor = String(tipo || "info").toLowerCase();
+        if (valor === "error") {
+            return "danger";
+        }
+        return TIPOS.has(valor) ? valor : "info";
+    }
+
+    function obtenerRegion() {
+        let region = document.querySelector("[data-toast-region]");
+        if (!region) {
+            region = document.createElement("div");
+            region.className = "sulpaa-toast-region";
+            region.dataset.toastRegion = "";
+            region.setAttribute("aria-live", "polite");
+            region.setAttribute("aria-relevant", "additions");
+            document.body.appendChild(region);
+        }
+        return region;
+    }
+
+    function cerrar(toast) {
+        if (toast && toast.parentNode) {
+            toast.remove();
+        }
+    }
+
+    function programarCierre(toast) {
+        const demora = Number(toast.dataset.toastAutoclose || 0);
+        if (demora > 0) {
+            window.setTimeout(function cerrarLuego() {
+                cerrar(toast);
+            }, demora);
+        }
+    }
+
+    function mostrar(mensaje, tipo, opciones) {
+        const texto = String(mensaje || "").trim();
+        if (!texto) {
+            return null;
+        }
+
+        const tipoNormalizado = normalizarTipo(tipo);
+        const configuracion = opciones || {};
+        const toast = document.createElement("div");
+        toast.className = "sulpaa-toast is-" + tipoNormalizado;
+        toast.dataset.toast = "";
+        toast.dataset.toastType = tipoNormalizado;
+        toast.setAttribute(
+            "role",
+            tipoNormalizado === "danger" || tipoNormalizado === "warning"
+                ? "alert"
+                : "status"
+        );
+
+        const iconos = { success: "✓", danger: "!", warning: "⚠", info: "i" };
+        const icono = document.createElement("span");
+        icono.className = "sulpaa-toast-icon";
+        icono.setAttribute("aria-hidden", "true");
+        icono.textContent = iconos[tipoNormalizado];
+
+        const contenido = document.createElement("p");
+        contenido.textContent = texto;
+
+        const boton = document.createElement("button");
+        boton.type = "button";
+        boton.className = "sulpaa-toast-close";
+        boton.dataset.toastClose = "";
+        boton.setAttribute("aria-label", "Cerrar notificación");
+        boton.textContent = "×";
+
+        toast.append(icono, contenido, boton);
+        if (configuracion.autoclose !== false &&
+            (tipoNormalizado === "success" || tipoNormalizado === "info")) {
+            toast.dataset.toastAutoclose = String(configuracion.demora || 6000);
+        }
+        obtenerRegion().appendChild(toast);
+        programarCierre(toast);
+        return toast;
+    }
+
+    document.addEventListener("click", function cerrarDesdeBoton(evento) {
+        const boton = evento.target.closest("[data-toast-close]");
+        if (boton) {
+            cerrar(boton.closest("[data-toast]"));
+        }
+    });
+
+    document.querySelectorAll("[data-toast]").forEach(programarCierre);
+
+    window.SulpaaToast = Object.freeze({
+        show: mostrar,
+        normalizeType: normalizarTipo,
+    });
+}());
+
+(function prepararMensajesDeGraficos() {
+    "use strict";
+
+    function mostrarErrorCarga(contenedor) {
+        const raiz = contenedor || document;
+        raiz.querySelectorAll('canvas[id^="chart-"]').forEach(function ocultar(lienzo) {
+            lienzo.hidden = true;
+            const aviso = document.createElement("p");
+            aviso.className = "admin-chart-empty";
+            aviso.textContent = "No se pudo cargar el componente de gráficos.";
+            lienzo.insertAdjacentElement("afterend", aviso);
+        });
+        console.error("SULPAA: Chart.js no está disponible.");
+    }
+
+    window.SulpaaCharts = Object.freeze({
+        showLoadError: mostrarErrorCarga,
+    });
+}());
