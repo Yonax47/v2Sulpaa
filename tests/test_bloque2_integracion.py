@@ -1,9 +1,9 @@
-"""Integración real (MySQL) del Bloque 2 sin alterar datos de producción.
+"""Integración MySQL del Bloque 2 sobre los esquemas TEST aislados.
 
-Estrategia: cada caso abre una UnidadTrabajo real y ejecuta las escrituras
+Estrategia: cada caso abre una UnidadTrabajo TEST y ejecuta las escrituras
 de los repositorios SIN confirmar; el __exit__ revierte todo, de modo que el
 flujo completo (LISTO -> PROGRAMADO -> EN_TRANSITO -> ENTREGADO, recojo
-disponible, seguimiento de envío) se valida contra el esquema real y queda
+disponible, seguimiento de envío) se valida contra el esquema aislado y queda
 intacto al terminar.
 """
 
@@ -27,7 +27,9 @@ class FlujoEntregaIntegracionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = create_app()
-        cls.app.config.update(TESTING=True)
+        cls.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_flujo_completo_delivery_se_revierte(self):
         candidata = next(
@@ -185,7 +187,9 @@ class KPIsDashboardIntegracionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = create_app()
-        cls.app.config.update(TESTING=True)
+        cls.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         cls.resumen = resumen_dashboard()
 
     def test_kpis_instrumentados_tienen_valor_real(self):
@@ -252,7 +256,9 @@ class ExportableViewsIntegracionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = create_app()
-        cls.app.config.update(TESTING=True)
+        cls.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def cliente_con_rol(self, roles, correo="actor@example.test"):
         cliente = self.app.test_client()

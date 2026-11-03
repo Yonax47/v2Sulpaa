@@ -8,6 +8,300 @@ No debe contener lógica de negocio ni código de rutas Flask.
 """
 
 from app.config.database import conexion_identidad
+from app.identidad.access_control import evaluar_fallo_contador
+
+
+def _auditar_acceso(
+    cursor,
+    *,
+    usuario_id,
+    correo,
+    evento,
+    resultado,
+    direccion_ip,
+    user_agent,
+    detalle,
+):
+    """Inserta un evento sin incluir contraseñas, tokens ni cookies."""
+
+    cursor.execute(
+        """
+        INSERT INTO auditoria_accesos (
+            usuario_id, correo_intentado, evento, resultado,
+            direccion_ip, user_agent, detalle
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            usuario_id,
+            correo or None,
+            evento,
+            resultado,
+            direccion_ip,
+            user_agent,
+            detalle,
+        ),
+    )
+
+
+def obtener_bloqueo_vigente(correo, direccion_ip):
+    """Busca un bloqueo activo por cuenta+IP o por IP completa."""
+
+    conexion = conexion_identidad()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, tipo, usuario_id, correo_objetivo, direccion_ip,
+                       intentos_al_bloquear, bloqueado_en, expira_en
+                FROM bloqueos_acceso
+                WHERE direccion_ip = %s
+                  AND desbloqueado_en IS NULL
+                  AND expira_en > NOW(6)
+                  AND (
+                      tipo = 'IP'
+                      OR (tipo = 'CUENTA_IP' AND correo_objetivo = %s)
+                  )
+                ORDER BY CASE WHEN tipo = 'IP' THEN 0 ELSE 1 END
+                LIMIT 1
+                """,
+                (direccion_ip, correo),
+            )
+            return cursor.fetchone()
+    finally:
+        conexion.close()
+
+
+def registrar_intento_bloqueado(
+    *, correo, usuario_id, direccion_ip, user_agent
+):
+    """Audita una petición rechazada sin volver a aumentar contadores."""
+
+    conexion = conexion_identidad()
+    try:
+        with conexion.cursor() as cursor:
+            _auditar_acceso(
+                cursor,
+                usuario_id=usuario_id,
+                correo=correo,
+                evento="LOGIN_BLOQUEADO",
+                resultado="BLOQUEADO",
+                direccion_ip=direccion_ip,
+                user_agent=user_agent,
+                detalle="Acceso rechazado por un bloqueo temporal vigente.",
+            )
+        conexion.commit()
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        conexion.close()
+
+
+def registrar_fallo_login(
+    *,
+    correo,
+    usuario_id,
+    direccion_ip,
+    user_agent,
+    max_cuenta_ip,
+    max_ip,
+    ventana_minutos,
+    bloqueo_minutos,
+):
+    """Suma un fallo y crea bloqueos sin perder incrementos concurrentes.
+
+    Las dos filas de contador se crean con una clave única y luego se bloquean
+    con ``FOR UPDATE``. Así dos instancias de Railway serializan los cambios y
+    ningún fallo se pierde. La fila de cuenta+IP nunca bloquea otras IP.
+    """
+
+    conexion = conexion_identidad()
+    try:
+        conexion.begin()
+        with conexion.cursor() as cursor:
+            cursor.execute("SELECT NOW(6) AS ahora")
+            ahora = cursor.fetchone()["ahora"]
+            claves = (("CUENTA_IP", correo), ("IP", ""))
+
+            for tipo, correo_clave in claves:
+                cursor.execute(
+                    """
+                    INSERT IGNORE INTO contadores_acceso (
+                        tipo, correo_clave, direccion_ip, usuario_id,
+                        intentos, ventana_inicia_en, ultimo_intento_en
+                    ) VALUES (%s, %s, %s, %s, 0, %s, %s)
+                    """,
+                    (
+                        tipo,
+                        correo_clave,
+                        direccion_ip,
+                        usuario_id,
+                        ahora,
+                        ahora,
+                    ),
+                )
+
+            cursor.execute(
+                """
+                SELECT tipo, correo_clave, intentos, ventana_inicia_en,
+                       bloqueado_hasta
+                FROM contadores_acceso
+                WHERE direccion_ip = %s
+                  AND ((tipo = 'CUENTA_IP' AND correo_clave = %s)
+                       OR (tipo = 'IP' AND correo_clave = ''))
+                ORDER BY tipo
+                FOR UPDATE
+                """,
+                (direccion_ip, correo),
+            )
+            contadores = cursor.fetchall()
+            bloqueos_creados = []
+            bloqueo_ya_vigente = False
+
+            for contador in contadores:
+                tipo = contador["tipo"]
+                limite = max_cuenta_ip if tipo == "CUENTA_IP" else max_ip
+                estado = evaluar_fallo_contador(
+                    intentos=contador["intentos"],
+                    ventana_inicia_en=contador["ventana_inicia_en"],
+                    bloqueado_hasta=contador["bloqueado_hasta"],
+                    ahora=ahora,
+                    limite=limite,
+                    ventana_minutos=ventana_minutos,
+                    bloqueo_minutos=bloqueo_minutos,
+                )
+                intentos = estado["intentos"]
+                inicio = estado["ventana_inicia_en"]
+                bloqueado_hasta = estado["bloqueado_hasta"]
+
+                # Una petición que pasó la comprobación antes que otra puede
+                # llegar aquí cuando el bloqueo ya nació. No crea otro episodio.
+                if estado["bloqueo_vigente"]:
+                    bloqueo_ya_vigente = True
+                    continue
+
+                if estado["bloqueo_nuevo"]:
+                    cursor.execute(
+                        """
+                        INSERT INTO bloqueos_acceso (
+                            tipo, usuario_id, correo_objetivo, direccion_ip,
+                            intentos_al_bloquear, primer_intento_en,
+                            ultimo_intento_en, bloqueado_en, expira_en
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            tipo,
+                            usuario_id,
+                            correo if tipo == "CUENTA_IP" else None,
+                            direccion_ip,
+                            intentos,
+                            inicio,
+                            ahora,
+                            ahora,
+                            bloqueado_hasta,
+                        ),
+                    )
+                    bloqueos_creados.append(tipo)
+
+                cursor.execute(
+                    """
+                    UPDATE contadores_acceso
+                    SET usuario_id = COALESCE(usuario_id, %s),
+                        intentos = %s,
+                        ventana_inicia_en = %s,
+                        ultimo_intento_en = %s,
+                        bloqueado_hasta = %s
+                    WHERE tipo = %s AND correo_clave = %s
+                      AND direccion_ip = %s
+                    """,
+                    (
+                        usuario_id,
+                        intentos,
+                        inicio,
+                        ahora,
+                        bloqueado_hasta,
+                        tipo,
+                        contador["correo_clave"],
+                        direccion_ip,
+                    ),
+                )
+
+            _auditar_acceso(
+                cursor,
+                usuario_id=usuario_id,
+                correo=correo,
+                evento="LOGIN_FALLIDO",
+                resultado=(
+                    "BLOQUEADO"
+                    if bloqueos_creados or bloqueo_ya_vigente
+                    else "FALLO"
+                ),
+                direccion_ip=direccion_ip,
+                user_agent=user_agent,
+                detalle=(
+                    "Se activó un bloqueo temporal."
+                    if bloqueos_creados or bloqueo_ya_vigente
+                    else "Credenciales rechazadas."
+                ),
+            )
+        conexion.commit()
+        return {
+            "bloqueado": bool(bloqueos_creados or bloqueo_ya_vigente),
+            "tipos": bloqueos_creados,
+        }
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        conexion.close()
+
+
+def registrar_login_exitoso(
+    *, usuario_id, correo, direccion_ip, user_agent
+):
+    """Actualiza el acceso, audita el éxito y reinicia solo cuenta+IP.
+
+    El contador general de IP no se limpia: una cuenta válida no debe permitir
+    que un atacante borre los fallos acumulados contra otras cuentas.
+    """
+
+    conexion = conexion_identidad()
+    try:
+        conexion.begin()
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "UPDATE usuarios SET ultimo_acceso_en = NOW() WHERE id = %s",
+                (usuario_id,),
+            )
+            cursor.execute(
+                """
+                UPDATE contadores_acceso
+                SET intentos = 0,
+                    ventana_inicia_en = NULL,
+                    ultimo_intento_en = NULL,
+                    bloqueado_hasta = NULL
+                WHERE tipo = 'CUENTA_IP' AND correo_clave = %s
+                  AND direccion_ip = %s
+                """,
+                (correo, direccion_ip),
+            )
+            _auditar_acceso(
+                cursor,
+                usuario_id=usuario_id,
+                correo=correo,
+                evento="LOGIN",
+                resultado="EXITO",
+                direccion_ip=direccion_ip,
+                user_agent=user_agent,
+                detalle="Inicio de sesión correcto.",
+            )
+        conexion.commit()
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        conexion.close()
 
 
 def buscar_usuario_por_correo(correo: str):
@@ -138,6 +432,55 @@ def listar_roles_usuario(
     finally:
 
         conexion.close()
+
+
+def obtener_contexto_autorizacion_usuario(usuario_id: str):
+    """Consulta el estado de la cuenta y todos sus roles activos de una vez.
+
+    Esta consulta se usa al proteger una petición. El ``LEFT JOIN`` permite
+    reconocer a un usuario activo aunque no tenga roles, algo normal para un
+    cliente. Así evitamos hacer una consulta para el usuario y otra para sus
+    permisos en cada página.
+    """
+
+    conexion = conexion_identidad()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    u.id,
+                    u.correo,
+                    u.estado,
+                    r.codigo AS rol_codigo
+                FROM usuarios AS u
+                LEFT JOIN usuario_roles AS ur
+                    ON ur.usuario_id = u.id
+                    AND ur.estado = 'ACTIVO'
+                LEFT JOIN roles AS r
+                    ON r.id = ur.rol_id
+                    AND r.estado = 'ACTIVO'
+                WHERE u.id = %s
+                ORDER BY r.codigo ASC
+                """,
+                (usuario_id,),
+            )
+            filas = cursor.fetchall()
+    finally:
+        conexion.close()
+
+    if not filas:
+        return None
+    return {
+        "id": filas[0]["id"],
+        "correo": filas[0]["correo"],
+        "estado": filas[0]["estado"],
+        "roles": [
+            fila["rol_codigo"]
+            for fila in filas
+            if fila.get("rol_codigo")
+        ],
+    }
 
 
 def buscar_perfil_por_dni(dni: str):

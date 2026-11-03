@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Pruebas de integración del módulo administrativo de Auditoría.
+"""Pruebas de integración TEST del módulo administrativo de Auditoría.
 
 Comprueban:
 - Que la auditoría solo es accesible al rol GERENTE.
 - Que ``registrar_evento`` deja un rastro real y legible.
 - Que el listado y el detalle renderizan.
+
+Requieren los esquemas aislados porque insertan y eliminan filas de prueba.
 """
 from __future__ import unicode_literals
 
@@ -19,7 +21,9 @@ from app.config.database import conexion_operaciones
 class AuditoriaAdminTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app()
-        self.app.config['TESTING'] = True
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         self.client = self.app.test_client()
         self.marca = "prueba.auditoria.%s" % uuid.uuid4().hex[:10]
 

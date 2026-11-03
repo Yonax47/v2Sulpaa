@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Seguridad de accesos | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-security.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "seguridad" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label>
+            <strong>Seguridad de accesos</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Protección de Identidad</span>
+                    <h1>Centro de seguridad</h1>
+                    <p>Supervisa intentos fallidos, bloqueos temporales y desbloqueos manuales.</p>
+                </div>
+                <div class="admin-live-status"><span class="admin-live-dot" aria-hidden="true"></span>{{ total }} bloqueos</div>
+            </header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}<div class="admin-alert-stack" aria-live="polite">{% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}</div>{% endif %}
+            {% endwith %}
+
+            <section class="admin-summary" aria-label="Indicadores de seguridad">
+                <div class="admin-summary-grid">
+                    <article class="admin-summary-card is-danger"><span>Intentos fallidos</span><strong>{{ indicadores.fallos }}</strong><small>Eventos registrados</small></article>
+                    <article class="admin-summary-card is-warning"><span>Bloqueos activos</span><strong>{{ indicadores.activos }}</strong><small>Requieren esperar o revisar</small></article>
+                    <article class="admin-summary-card is-info"><span>Bloqueos expirados</span><strong>{{ indicadores.expirados }}</strong><small>Finalizados automáticamente</small></article>
+                    <article class="admin-summary-card is-success"><span>Desbloqueos manuales</span><strong>{{ indicadores.desbloqueados }}</strong><small>Acciones de gerencia</small></article>
+                </div>
+            </section>
+
+            <form method="GET" class="admin-order-filters security-filters" aria-label="Filtros de seguridad">
+                <label class="admin-filter-field admin-filter-search"><span>Cuenta objetivo</span><input type="search" name="cuenta" value="{{ filtros.cuenta }}" placeholder="correo@ejemplo.com"></label>
+                <label class="admin-filter-field"><span>Dirección IP</span><input type="text" name="ip" value="{{ filtros.ip }}" inputmode="text" placeholder="192.0.2.1"></label>
+                <label class="admin-filter-field"><span>Estado</span><select name="estado"><option value="">Todos</option>{% for valor in ('ACTIVO', 'EXPIRADO', 'DESBLOQUEADO') %}<option value="{{ valor }}"{% if filtros.estado == valor %} selected{% endif %}>{{ valor|capitalize }}</option>{% endfor %}</select></label>
+                <label class="admin-filter-field"><span>Desde</span><input type="date" name="desde" value="{{ filtros.desde[:10] if filtros.desde else '' }}"></label>
+                <label class="admin-filter-field"><span>Hasta</span><input type="date" name="hasta" value="{{ filtros.hasta[:10] if filtros.hasta else '' }}"></label>
+                <div class="admin-filter-actions"><button type="submit" class="admin-button is-primary">Aplicar</button><a href="{{ url_for('admin_seguridad.accesos') }}" class="admin-button is-secondary">Limpiar</a></div>
+            </form>
+
+            {% if bloqueos %}
+                <section class="admin-order-table-card" aria-labelledby="tabla-bloqueos-titulo">
+                    <h2 id="tabla-bloqueos-titulo" class="admin-order-heading">Bloqueos registrados</h2>
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead><tr><th>Cuenta</th><th>IP</th><th>Tipo</th><th>Intentos</th><th>Primer / último fallo</th><th>Expiración</th><th>Estado</th><th></th></tr></thead>
+                            <tbody>
+                                {% for b in bloqueos %}
+                                    <tr>
+                                        <td data-label="Cuenta"><strong>{{ (b.correo_objetivo or "Sin correo indicado") if b.tipo == "CUENTA_IP" else "Todas las cuentas" }}</strong></td>
+                                        <td data-label="IP"><code>{{ b.direccion_ip }}</code></td>
+                                        <td data-label="Tipo">{{ "Cuenta + IP" if b.tipo == "CUENTA_IP" else "Límite por IP" }}</td>
+                                        <td data-label="Intentos">{{ b.intentos_al_bloquear }}</td>
+                                        <td data-label="Intentos"><small>{{ b.primer_intento_en.strftime('%d/%m/%Y %H:%M:%S') }}</small><small>{{ b.ultimo_intento_en.strftime('%d/%m/%Y %H:%M:%S') }}</small></td>
+                                        <td data-label="Expiración"><small>{{ b.expira_en.strftime('%d/%m/%Y %H:%M:%S') }}</small>{% if b.estado == 'ACTIVO' %}<strong>{{ b.tiempo_restante }}</strong>{% endif %}</td>
+                                        <td data-label="Estado"><span class="security-state is-{{ b.estado|lower }}">{{ b.estado }}</span></td>
+                                        <td data-label="" class="admin-order-action"><a class="admin-table-link" href="{{ url_for('admin_seguridad.detalle', bloqueo_id=b.id) }}">Ver detalle</a></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                {% if paginas > 1 %}<nav class="admin-pagination" aria-label="Paginación de bloqueos">{% if pagina > 1 %}<a class="admin-button is-secondary" href="{{ url_for('admin_seguridad.accesos', pagina=pagina-1, cuenta=filtros.cuenta, ip=filtros.ip, estado=filtros.estado, desde=filtros.desde[:10], hasta=filtros.hasta[:10]) }}">Anterior</a>{% endif %}<span>Página {{ pagina }} de {{ paginas }}</span>{% if pagina < paginas %}<a class="admin-button is-secondary" href="{{ url_for('admin_seguridad.accesos', pagina=pagina+1, cuenta=filtros.cuenta, ip=filtros.ip, estado=filtros.estado, desde=filtros.desde[:10], hasta=filtros.hasta[:10]) }}">Siguiente</a>{% endif %}</nav>{% endif %}
+            {% else %}
+                <div class="admin-empty-state"><span aria-hidden="true">✓</span><h2>Sin bloqueos para mostrar</h2><p>No existen episodios que coincidan con los filtros seleccionados.</p></div>
+            {% endif %}
+
+            <section class="security-history" aria-labelledby="historial-desbloqueos">
+                <div class="admin-section-heading"><div><span class="admin-section-kicker">Trazabilidad</span><h2 id="historial-desbloqueos">Desbloqueos manuales recientes</h2></div></div>
+                {% if desbloqueos %}<ul class="admin-history-list">{% for d in desbloqueos %}<li><span class="admin-history-dot" aria-hidden="true"></span><div><strong>{{ d.actor_correo or d.desbloqueado_por_id }}</strong><span>{{ d.creado_en.strftime('%d/%m/%Y %H:%M:%S') }} · IP {{ d.direccion_ip }}</span><p>{{ d.motivo }}</p><small>{{ d.correo_objetivo or 'Bloqueo por IP o cuenta sin correo' }} · {{ d.bloqueo_ip }}</small></div></li>{% endfor %}</ul>{% else %}<p class="admin-muted">Todavía no existen desbloqueos manuales.</p>{% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

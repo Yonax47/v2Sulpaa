@@ -120,6 +120,7 @@
             {% if encuesta.estado != "RESPONDIDA" %}
                 <div class="admin-filter-row">
                     <form method="POST" action="{{ url_for('admin_encuestas.regenerar', encuesta_id=encuesta.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="admin-button is-warning">Rehabilitar invitación PORTAL</button>
                     </form>
                 </div>

@@ -190,7 +190,9 @@ class RutasCoberturasTest(unittest.TestCase):
         from app import create_app
 
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def _cliente(self):
         cliente = self.app.test_client()

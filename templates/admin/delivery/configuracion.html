@@ -53,6 +53,7 @@
 
                     {% if puede_editar %}
                         <form method="POST" action="{{ url_for('admin_delivery.actualizar_tarifa') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="tarifa_id" value="{{ tarifa_activa.id }}">
                             <div class="admin-form-grid">
                                 <label class="admin-filter-field">

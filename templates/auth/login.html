@@ -211,6 +211,7 @@ Iniciar sesión | SULPAA
                     id="login-form"
                     autocomplete="on"
                 >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
 
                     <!-- Correo -->

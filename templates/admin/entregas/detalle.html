@@ -68,6 +68,7 @@
                     </dl>
                     {% if (entrega.pago_modalidad or "")|upper == "ANTICIPADO" and (entrega.pago_estado or "")|upper == "PENDIENTE" %}
                         <form method="POST" action="{{ url_for('admin_entregas.accion_pago_anticipado', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Confirmar el pago anticipado como recibido?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="admin-button is-primary">Confirmar pago anticipado</button>
                         </form>
                     {% endif %}
@@ -105,6 +106,7 @@
                     </dl>
                     {% if not (entrega.transportista.estado or "") == "ENTREGADO" %}
                     <form method="POST" action="{{ url_for('admin_entregas.accion_envio', entrega_id=entrega.id) }}" class="admin-inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label>Nuevo estado del envío
                             <select name="estado_envio">
                                 {% for valor in ["ENTREGADO_TRANSPORTISTA", "DESPACHADO", "EN_TRANSITO", "EN_AGENCIA_DESTINO", "EN_REPARTO", "ENTREGADO", "INCIDENCIA"] %}
@@ -138,10 +140,12 @@
                     {% if est == "EN_PREPARACION" %}
                         {% if tipo == "DELIVERY_LOCAL" %}
                             <form method="POST" action="{{ url_for('admin_entregas.accion_listo', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Marcar la entrega como lista? Se generará el código de entrega.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="admin-button is-primary">Marcar como lista</button>
                             </form>
                         {% elif tipo == "RECOJO_LOCAL" %}
                             <form method="POST" action="{{ url_for('admin_entregas.accion_recojo', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Notificar el recojo disponible? Se generará el código de recojo.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="admin-button is-primary">Confirmar recojo disponible</button>
                             </form>
                         {% endif %}
@@ -149,6 +153,7 @@
 
                     {% if est == "LISTO" and tipo in ["DELIVERY_LOCAL", "TRANSPORTISTA_ASOCIADO"] %}
                         <form method="POST" action="{{ url_for('admin_entregas.accion_programar', entrega_id=entrega.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <label>Fecha de programación
                                 <input type="datetime-local" name="fecha_programada" required>
                             </label>
@@ -158,6 +163,7 @@
 
                     {% if est == "PROGRAMADO" and tipo == "DELIVERY_LOCAL" %}
                         <form method="POST" action="{{ url_for('admin_entregas.accion_asignar', entrega_id=entrega.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <label>Repartidor disponible
                                 <select name="repartidor_id" required>
                                     <option value="">Selecciona un repartidor</option>
@@ -174,6 +180,7 @@
 
                     {% if est == "EN_TRANSITO" and tipo == "DELIVERY_LOCAL" %}
                         <form method="POST" action="{{ url_for('admin_entregas.accion_confirmar', entrega_id=entrega.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <label>Código de entrega presentado por el cliente
                                 <input type="text" name="codigo_cliente" required placeholder="Ej. A7K2M9XQ">
                             </label>
@@ -183,6 +190,7 @@
 
                     {% if est == "LISTO_PARA_RECOJO" and tipo == "RECOJO_LOCAL" %}
                         <form method="POST" action="{{ url_for('admin_entregas.accion_confirmar_recojo', entrega_id=entrega.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <label>Código de recojo presentado por el cliente
                                 <input type="text" name="codigo_cliente" required placeholder="Ej. A7K2M9XQ">
                             </label>
@@ -226,6 +234,7 @@
                         </div>
                         {% if incidencia.estado in ["ABIERTA", "EN_REVISION"] %}
                             <form method="POST" action="{{ url_for('admin_entregas.accion_resolver', entrega_id=entrega.id, incidencia_id=incidencia.id) }}" onsubmit="return confirm('¿Resolver esta incidencia? La entrega retomará su estado previo.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="admin-button is-secondary">Resolver</button>
                             </form>
                         {% endif %}
@@ -241,6 +250,7 @@
                 </div>
                 <div class="admin-action-stack">
                     <form method="POST" action="{{ url_for('admin_entregas.accion_incidencia', entrega_id=entrega.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label>Tipo de incidencia
                             <select name="tipo" required>
                                 <option value="">Selecciona</option>
@@ -255,6 +265,7 @@
                         <button type="submit" class="admin-button is-warning">Registrar incidencia</button>
                     </form>
                     <form method="POST" action="{{ url_for('admin_entregas.accion_cancelar', entrega_id=entrega.id) }}" onsubmit="return confirm('¿Cancelar definitivamente la entrega? Esta acción no se revierte.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label>Motivo de cancelación
                             <input type="text" name="motivo" required placeholder="Indica el motivo">
                         </label>

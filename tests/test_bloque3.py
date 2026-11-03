@@ -34,7 +34,9 @@ class PermisosHTTPAdminInventarioTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_listado_permite_roles_inventario(self):
         for rol in ("GERENTE", "ADMINISTRADOR", "INVENTARIO"):
@@ -81,7 +83,9 @@ class PermisosHTTPAdminContenidoTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_listado_permite_roles_contentino(self):
         with patch("app.admin.contenido.routes.listar_para_admin",
@@ -140,7 +144,11 @@ class RutasAprendeTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        self.app.config.update(
+            TESTING=True,
+            OMITIR_SEGURIDAD_EN_PRUEBAS=True,
+            WTF_CSRF_ENABLED=False,
+        )
 
     def test_portada_accesible_sin_sesion(self):
         with patch("app.aprende.routes.listar_publico", return_value=[]):
@@ -168,7 +176,9 @@ class RutasClienteFavoritosProductoTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_favoritos_requiere_sesion(self):
         respuesta = self.app.test_client().get("/favoritos")

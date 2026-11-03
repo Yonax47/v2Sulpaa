@@ -202,6 +202,7 @@
                                                     class="admin-inline-form"
                                                     onsubmit="var m=this.querySelector('input[name=motivo]'); if(!m.value){m.value='Corrección manual registrada por el equipo.';}"
                                                 >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <input type="text" name="motivo" placeholder="Motivo de anulación" required>
                                                     <button type="submit" class="admin-table-link is-danger">Anular</button>
                                                 </form>

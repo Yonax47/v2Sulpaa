@@ -21,6 +21,13 @@
     >
 
     <!--
+        JavaScript toma este valor para proteger las solicitudes que cambian
+        información. No es una credencial: solo demuestra que la petición se
+        creó desde una página de la sesión actual.
+    -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <!--
         Cada página hija puede definir su propio título.
     -->
     <title>

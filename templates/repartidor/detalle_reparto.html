@@ -69,18 +69,21 @@
 
                 {% if aes == "ASIGNADA" %}
                     <form method="POST" action="{{ url_for('repartidor.aceptar', entrega_id=reparto.entrega_id) }}" onsubmit="return confirm('¿Aceptar esta asignación?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="admin-button is-primary">Aceptar asignación</button>
                     </form>
                 {% endif %}
 
                 {% if aes == "ACEPTADA" and ees == "PROGRAMADO" and tipo == "DELIVERY_LOCAL" %}
                     <form method="POST" action="{{ url_for('repartidor.iniciar', entrega_id=reparto.entrega_id) }}" onsubmit="return confirm('¿Iniciar el reparto hacia el destino?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="admin-button is-primary">Iniciar reparto</button>
                     </form>
                 {% endif %}
 
                 {% if aes == "ACEPTADA" and ees == "EN_TRANSITO" and tipo == "DELIVERY_LOCAL" %}
                     <form method="POST" action="{{ url_for('repartidor.confirmar', entrega_id=reparto.entrega_id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label>Código de entrega presentado por el cliente
                             <input type="text" name="codigo_cliente" required placeholder="Ej. A7K2M9XQ">
                         </label>

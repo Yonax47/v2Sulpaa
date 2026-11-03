@@ -237,6 +237,7 @@ Si cambia la navegación, se modifica únicamente aquí.
                 action="{{ url_for('identidad.logout') }}"
                 class="navbar-logout-form"
             >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <button
                     type="submit"
@@ -410,6 +411,7 @@ Si cambia la navegación, se modifica únicamente aquí.
                 method="POST"
                 action="{{ url_for('identidad.logout') }}"
             >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <button
                     type="submit"

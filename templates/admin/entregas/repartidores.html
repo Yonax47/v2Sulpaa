@@ -47,6 +47,7 @@
                     <div><span class="admin-section-kicker">Nuevo miembro</span><h2>Registrar repartidor</h2></div>
                 </div>
                 <form method="POST" action="{{ url_for('admin_entregas.registrar_repartidor_route') }}" class="admin-repartidor-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <label>Correo electrónico
                         <input type="email" name="correo" required>
                     </label>

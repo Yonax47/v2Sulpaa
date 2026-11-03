@@ -238,6 +238,7 @@ Crear cuenta | SULPAA
                     id="registro-form"
                     autocomplete="on"
                 >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                     <div class="auth-form-grid">
 

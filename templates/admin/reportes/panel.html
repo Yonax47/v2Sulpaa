@@ -49,6 +49,7 @@
                         action="{{ url_for('admin_reportes.generar') }}"
                         class="admin-report-card"
                     >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="tipo" value="{{ tipo.codigo }}">
                         <span class="admin-section-kicker">{{ tipo.codigo }}</span>
                         <h2>{{ tipo.nombre }}</h2>

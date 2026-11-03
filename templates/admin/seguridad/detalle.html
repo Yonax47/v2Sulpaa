@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de bloqueo | SULPAA{% endblock %}
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-security.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% set admin_activo = "seguridad" %}
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+    <main class="admin-main">
+        <div class="admin-mobile-bar"><label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label><strong>Detalle de bloqueo</strong><span class="admin-mobile-spacer"></span></div>
+        <div class="admin-content">
+            <a class="admin-back-link" href="{{ url_for('admin_seguridad.accesos') }}">← Volver al centro de seguridad</a>
+            <header class="admin-page-header admin-order-detail-header"><div><span class="admin-eyebrow">Episodio #{{ bloqueo.id }}</span><h1>{{ (bloqueo.correo_objetivo or "Sin correo indicado") if bloqueo.tipo == "CUENTA_IP" else "Bloqueo general de IP" }}</h1><p>Dirección asociada: <code>{{ bloqueo.direccion_ip }}</code></p></div><span class="security-state is-{{ bloqueo.estado|lower }} is-large">{{ bloqueo.estado }}</span></header>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}{% if mensajes %}<div class="admin-alert-stack" aria-live="polite">{% for categoria, mensaje in mensajes %}<div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+
+            <div class="admin-detail-grid security-detail-grid">
+                <section class="admin-detail-card"><h2>Evaluación</h2><dl class="admin-detail-list"><div><dt>Tipo</dt><dd>{{ "Cuenta + IP" if bloqueo.tipo == "CUENTA_IP" else "Límite general por IP" }}</dd></div><div><dt>Intentos</dt><dd>{{ bloqueo.intentos_al_bloquear }}</dd></div><div><dt>Primer intento</dt><dd>{{ bloqueo.primer_intento_en.strftime('%d/%m/%Y %H:%M:%S') }}</dd></div><div><dt>Último intento</dt><dd>{{ bloqueo.ultimo_intento_en.strftime('%d/%m/%Y %H:%M:%S') }}</dd></div></dl></section>
+                <section class="admin-detail-card"><h2>Vigencia</h2><dl class="admin-detail-list"><div><dt>Inicio</dt><dd>{{ bloqueo.bloqueado_en.strftime('%d/%m/%Y %H:%M:%S') }}</dd></div><div><dt>Expiración</dt><dd>{{ bloqueo.expira_en.strftime('%d/%m/%Y %H:%M:%S') }}</dd></div><div><dt>Tiempo restante</dt><dd>{{ bloqueo.tiempo_restante if bloqueo.estado == 'ACTIVO' else 'Finalizado' }}</dd></div><div><dt>Desbloqueado</dt><dd>{{ bloqueo.desbloqueado_en.strftime('%d/%m/%Y %H:%M:%S') if bloqueo.desbloqueado_en else '—' }}</dd></div></dl></section>
+            </div>
+
+            {% if bloqueo.estado == 'ACTIVO' %}
+                <section class="admin-form-card security-unlock-card" aria-labelledby="titulo-desbloquear">
+                    <h2 id="titulo-desbloquear">Finalizar bloqueo anticipadamente</h2>
+                    <p>Esta acción tiene efecto inmediato, queda auditada y no elimina los intentos anteriores.</p>
+                    <form method="POST" action="{{ url_for('admin_seguridad.desbloquear', bloqueo_id=bloqueo.id) }}" onsubmit="return window.confirm('¿Confirmas que deseas desbloquear este acceso?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="admin-form-field is-full"><span>Motivo obligatorio</span><textarea name="motivo" rows="4" minlength="5" maxlength="500" required></textarea></label>
+                        <label class="security-confirm"><input type="checkbox" name="confirmar" value="1" required><span>Confirmo que revisé el bloqueo y deseo finalizarlo.</span></label>
+                        <div class="admin-form-actions"><button type="submit" class="admin-button is-danger">Desbloquear acceso</button></div>
+                    </form>
+                </section>
+            {% endif %}
+
+            <section class="admin-detail-card admin-detail-wide"><h2>Historial de desbloqueo</h2>{% if bloqueo.desbloqueos %}<ul class="admin-history-list">{% for d in bloqueo.desbloqueos %}<li><span class="admin-history-dot"></span><div><strong>{{ d.actor_correo or d.desbloqueado_por_id }}</strong><span>{{ d.creado_en.strftime('%d/%m/%Y %H:%M:%S') }} · {{ d.direccion_ip }}</span><p>{{ d.motivo }}</p></div></li>{% endfor %}</ul>{% else %}<p class="admin-muted">Este episodio no tiene desbloqueos manuales.</p>{% endif %}</section>
+        </div>
+    </main>
+</div>
+{% endblock %}

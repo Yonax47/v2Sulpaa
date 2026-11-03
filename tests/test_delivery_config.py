@@ -20,7 +20,9 @@ from app.operaciones.services import calcular_costo_delivery_local
 class DeliveryConfigTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app()
-        self.app.config['TESTING'] = True
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         self.client = self.app.test_client()
 
     def _sesion(self, roles):

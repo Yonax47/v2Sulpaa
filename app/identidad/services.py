@@ -8,8 +8,10 @@ Esta capa no contiene rutas Flask ni SQL directo.
 """
 
 import uuid
+import logging
 
 import bcrypt
+from flask import current_app, has_app_context
 
 import re
 import unicodedata
@@ -33,7 +35,13 @@ from app.identidad.repositories import (
     guardar_datos_facturacion,
     listar_direcciones_usuario,
     listar_roles_usuario,
+    obtener_contexto_autorizacion_usuario,
+    obtener_bloqueo_vigente,
+    registrar_fallo_login,
+    registrar_intento_bloqueado,
+    registrar_login_exitoso,
 )
+from app.config.security import politica_bloqueos
 
 from app.shared.validators import (
     normalizar_telefono,
@@ -43,6 +51,33 @@ from app.shared.validators import (
     validar_password,
     validar_telefono_peru,
 )
+
+
+# Este hash pertenece a una clave ficticia que nunca se usa para iniciar
+# sesión. Permite ejecutar bcrypt aunque el correo no exista, de modo que un
+# atacante no pueda distinguir cuentas válidas midiendo una respuesta rápida.
+_HASH_BCRYPT_FICTICIO = (
+    b"$2b$12$D0j.JGrC8NcnYP/4f6T2S.f82K3/jicG/ApQF/CvbGrwKCgCyLwz6"
+)
+_MENSAJE_LOGIN_GENERICO = (
+    "No fue posible iniciar sesión con los datos proporcionados."
+)
+
+logger = logging.getLogger(__name__)
+
+
+def normalizar_correo_objetivo(correo):
+    """Normaliza la cuenta objetivo sin revelar si está registrada."""
+
+    return str(correo or "").strip().lower()[:150]
+
+
+def _politica_login_actual():
+    """Mantiene el flujo anterior cuando la protección no está habilitada."""
+
+    if not has_app_context():
+        return {"habilitado": False}
+    return politica_bloqueos(current_app)
 
 
 
@@ -285,90 +320,138 @@ def registrar_usuario(
 def autenticar_usuario(
     correo: str,
     password: str,
+    direccion_ip=None,
+    user_agent=None,
 ):
     """
     Autentica un usuario utilizando correo y contraseña.
 
     Flujo:
     1. Normaliza el correo.
-    2. Comprueba que exista la cuenta.
-    3. Verifica que esté activa.
-    4. Compara la contraseña con bcrypt.
+    2. Busca la cuenta y elige su hash o un hash ficticio.
+    3. Compara siempre la contraseña con bcrypt.
+    4. Comprueba que la cuenta exista y siga activa.
     5. Actualiza el último acceso.
     6. Devuelve únicamente los datos necesarios para la sesión.
 
-    No revelamos al usuario si falló específicamente
-    el correo o la contraseña. Esto evita filtrar información
-    sobre las cuentas registradas.
+    Todas las credenciales rechazadas reciben el mismo mensaje. Además, el
+    trabajo de bcrypt se realiza para cuentas existentes e inexistentes, lo
+    que reduce diferencias de tiempo que podrían revelar un correo registrado.
     """
 
-    correo = (correo or "").strip().lower()
+    correo = normalizar_correo_objetivo(correo)
     password = password or ""
+    politica = _politica_login_actual()
 
-    # --------------------------------------------------------
-    # Validaciones mínimas de entrada
-    # --------------------------------------------------------
-
-    if not correo or not password:
-
-        return {
-            "ok": False,
-            "mensaje": "Ingresa tu correo y contraseña.",
-        }
+    # La protección persistente solo se consulta cuando fue activada. Esto
+    # permite aplicar primero la migración y validar Railway antes de cambiar
+    # el comportamiento de producción.
+    if politica.get("habilitado"):
+        if not direccion_ip:
+            logger.error(
+                "Se rechazó un login porque no existe una IP confiable."
+            )
+            return {"ok": False, "mensaje": _MENSAJE_LOGIN_GENERICO}
+        try:
+            bloqueo = obtener_bloqueo_vigente(correo, direccion_ip)
+            if bloqueo:
+                registrar_intento_bloqueado(
+                    correo=correo,
+                    usuario_id=bloqueo.get("usuario_id"),
+                    direccion_ip=direccion_ip,
+                    user_agent=user_agent,
+                )
+                return {"ok": False, "mensaje": _MENSAJE_LOGIN_GENERICO}
+        except Exception:
+            # Si la base de seguridad no responde, no se verifican credenciales.
+            # Esta decisión impide saltar el límite provocando fallos técnicos.
+            logger.exception("No se pudo comprobar el bloqueo de acceso")
+            return {"ok": False, "mensaje": _MENSAJE_LOGIN_GENERICO}
 
     # --------------------------------------------------------
     # Buscar usuario
     # --------------------------------------------------------
 
-    usuario = buscar_usuario_por_correo(
-        correo
-    )
-
-    # Utilizamos un mensaje genérico deliberadamente.
-    if not usuario:
-
-        return {
-            "ok": False,
-            "mensaje": "Correo o contraseña incorrectos.",
-        }
-
-    # --------------------------------------------------------
-    # Estado de cuenta
-    # --------------------------------------------------------
-
-    if usuario["estado"] != "ACTIVO":
-
-        return {
-            "ok": False,
-            "mensaje": (
-                "Tu cuenta no se encuentra disponible "
-                "para iniciar sesión."
-            ),
-        }
+    try:
+        usuario = buscar_usuario_por_correo(
+            correo
+        )
+    except Exception:
+        logger.exception("No se pudo consultar la cuenta durante el login")
+        return {"ok": False, "mensaje": _MENSAJE_LOGIN_GENERICO}
 
     # --------------------------------------------------------
     # Comparación segura de contraseña
     # --------------------------------------------------------
 
-    password_correcto = bcrypt.checkpw(
-        password.encode("utf-8"),
-        usuario["password_hash"].encode("utf-8"),
+    # Si no encontramos la cuenta se usa un hash válido de prueba. No se usa
+    # una contraseña real ni se guarda el resultado; solo iguala el trabajo
+    # de bcrypt para dificultar la enumeración por tiempo de respuesta.
+    hash_comparacion = (
+        usuario["password_hash"].encode("utf-8")
+        if usuario
+        else _HASH_BCRYPT_FICTICIO
     )
+    try:
+        password_correcto = bcrypt.checkpw(
+            password.encode("utf-8"),
+            hash_comparacion,
+        )
+    except (ValueError, TypeError):
+        logger.exception("El hash de autenticación no pudo verificarse")
+        password_correcto = False
 
-    if not password_correcto:
+    # Se evalúan juntas las tres causas para no dar mensajes diferentes. Una
+    # cuenta inactiva tampoco puede entrar aunque la contraseña sea correcta.
+    if (
+        not usuario
+        or usuario["estado"] != "ACTIVO"
+        or not password_correcto
+        or not correo
+        or not password
+    ):
+
+        if politica.get("habilitado"):
+            try:
+                registrar_fallo_login(
+                    correo=correo,
+                    usuario_id=usuario.get("id") if usuario else None,
+                    direccion_ip=direccion_ip,
+                    user_agent=user_agent,
+                    max_cuenta_ip=politica["max_cuenta_ip"],
+                    max_ip=politica["max_ip"],
+                    ventana_minutos=politica["ventana_minutos"],
+                    bloqueo_minutos=politica["bloqueo_minutos"],
+                )
+            except Exception:
+                logger.exception("No se pudo registrar el fallo de acceso")
 
         return {
             "ok": False,
-            "mensaje": "Correo o contraseña incorrectos.",
+            "mensaje": _MENSAJE_LOGIN_GENERICO,
         }
 
     # --------------------------------------------------------
     # Último acceso
     # --------------------------------------------------------
 
-    actualizar_ultimo_acceso(
-        usuario["id"]
-    )
+    if politica.get("habilitado"):
+        try:
+            registrar_login_exitoso(
+                usuario_id=usuario["id"],
+                correo=correo,
+                direccion_ip=direccion_ip,
+                user_agent=user_agent,
+            )
+        except Exception:
+            # El acceso no se concede si no puede quedar auditado ni limpiar
+            # su contador de forma transaccional.
+            logger.exception("No se pudo confirmar el acceso correcto")
+            return {"ok": False, "mensaje": _MENSAJE_LOGIN_GENERICO}
+    else:
+        actualizar_ultimo_acceso(
+            usuario["id"]
+        )
 
     # --------------------------------------------------------
     # Resultado
@@ -426,6 +509,17 @@ def obtener_roles_usuario(
     return listar_roles_usuario(
         usuario_id
     )
+
+
+def obtener_contexto_sesion(usuario_id: str):
+    """Devuelve el estado y los roles actuales para proteger una petición.
+
+    El repositorio realiza una sola consulta. Esta función mantiene la regla
+    del proyecto donde los decoradores piden información a Servicios y no
+    escriben SQL directamente.
+    """
+
+    return obtener_contexto_autorizacion_usuario(usuario_id)
 # ============================================================
 # DATOS PARA CHECKOUT
 # ============================================================

@@ -132,7 +132,9 @@ class PermisosHTTPPedidosTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def cliente_con_rol(self, rol):
         cliente = self.app.test_client()

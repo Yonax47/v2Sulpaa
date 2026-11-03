@@ -1,0 +1,24 @@
+/* Centro de seguridad: complementa el panel sin cambiar sus componentes. */
+.security-filters { grid-template-columns: minmax(210px, 1.3fr) repeat(4, minmax(130px, .7fr)) auto; }
+.security-state { display: inline-flex; align-items: center; padding: .32rem .6rem; border-radius: 999px; font-size: .66rem; font-weight: 850; letter-spacing: .03em; }
+.security-state.is-large { padding: .55rem .85rem; font-size: .75rem; }
+.security-state.is-activo { background: #ffeded; color: #923b3b; }
+.security-state.is-expirado { background: #edf1ef; color: #65706b; }
+.security-state.is-desbloqueado { background: #e9f7ed; color: #267044; }
+.security-history { margin-top: 1.5rem; padding: 1.25rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.security-history .admin-section-heading { margin-bottom: 1rem; }
+.security-history h2 { margin: .25rem 0 0; font-size: 1.15rem; }
+.security-unlock-card { margin-top: 1rem; }
+.security-unlock-card > p { color: var(--color-text-secondary); }
+.security-confirm { display: flex; align-items: flex-start; gap: .6rem; margin-top: 1rem; color: var(--color-text-secondary); font-size: .82rem; }
+.security-confirm input { width: 18px; height: 18px; margin-top: .1rem; accent-color: var(--sulpaa-green-800); }
+.security-detail-grid { padding: 0; }
+.admin-order-table code, .admin-page-header code { overflow-wrap: anywhere; color: var(--sulpaa-green-900); }
+
+@media (max-width: 1180px) {
+    .security-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 540px) {
+    .security-filters { grid-template-columns: 1fr; }
+    .security-state.is-large { align-self: flex-start; }
+}

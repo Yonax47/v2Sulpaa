@@ -11,7 +11,9 @@ from app import create_app
 class DashboardChartsTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app()
-        self.app.config['TESTING'] = True
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         self.client = self.app.test_client()
 
     def test_chart_canvases_present_in_html(self):
@@ -96,7 +98,9 @@ class DashboardRenderAisladoTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config["TESTING"] = True
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         self.client = self.app.test_client()
         with self.client.session_transaction() as sesion:
             sesion["autenticado"] = True

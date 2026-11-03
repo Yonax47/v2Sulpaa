@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pruebas de integración del módulo administrativo de Usuarios y Roles.
+"""Pruebas de integración TEST del módulo administrativo de Usuarios y Roles.
 
 Comprueban:
 - Control de acceso real (solo GERENTE/ADMINISTRADOR).
@@ -8,8 +8,8 @@ Comprueban:
 - Que nunca se guarda "a medias" (correo duplicado).
 - Que cada cambio deja un evento en la auditoría.
 
-Las pruebas crean cuentas de prueba con correo único y las eliminan
-en `tearDown`; no tocan datos reales del sistema.
+Las pruebas crean cuentas con correo único y las eliminan en `tearDown`.
+Solo se ejecutan mediante el entorno aislado y nunca sobre datos productivos.
 """
 from __future__ import unicode_literals
 
@@ -24,7 +24,9 @@ from app.config.database import conexion_identidad, conexion_operaciones
 class UsuariosAdminTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app()
-        self.app.config['TESTING'] = True
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         self.client = self.app.test_client()
         self.correo_prueba = "prueba.admin.%s@sulpaa.test" % uuid.uuid4().hex[:10]
         self._ids_creados = []

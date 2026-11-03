@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitud no válida | SULPAA{% endblock %}
+
+{% block content %}
+<!-- Esta página explica el rechazo sin repetir una operación que podría modificar datos. -->
+<main class="container" style="min-height:70vh;display:grid;place-items:center;padding-block:2rem">
+    <section style="width:min(100%,36rem);padding:2rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);box-shadow:var(--shadow-sm)" role="alert">
+        <p style="color:var(--sulpaa-green-800);font-weight:800">Protección de seguridad</p>
+        <h1>No pudimos procesar la acción</h1>
+        <p>{{ mensaje }}</p>
+        <!-- Se usa una ruta interna fija; no confiamos en una URL de referencia enviada por el navegador. -->
+        <a class="button button-primary" href="{{ url_for('identidad.login') }}">Volver al inicio de sesión</a>
+    </section>
+</main>
+{% endblock %}

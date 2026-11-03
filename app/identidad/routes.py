@@ -33,7 +33,9 @@ from flask import (
 
 from app.shared.decorators import (
     login_required,
+    revalidar_sesion_actual,
 )
+from app.shared.network import obtener_agente_cliente, obtener_ip_cliente
 
 from app.identidad.services import (
     autenticar_usuario,
@@ -205,6 +207,12 @@ def login():
 
     if session.get("autenticado"):
 
+        # Una cookie antigua no basta para continuar. Antes de usar sus roles
+        # comprobamos que la cuenta siga activa y actualizamos los permisos.
+        # Si ya no es válida, se limpia y se muestra el formulario de login.
+        if not revalidar_sesion_actual():
+            return redirect(url_for("identidad.login"))
+
         # Ya hay una sesión válida: el formulario no se vuelve a
         # mostrar y el usuario continua en su panel según sus roles
         # ACTIVOS (misma prioridad que el POST de autenticación).
@@ -255,6 +263,8 @@ def login():
         resultado = autenticar_usuario(
             correo=correo,
             password=password,
+            direccion_ip=obtener_ip_cliente(request),
+            user_agent=obtener_agente_cliente(request),
         )
 
         # ----------------------------------------------------
@@ -393,8 +403,8 @@ def logout():
     Utilizamos POST en lugar de GET porque cerrar sesión
     modifica el estado de autenticación del usuario.
 
-    Más adelante, cuando incorporemos protección CSRF,
-    esta acción también quedará protegida mediante token.
+    La protección CSRF global comprueba el token antes de llegar aquí. Así
+    otro sitio no puede cerrar la sesión del usuario sin su autorización.
     """
 
     # Eliminamos completamente los datos de sesión.

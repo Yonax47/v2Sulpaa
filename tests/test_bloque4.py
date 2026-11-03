@@ -37,7 +37,9 @@ class PermisosHTTPCajaTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_listado_permite_roles_caja(self):
         for rol in ("GERENTE", "ADMINISTRADOR"):
@@ -110,7 +112,9 @@ class PermisosHTTPReportesTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_panel_permite_roles_reportes(self):
         for rol in ("GERENTE", "ADMINISTRADOR"):
@@ -167,7 +171,9 @@ class PermisosHTTPEncuestasAdminTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_listado_permite_roles_encuestas(self):
         for rol in ("GERENTE", "ADMINISTRADOR"):
@@ -242,7 +248,9 @@ class PortalEncuestaTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_portal_requiere_sesion(self):
         respuesta = self.app.test_client().get("/encuesta/TOKEN-PRUEBA")
@@ -809,7 +817,9 @@ class RutaIndicadoresKPITest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_ruta_kpi_permite_roles_administrativos(self):
         for rol in ("GERENTE", "ADMINISTRADOR"):
@@ -888,7 +898,9 @@ class SidebarSinProximamenteTest(unittest.TestCase):
 
     def test_dashboard_render_sin_proximamente(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         with patch(
             "app.admin.routes.resumen_dashboard",
             return_value={
@@ -1033,7 +1045,9 @@ class PermisosReportesNuevosTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_generar_nuevos_tipos_rechaza_roles_sin_acceso(self):
         from tests.test_bloque4 import cliente_con_sesion as ccs
@@ -1222,7 +1236,9 @@ class ContenidoBorradorPublicadoTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def test_borrador_no_aparece_en_portada(self):
         with patch(
@@ -1512,7 +1528,9 @@ class AuditoriaKPI05Test(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def _cliente(self):
         cliente = self.app.test_client()

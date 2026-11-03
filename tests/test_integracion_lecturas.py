@@ -1,4 +1,8 @@
-"""Pruebas de integración de lectura contra MySQL y render Jinja real."""
+"""Pruebas de integración contra MySQL TEST y render Jinja real.
+
+Aunque casi todos los casos son de lectura, uno verifica un rollback con
+escrituras. Por eso el archivo solo puede ejecutarse en esquemas aislados.
+"""
 
 import unittest
 
@@ -15,7 +19,9 @@ class LecturasRealesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = create_app()
-        cls.app.config.update(TESTING=True)
+        cls.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
         pedidos = listar_pedidos_admin({})
         if not pedidos:
             raise unittest.SkipTest("No existen pedidos reales para integrar.")

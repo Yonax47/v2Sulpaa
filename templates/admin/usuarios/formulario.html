@@ -52,6 +52,7 @@
 
             {% if not editando %}
                 <form method="POST" action="{{ url_for('admin_usuarios.nuevo') }}" class="admin-order-table-card">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="admin-section-heading"><h2>Datos de la cuenta</h2></div>
                     <div class="admin-form-grid">
                         <label class="admin-filter-field">
@@ -117,6 +118,7 @@
                 </section>
 
                 <form method="POST" action="{{ url_for('admin_usuarios.asignar_roles', usuario_id=usuario.id) }}" class="admin-order-table-card">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="admin-section-heading"><h2>Roles asignados</h2></div>
                     <div class="admin-checkbox-grid">
                         {% for rol in roles %}
@@ -138,6 +140,7 @@
                 </form>
 
                 <form method="POST" action="{{ url_for('admin_usuarios.cambiar_estado', usuario_id=usuario.id) }}" class="admin-order-table-card">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="admin-section-heading"><h2>Estado de la cuenta</h2></div>
                     <div class="admin-filter-actions">
                         <select name="estado" class="admin-select">

@@ -43,6 +43,7 @@
             {% endwith %}
 
             <form method="POST" action="{{ url_for('admin_caja.registrar_egreso') }}" class="admin-form-card">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="admin-form-grid">
                     <label class="admin-form-field">
                         <span>Categoría de egreso</span>

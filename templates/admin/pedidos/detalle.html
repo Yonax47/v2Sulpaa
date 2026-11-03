@@ -49,10 +49,12 @@
                     {% for accion in pedido.acciones %}
                         {% if accion.codigo == "CONFIRMAR" %}
                             <form method="POST" action="{{ url_for('admin_pedidos.confirmar', pedido_id=pedido.id) }}" onsubmit="return confirm('¿Confirmar este pedido? La acción quedará registrada en el historial.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="admin-button is-primary">{{ accion.etiqueta }}</button>
                             </form>
                         {% elif accion.codigo == "INICIAR_PREPARACION" %}
                             <form method="POST" action="{{ url_for('admin_pedidos.preparar', pedido_id=pedido.id) }}" onsubmit="return confirm('¿Iniciar la preparación? El pedido y la entrega cambiarán de forma atómica.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="admin-button is-primary">{{ accion.etiqueta }}</button>
                             </form>
                         {% endif %}

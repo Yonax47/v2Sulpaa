@@ -117,7 +117,9 @@ class PermisosHTTPEntregasTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def cliente_con_rol(self, rol):
         cliente = self.app.test_client()
@@ -187,7 +189,9 @@ class PermisosHTTPRepartidorTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def cliente_con_rol(self, rol):
         cliente = self.app.test_client()
@@ -230,7 +234,9 @@ class RedireccionesLoginYConfirmacionTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def _cliente_con_sesion(self, roles, correo="actor@example.test"):
         cliente = self.app.test_client()
@@ -367,7 +373,9 @@ class CabeceraRepartidorLogoutTest(unittest.TestCase):
 
     def setUp(self):
         self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app.config.update(
+            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+        )
 
     def _cliente_con_sesion(self, correo="repartidor@example.test"):
         cliente = self.app.test_client()

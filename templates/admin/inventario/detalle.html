@@ -73,6 +73,7 @@
                         si corresponde.
                     </p>
                     <form method="POST" action="{{ url_for('admin_inventario.accion_verificar', existencia_id=existencia.existencia_id) }}" class="admin-detail-grid" style="gap:.7rem">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label class="admin-filter-field">
                             <span>Conteo físico</span>
                             <input type="number" name="conteo_fisico" min="0" step="1" required placeholder="Unidades contadas">
@@ -103,6 +104,7 @@
                         class="admin-detail-card"
                         style="box-shadow:none"
                     >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <h2 style="margin-bottom:.6rem">Entrada de stock</h2>
                         <label class="admin-filter-field" style="margin-bottom:.7rem">
                             <span>Motivo</span>
@@ -132,6 +134,7 @@
                         class="admin-detail-card"
                         style="box-shadow:none"
                     >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <h2 style="margin-bottom:.6rem">Ajuste de stock</h2>
                         <label class="admin-filter-field" style="margin-bottom:.7rem">
                             <span>Motivo</span>
