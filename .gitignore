@@ -3,6 +3,7 @@ venv/
 
 # Variables de entorno
 .env
+.env.test
 
 # Caché de Python
 __pycache__/
