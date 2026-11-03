@@ -14,6 +14,7 @@ usuario sin perfil, ni un rol sin su vínculo.
 import uuid
 
 from app.config.database import conexion_identidad
+from app.identidad.email_repositories import insertar_solicitud
 
 
 def _nuevo_uuid():
@@ -237,6 +238,7 @@ def crear_usuario_con_roles(
     telefono,
     rol_ids,
     asignado_por=None,
+    verificacion_correo=None,
 ):
     """Crea cuenta + perfil + vínculos de rol en una sola transacción.
 
@@ -248,9 +250,10 @@ def crear_usuario_con_roles(
             cursor.execute(
                 """
                 INSERT INTO usuarios (
-                    id, correo, password_hash, estado, correo_verificado
+                    id, correo, password_hash, estado, correo_verificado,
+                    requiere_verificacion_correo
                 )
-                VALUES (%s, %s, %s, 'ACTIVO', FALSE)
+                VALUES (%s, %s, %s, 'ACTIVO', FALSE, TRUE)
                 """,
                 (usuario_id, correo, password_hash),
             )
@@ -290,6 +293,12 @@ def crear_usuario_con_roles(
                         asignado_por,
                     ),
                 )
+
+            if not verificacion_correo:
+                raise RuntimeError(
+                    "El usuario nuevo requiere una solicitud de correo."
+                )
+            insertar_solicitud(cursor, verificacion_correo)
 
         conexion.commit()
         return True

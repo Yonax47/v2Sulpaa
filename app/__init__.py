@@ -60,6 +60,7 @@ from app.admin.contenido.routes import admin_contenido_bp
 from app.admin.catalogo.routes import admin_catalogo_bp
 from app.admin.catalogo.imagenes import url_imagen_catalogo
 from app.admin.caja.commands import registrar_comandos_caja
+from app.shared.email.commands import registrar_comandos_email
 from app.admin.caja.routes import admin_caja_bp
 from app.admin.reportes.routes import admin_reportes_bp
 from app.admin.encuestas.routes import admin_encuestas_bp
@@ -81,6 +82,7 @@ from app.shared.decorators import login_required
 from app.shared.csrf import inicializar_csrf
 from app.config.testing import configurar_seguridad_pruebas
 from app.config.security import configurar_seguridad_accesos
+from app.config.email import configurar_email
 
 from app.config.database import cerrar_conexiones_solicitud
 
@@ -132,6 +134,8 @@ def create_app():
     # Los límites se cargan una sola vez. En producción el bloqueo permanece
     # apagado hasta confirmar expresamente la cadena de proxies de Railway.
     configurar_seguridad_accesos(app)
+    # Solo carga configuración. No envía correos ni procesa el outbox.
+    configurar_email(app)
 
 
     # ========================================================
@@ -470,6 +474,7 @@ def create_app():
     # no se deja SQL manual aislado que pueda ejecutarse sin sus controles.
     registrar_comandos_pedidos(app)
     registrar_comandos_caja(app)
+    registrar_comandos_email(app)
 
 
     # ========================================================

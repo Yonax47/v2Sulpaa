@@ -42,6 +42,7 @@ from app.identidad.repositories import (
     registrar_login_exitoso,
 )
 from app.config.security import politica_bloqueos
+from app.identidad.email_verification import preparar_solicitud
 
 from app.shared.validators import (
     normalizar_telefono,
@@ -146,6 +147,9 @@ def registrar_usuario(
         bcrypt.gensalt(),
     ).decode("utf-8")
     try:
+        solicitud_correo = preparar_solicitud(
+            usuario_id, correo, nombres
+        )
         crear_usuario_y_perfil(
             usuario_id=usuario_id,
             perfil_id=perfil_id,
@@ -157,6 +161,7 @@ def registrar_usuario(
             dni=dni,
             telefono=telefono,
             rol_codigo="CLIENTE",
+            verificacion_correo=solicitud_correo,
         )
     except Exception:
         # Las excepciones SQL de unicidad pueden incluir correo o DNI en su
@@ -171,6 +176,7 @@ def registrar_usuario(
         "ok": True,
         "mensaje": "Usuario registrado correctamente.",
         "usuario_id": usuario_id,
+        "correo_pendiente": True,
     }
 
 
@@ -323,6 +329,10 @@ def autenticar_usuario(
         "usuario": {
             "id": usuario["id"],
             "correo": usuario["correo"],
+            "correo_verificado": bool(usuario.get("correo_verificado")),
+            "requiere_verificacion_correo": bool(
+                usuario.get("requiere_verificacion_correo")
+            ),
         },
     }
 # ============================================================

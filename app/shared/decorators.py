@@ -10,7 +10,17 @@ decoradores apilados no repiten la misma consulta.
 import logging
 from functools import wraps
 
-from flask import abort, current_app, flash, g, redirect, session, url_for
+from flask import (
+    abort,
+    current_app,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 
 from app.config.testing import seguridad_puede_omitirse
 
@@ -50,6 +60,13 @@ def revalidar_sesion_actual():
     if seguridad_puede_omitirse(current_app):
         roles_prueba = list(session.get("roles") or [])
         g.roles_vigentes = roles_prueba
+        g.contexto_sesion = {
+            "correo_verificado": bool(session.get("correo_verificado")),
+            "requiere_verificacion_correo": bool(
+                session.get("requiere_verificacion_correo")
+            ),
+            "roles": roles_prueba,
+        }
         g.sesion_revalidada = True
         return True
 
@@ -85,6 +102,11 @@ def revalidar_sesion_actual():
     if session.get("correo") != correo_actual:
         session["correo"] = correo_actual
     g.roles_vigentes = roles
+    g.contexto_sesion = contexto
+    session["correo_verificado"] = bool(contexto.get("correo_verificado"))
+    session["requiere_verificacion_correo"] = bool(
+        contexto.get("requiere_verificacion_correo")
+    )
     g.sesion_revalidada = True
     return True
 
@@ -93,6 +115,29 @@ def _redirigir_login():
     """Lleva al login cuando no existe una sesión válida."""
 
     return redirect(url_for("identidad.login"))
+
+
+def _estado_correo_actual():
+    from app.identidad.email_verification import estado_cuenta
+
+    contexto = getattr(g, "contexto_sesion", {})
+    return estado_cuenta(
+        contexto.get("correo_verificado"),
+        contexto.get("requiere_verificacion_correo"),
+        contexto.get("roles") or session.get("roles") or [],
+    )
+
+
+def _respuesta_correo_requerido():
+    mensaje = "Verifica tu correo antes de realizar esta operación."
+    if request.path.startswith("/api/") or request.is_json:
+        return jsonify({
+            "ok": False,
+            "codigo": "CORREO_NO_VERIFICADO",
+            "mensaje": mensaje,
+        }), 403
+    flash(mensaje, "warning")
+    return redirect(url_for("identidad.verificacion_pendiente"))
 
 
 def login_required(funcion):
@@ -123,6 +168,8 @@ def admin_required(funcion):
         roles = set(g.get("roles_vigentes", session.get("roles") or []))
         if not ROLES_ADMINISTRATIVOS.intersection(roles):
             abort(403)
+        if _estado_correo_actual() == "PENDIENTE_OBLIGATORIO":
+            return _respuesta_correo_requerido()
         return funcion(*args, **kwargs)
 
     return funcion_protegida
@@ -141,8 +188,27 @@ def role_required(*roles_permitidos):
             roles = set(g.get("roles_vigentes", session.get("roles") or []))
             if not roles_necesarios.intersection(roles):
                 abort(403)
+            if _estado_correo_actual() == "PENDIENTE_OBLIGATORIO":
+                return _respuesta_correo_requerido()
             return funcion(*args, **kwargs)
 
         return funcion_protegida
 
     return decorador
+
+
+def correo_verificado_required(funcion):
+    """Bloquea operaciones sensibles según la política de transición."""
+
+    @wraps(funcion)
+    def funcion_protegida(*args, **kwargs):
+        if not session.get("autenticado") or not revalidar_sesion_actual():
+            return _redirigir_login()
+        estado = _estado_correo_actual()
+        g.estado_verificacion_correo = estado
+        if estado != "PENDIENTE_OBLIGATORIO":
+            return funcion(*args, **kwargs)
+
+        return _respuesta_correo_requerido()
+
+    return funcion_protegida

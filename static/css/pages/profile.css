@@ -37,6 +37,8 @@
 .profile-form-status { color: #5b6b64; flex-basis: 100%; font-size: .85rem; margin: 0; }
 .profile-form-status.is-error { color: #a52a2a; font-weight: 700; }
 .profile-form-status.is-success { color: #17623f; font-weight: 700; }
+.profile-verification-notice { align-items: center; background: #fff7df; border: 1px solid #ead79b; border-radius: .85rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; margin: 1rem 0; padding: 1rem; }
+.profile-verification-notice p, .profile-verification-notice form { margin: 0; }
 .profile-list { display: grid; gap: .75rem; }
 .profile-list-item { align-items: center; border: 1px solid #e0e8e2; border-radius: .8rem; display: flex; gap: 1rem; justify-content: space-between; padding: 1rem; }
 .profile-list-item p { margin: .35rem 0; }

@@ -16,6 +16,8 @@ from __future__ import unicode_literals
 import uuid
 import unittest
 
+from cryptography.fernet import Fernet
+
 from app import create_app
 from app.admin.usuarios import services as usuarios
 from app.config.database import conexion_identidad, conexion_operaciones
@@ -25,20 +27,37 @@ class UsuariosAdminTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app()
         self.app.config.update(
-            TESTING=True, OMITIR_SEGURIDAD_EN_PRUEBAS=True
+            TESTING=True,
+            OMITIR_SEGURIDAD_EN_PRUEBAS=True,
+            APP_PUBLIC_URL="https://sulpaa.test",
+            MAIL_PAYLOAD_ENCRYPTION_KEY=Fernet.generate_key().decode("ascii"),
+            MAIL_RATE_LIMIT_KEY="clave-sintetica-de-prueba-para-fase44",
         )
+        self.contexto_app = self.app.app_context()
+        self.contexto_app.push()
         self.client = self.app.test_client()
         self.correo_prueba = "prueba.admin.%s@sulpaa.test" % uuid.uuid4().hex[:10]
         self._ids_creados = []
 
     def tearDown(self):
-        self._limpiar()
+        try:
+            self._limpiar()
+        finally:
+            self.contexto_app.pop()
 
     def _limpiar(self):
         conexion = conexion_identidad()
         try:
             with conexion.cursor() as cursor:
                 for usuario_id in self._ids_creados:
+                    cursor.execute(
+                        "DELETE FROM correos_outbox WHERE destinatario = %s",
+                        (self.correo_prueba,),
+                    )
+                    cursor.execute(
+                        "DELETE FROM tokens_verificacion WHERE usuario_id = %s",
+                        (usuario_id,),
+                    )
                     cursor.execute(
                         "DELETE FROM usuario_roles WHERE usuario_id = %s",
                         (usuario_id,),

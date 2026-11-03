@@ -1,0 +1,17 @@
+SULPAA — Pedido confirmado
+
+Hola {{ nombre }}, recibimos correctamente tu compra.
+
+Pedido: {{ numero_pedido }}
+Fecha: {{ fecha }}
+Estado: {{ estado }}
+
+Productos:
+{% for item in items %}- {{ item.nombre }} — {{ item.cantidad }} x S/ {{ '%.2f'|format(item.precio) }}
+{% endfor %}
+Total: S/ {{ '%.2f'|format(total) }}
+
+Detalle del pedido: {{ order_url }}
+
+Este mensaje confirma la recepción del pedido. No constituye una boleta
+electrónica SUNAT.

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;background:#f3f6f2;color:#19342c;font-family:Arial,sans-serif">
+<div style="display:none;max-height:0;overflow:hidden">Recibimos tu pedido {{ numero_pedido }}.</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6f2;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fff;border:1px solid #dce7df;border-radius:18px;overflow:hidden">
+<tr><td style="background:#176044;color:#fff;padding:28px 32px"><strong style="font-size:24px;letter-spacing:.08em">SULPAA</strong><div style="margin-top:6px;color:#cde8d6">Gracias por elegirnos</div></td></tr>
+<tr><td style="padding:34px 32px">
+<h1 style="margin:0 0 12px;font-size:28px">Pedido confirmado</h1>
+<p style="line-height:1.6">Hola {{ nombre }}, recibimos correctamente tu compra.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="8" style="margin:22px 0;border-collapse:collapse">
+<tr><td style="border-bottom:1px solid #dce7df"><strong>Pedido</strong></td><td align="right" style="border-bottom:1px solid #dce7df">{{ numero_pedido }}</td></tr>
+<tr><td style="border-bottom:1px solid #dce7df"><strong>Fecha</strong></td><td align="right" style="border-bottom:1px solid #dce7df">{{ fecha }}</td></tr>
+<tr><td style="border-bottom:1px solid #dce7df"><strong>Estado</strong></td><td align="right" style="border-bottom:1px solid #dce7df">{{ estado }}</td></tr>
+</table>
+<h2 style="font-size:19px">Productos</h2>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="8" style="border-collapse:collapse">
+{% for item in items %}<tr><td style="border-bottom:1px solid #edf1ee">{{ item.nombre }}<br><small>Cantidad: {{ item.cantidad }}</small></td><td align="right" style="border-bottom:1px solid #edf1ee">S/ {{ '%.2f'|format(item.precio * item.cantidad) }}</td></tr>{% endfor %}
+<tr><td style="padding-top:16px"><strong>Total</strong></td><td align="right" style="padding-top:16px;font-size:20px"><strong>S/ {{ '%.2f'|format(total) }}</strong></td></tr>
+</table>
+<p style="margin:28px 0"><a href="{{ order_url }}" style="display:inline-block;background:#176044;color:#fff;text-decoration:none;font-weight:bold;padding:14px 22px;border-radius:10px">Ver detalle del pedido</a></p>
+<p style="color:#596a64;line-height:1.6">Este mensaje confirma la recepción de tu pedido. No constituye una boleta electrónica SUNAT.</p>
+</td></tr>
+<tr><td style="padding:20px 32px;background:#edf4ef;color:#5b6b65;font-size:13px">SULPAA · Kombucha artesanal</td></tr>
+</table></td></tr></table>
+</body></html>

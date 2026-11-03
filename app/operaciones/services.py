@@ -2016,6 +2016,7 @@ from app.shared.validators import (
     validar_telefono_peru,
     normalizar_telefono,
 )
+from app.identidad.email_verification import preparar_solicitud
 
 ROLES_OPERACION_ENTREGAS = frozenset({
     "GERENTE",
@@ -2965,10 +2966,12 @@ def registrar_repartidor(actor_id, roles, correo, password, nombres,
         password_hash = _bcrypt.hashpw(
             password.encode("utf-8"), _bcrypt.gensalt()
         ).decode("utf-8")
+        solicitud_correo = preparar_solicitud(usuario_id, correo, nombres)
         _repos.crear_usuario_perfil(
             unidad.conexion, unidad.esquemas, usuario_id, perfil_id,
             correo, password_hash, nombres, apellido_paterno,
             apellido_materno, dni, telefono,
+            verificacion_correo=solicitud_correo,
         )
         _repos.asignar_rol_usuario(
             unidad.conexion, unidad.esquemas, usuario_id, rol["id"], actor_id

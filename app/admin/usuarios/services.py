@@ -28,6 +28,7 @@ from app.shared.validators import (
     validar_password,
     validar_telefono_peru,
 )
+from app.identidad.email_verification import preparar_solicitud
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,7 @@ def crear_usuario_admin(roles, actor_id, actor_roles, datos, direccion_ip=None):
     ).decode("utf-8")
 
     try:
+        solicitud_correo = preparar_solicitud(usuario_id, correo, nombres)
         repos.crear_usuario_con_roles(
             usuario_id=usuario_id,
             perfil_id=perfil_id,
@@ -201,6 +203,7 @@ def crear_usuario_admin(roles, actor_id, actor_roles, datos, direccion_ip=None):
             telefono=telefono,
             rol_ids=rol_ids,
             asignado_por=actor_id,
+            verificacion_correo=solicitud_correo,
         )
     except Exception:
         logger.exception("Falló la creación del usuario %s", correo)

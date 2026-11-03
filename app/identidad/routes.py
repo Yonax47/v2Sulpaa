@@ -29,6 +29,7 @@ from flask import (
     session,
     url_for,
     jsonify,
+    make_response,
 )
 
 from app.shared.decorators import (
@@ -51,6 +52,11 @@ from app.identidad.services import (
     verificar_dni_registro,
 )
 from app.shared.rate_limit import consumir_limite
+from app.identidad.email_verification import (
+    confirmar as confirmar_correo,
+    estado_cuenta,
+    solicitar_reenvio,
+)
 
 
 # ============================================================
@@ -160,17 +166,9 @@ def registro():
         # ----------------------------------------------------
 
         if resultado["ok"]:
-
-            flash(
-                "Cuenta creada correctamente. "
-                "Ahora puedes iniciar sesión.",
-                "success",
-            )
-
-            # Ahora que Login existe, ya no regresamos
-            # al formulario de registro.
+            session["registro_correo_pendiente"] = True
             return redirect(
-                url_for("identidad.login")
+                url_for("identidad.verificacion_pendiente")
             )
 
         # ----------------------------------------------------
@@ -334,6 +332,12 @@ def login():
             session["autenticado"] = True
             session["usuario_id"] = usuario["id"]
             session["correo"] = usuario["correo"]
+            session["correo_verificado"] = bool(
+                usuario.get("correo_verificado")
+            )
+            session["requiere_verificacion_correo"] = bool(
+                usuario.get("requiere_verificacion_correo")
+            )
 
 
             # ------------------------------------------------
@@ -368,6 +372,24 @@ def login():
             # ------------------------------------------------
 
             session.permanent = recordarme
+
+            estado_correo = estado_cuenta(
+                usuario.get("correo_verificado"),
+                usuario.get("requiere_verificacion_correo"),
+                session["roles"],
+            )
+            if estado_correo == "PENDIENTE_OBLIGATORIO":
+                flash(
+                    "Iniciaste sesión. Verifica tu correo antes de comprar.",
+                    "warning",
+                )
+                return redirect(url_for("identidad.verificacion_pendiente"))
+            if estado_correo == "PENDIENTE_TRANSICION":
+                flash(
+                    "Tu cuenta histórica sigue activa. Te recomendamos "
+                    "verificar tu correo.",
+                    "warning",
+                )
 
             # ------------------------------------------------
             # Redirección temporal
@@ -433,6 +455,65 @@ def login():
         "auth/login.html",
         correo=correo,
     )
+
+
+# ============================================================
+# VERIFICACIÓN DE CORREO
+# ============================================================
+
+@identidad_bp.route("/verificacion/pendiente", methods=["GET"])
+def verificacion_pendiente():
+    respuesta = make_response(render_template(
+        "auth/verificacion_pendiente.html",
+        autenticado=bool(session.get("autenticado")),
+        correo=session.get("correo", "") if session.get("autenticado") else "",
+    ))
+    respuesta.headers["Cache-Control"] = "no-store"
+    respuesta.headers["Referrer-Policy"] = "no-referrer"
+    return respuesta
+
+
+@identidad_bp.route("/verificacion/reenviar", methods=["POST"])
+def reenviar_verificacion():
+    correo = (
+        session.get("correo")
+        if session.get("autenticado")
+        else request.form.get("correo")
+    )
+    resultado = solicitar_reenvio(correo, obtener_ip_cliente(request))
+    flash(resultado["mensaje"], "info")
+    return redirect(url_for("identidad.verificacion_pendiente"))
+
+
+@identidad_bp.route("/verificacion", methods=["GET", "POST"])
+def verificar_correo():
+    if request.method == "POST":
+        token = request.form.get("token", "")
+        resultado = confirmar_correo(token)
+        if resultado.get("estado") == "VERIFICADO":
+            if session.get("usuario_id") == resultado.get("usuario_id"):
+                session["correo_verificado"] = True
+            plantilla = "auth/verificacion_exitosa.html"
+            codigo = 200
+        else:
+            plantilla = "auth/verificacion_resultado.html"
+            codigo = 400
+    else:
+        # El token llega en el fragmento #token=..., que nunca se envía en la
+        # petición GET ni aparece en access logs. La visita no consulta ni
+        # consume el token; el usuario confirma después mediante POST+CSRF.
+        resultado = {"estado": "PENDIENTE_CONFIRMACION"}
+        plantilla = "auth/verificacion_confirmar.html"
+        codigo = 200
+
+    respuesta = make_response(
+        render_template(plantilla, estado=resultado.get("estado")),
+        codigo,
+    )
+    respuesta.headers["Cache-Control"] = "no-store"
+    respuesta.headers["Referrer-Policy"] = "no-referrer"
+    respuesta.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return respuesta
 
 
 # ============================================================

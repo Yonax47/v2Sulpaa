@@ -1,0 +1,14 @@
+SULPAA — Verificación de correo
+
+Hola {{ nombre }},
+
+Confirma que esta dirección de correo pertenece a tu cuenta SULPAA:
+{{ verification_url }}
+
+Código para ingreso manual: {{ verification_code }}
+
+El enlace vence en {{ expires_hours }} horas. La primera pantalla no confirma
+nada: deberás pulsar el botón de confirmación.
+
+Si no creaste esta cuenta, ignora este mensaje. SULPAA nunca solicitará tu
+contraseña por correo.

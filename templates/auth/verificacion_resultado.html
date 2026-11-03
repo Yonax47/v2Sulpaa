@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block title %}Verificación no disponible | SULPAA{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/auth.css') }}">{% endblock %}
+{% block content %}<main class="auth-page"><section class="auth-status-card"><span class="auth-status-icon is-warning">!</span><h1>No se pudo confirmar</h1><p>{% if estado == 'EXPIRADO' %}El enlace venció.{% elif estado == 'CONSUMIDO' %}El enlace ya fue utilizado.{% else %}El enlace no es válido o fue reemplazado.{% endif %}</p><a href="{{ url_for('identidad.verificacion_pendiente') }}">Solicitar otro correo</a></section></main>{% endblock %}

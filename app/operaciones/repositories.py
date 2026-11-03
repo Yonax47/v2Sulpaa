@@ -12,6 +12,7 @@ Reglas de arquitectura:
 """
 
 from app.config.database import conexion_operaciones, nombre_esquema
+from app.identidad.email_repositories import insertar_solicitud
 import uuid
 
 
@@ -2732,15 +2733,17 @@ def obtener_rol_por_codigo(conexion, esquemas, codigo):
 
 def crear_usuario_perfil(conexion, esquemas, usuario_id, perfil_id, correo,
                          password_hash, nombres, apellido_paterno,
-                         apellido_materno, dni, telefono):
+                         apellido_materno, dni, telefono,
+                         verificacion_correo=None):
     """Crea el usuario y su perfil dentro de la transacción recibida."""
     identidad = esquemas["identidad"]
     with conexion.cursor() as cursor:
         cursor.execute(
             f"""
             INSERT INTO {identidad}.usuarios
-                (id, correo, password_hash, estado, correo_verificado)
-            VALUES (%s, %s, %s, 'ACTIVO', 0)
+                (id, correo, password_hash, estado, correo_verificado,
+                 requiere_verificacion_correo)
+            VALUES (%s, %s, %s, 'ACTIVO', 0, 1)
             """,
             (usuario_id, correo, password_hash),
         )
@@ -2754,6 +2757,12 @@ def crear_usuario_perfil(conexion, esquemas, usuario_id, perfil_id, correo,
             (perfil_id, usuario_id, nombres, apellido_paterno,
              apellido_materno, dni, telefono),
         )
+        if not verificacion_correo:
+            raise RuntimeError(
+                "El repartidor nuevo requiere una solicitud de correo."
+            )
+        conexion.select_db(identidad)
+        insertar_solicitud(cursor, verificacion_correo)
         return True
 
 

@@ -10,6 +10,7 @@ def obtener_perfil(usuario_id):
             cursor.execute(
                 """
                 SELECT u.id AS usuario_id, u.correo, u.correo_verificado,
+                       u.requiere_verificacion_correo,
                        u.estado, p.nombres, p.apellido_paterno,
                        p.apellido_materno, p.dni, p.telefono
                 FROM usuarios AS u

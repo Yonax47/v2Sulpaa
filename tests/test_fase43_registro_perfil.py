@@ -47,6 +47,20 @@ def persona_valida(dni="12345678"):
     }
 
 
+def solicitud_correo_sintetica():
+    return {
+        "token_id": "token-id",
+        "evento_id": "evento-id",
+        "usuario_id": "usuario",
+        "correo": "nuevo@sulpaa.test",
+        "token_hash": b"h" * 32,
+        "expira_en": "2026-11-04 10:00:00",
+        "clave_idempotencia": "VERIFICAR_CORREO:token-id",
+        "datos": {"nombre": "ANA", "expires_hours": 24},
+        "secreto_cifrado": "cifrado",
+    }
+
+
 def perfil_sintetico():
     return {
         "perfil": {
@@ -216,6 +230,9 @@ class RegistroUsuarioServicioTest(unittest.TestCase):
         ) as consultar, patch(
             "app.identidad.services.crear_usuario_y_perfil"
         ) as crear, patch(
+            "app.identidad.services.preparar_solicitud",
+            return_value=solicitud_correo_sintetica(),
+        ), patch(
             "app.identidad.services.bcrypt.hashpw",
             return_value=b"hash-de-prueba",
         ):
@@ -313,6 +330,9 @@ class RegistroUsuarioServicioTest(unittest.TestCase):
             "app.identidad.services.crear_usuario_y_perfil",
             side_effect=crear_atomico,
         ), patch(
+            "app.identidad.services.preparar_solicitud",
+            return_value=solicitud_correo_sintetica(),
+        ), patch(
             "app.identidad.services.bcrypt.hashpw",
             return_value=b"hash-de-prueba",
         ), patch.object(identidad_services.logger, "error"):
@@ -335,6 +355,7 @@ class RegistroTransaccionalRepositorioTest(unittest.TestCase):
             self.rol = rol
             self.fallar_rol = fallar_rol
             self.consultas = []
+            self.rowcount = 1
 
         def __enter__(self):
             return self
@@ -384,6 +405,7 @@ class RegistroTransaccionalRepositorioTest(unittest.TestCase):
                 dni="12345678",
                 telefono="987654321",
                 rol_codigo="CLIENTE",
+                verificacion_correo=solicitud_correo_sintetica(),
             )
 
     def test_inserta_cliente_y_confirma_una_sola_vez(self):

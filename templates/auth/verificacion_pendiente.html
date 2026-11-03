@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Verifica tu correo | SULPAA{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/auth.css') }}">{% endblock %}
+{% block content %}
+<main class="auth-page"><section class="auth-status-card" aria-labelledby="verification-title">
+    <span class="auth-status-icon" aria-hidden="true">✉</span>
+    <p class="auth-eyebrow">PROTEGE TU CUENTA</p>
+    <h1 id="verification-title">Revisa tu correo</h1>
+    <p>Enviamos una solicitud a la cola segura de SULPAA. La entrega puede tardar unos minutos.</p>
+    <p>El enlace abre primero una pantalla de confirmación y vence automáticamente.</p>
+    <form method="POST" action="{{ url_for('identidad.reenviar_verificacion') }}" class="auth-form auth-status-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if not autenticado %}<label class="form-group"><span class="form-label">Correo electrónico</span><input class="form-control" type="email" name="correo" value="{{ correo }}" maxlength="150" autocomplete="email" required></label>{% endif %}
+        <button class="btn btn-primary btn-block" type="submit">Solicitar otro correo</button>
+    </form>
+    <div class="auth-status-actions">
+    {% if autenticado %}<a href="{{ url_for('perfil.inicio') }}">Ir a Mi perfil</a>
+    <form method="POST" action="{{ url_for('identidad.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="auth-link-button" type="submit">Cerrar sesión</button></form>
+    {% else %}<a href="{{ url_for('identidad.login') }}">Volver al inicio de sesión</a>{% endif %}
+    </div>
+</section></main>
+{% endblock %}

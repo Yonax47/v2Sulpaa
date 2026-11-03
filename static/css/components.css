@@ -1100,3 +1100,19 @@ Objetivos:
             );
     }
 }
+/* Aviso global de transición/verificación de correo. */
+.email-verification-banner {
+    align-items: center;
+    background: #fff4cf;
+    border-bottom: 1px solid #ead18a;
+    color: #5b4300;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: .9rem;
+    font-weight: 650;
+    gap: .75rem;
+    justify-content: center;
+    padding: .7rem 1rem;
+    text-align: center;
+}
+.email-verification-banner a { color: #174f3d; font-weight: 800; }

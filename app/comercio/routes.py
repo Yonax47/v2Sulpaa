@@ -24,6 +24,7 @@ from app.admin.catalogo.validaciones import ErrorCatalogo
 
 from app.shared.decorators import (
     login_required,
+    correo_verificado_required,
 )
 
 from app.comercio.services import (
@@ -608,6 +609,7 @@ def checkout():
     methods=["POST"],
 )
 @login_required
+@correo_verificado_required
 def api_confirmar_checkout():
     """
     Confirma definitivamente el pedido del usuario autenticado.

@@ -457,6 +457,24 @@ Login no necesita obligatoriamente esta rejilla,
 pero reutilizamos la misma estructura si fuera necesario.
 */
 
+.auth-status-card {
+    width: min(100%, 620px);
+    padding: clamp(1.5rem, 5vw, 3.5rem);
+    border: 1px solid rgba(1, 111, 70, .12);
+    border-radius: 24px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+}
+.auth-status-card h1 { margin: .5rem 0 1rem; color: #173f35; }
+.auth-status-card p { color: #5b6b65; line-height: 1.65; }
+.auth-status-icon { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 1rem; border-radius: 50%; background: #e3f2e8; color: #176044; font-size: 1.7rem; font-weight: 800; }
+.auth-status-icon.is-warning { background: #fff1d2; color: #855d00; }
+.auth-status-form { margin: 1.5rem auto; max-width: 420px; text-align: left; }
+.auth-status-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 1.25rem; }
+.auth-status-actions form { margin: 0; }
+.auth-link-button { padding: 0; border: 0; background: none; color: #176044; font: inherit; text-decoration: underline; cursor: pointer; }
+
 .auth-form-grid {
     display:
         grid;

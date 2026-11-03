@@ -36,6 +36,21 @@ class _ConexionFalsa:
     def select_db(self, nombre):
         self.esquemas_seleccionados.append(nombre)
 
+    def cursor(self):
+        return _CursorFalso(self)
+
+
+class _CursorFalso:
+
+    def __init__(self, conexion):
+        self.conexion = conexion
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, tipo, error, traza):
+        return False
+
 
 class _UnidadTrabajoFalsa:
 
@@ -79,6 +94,10 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
                 return exito
             return _falso
 
+        def fabricar_outbox(cursor, **kwargs):
+            capturas.setdefault("outbox", []).append(cursor.conexion)
+            return True
+
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
@@ -90,7 +109,8 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
                 patch.object(services, "crear_pago_checkout", fabricar("pago", {"ok": True})), \
                 patch.object(services, "crear_entrega_pedido", fabricar("entrega", "entrega-1")), \
                 patch.object(services, "cerrar_carrito_usuario", fabricar("carrito", True)), \
-                patch.object(services, "confirmar_stock_pedido", fabricar("inventario", {"ok": True})):
+                patch.object(services, "confirmar_stock_pedido", fabricar("inventario", {"ok": True})), \
+                patch.object(services, "insertar_confirmacion_pedido", fabricar_outbox):
 
             resultado = services.confirmar_checkout(
                 usuario_id="usuario-1",
@@ -110,14 +130,14 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
         self.assertTrue(uow.confirmada)
 
         conexiones = [c for lista in capturas.values() for c in lista]
-        self.assertEqual(len(conexiones), 6)
+        self.assertEqual(len(conexiones), 7)
         self.assertEqual(len({id(c) for c in conexiones}), 1)
         self.assertIs(conexiones[0], uow.conexion)
         self.assertEqual(
             uow.conexion.esquemas_seleccionados,
             [ESQUEMAS["inventario"], ESQUEMAS["comercio"],
              ESQUEMAS["operaciones"], ESQUEMAS["comercio"],
-             ESQUEMAS["inventario"]],
+             ESQUEMAS["inventario"], ESQUEMAS["identidad"]],
         )
 
     def test_fallo_reserva_no_escribe_nada_posterior(self):
@@ -258,6 +278,10 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
                 return {"ok": False, "mensaje": "fallo simulado en facturacion"}
             return facturacion_resultado or {"ok": True, "facturacion_id": "fact-1"}
 
+        def fabricar_outbox(cursor, **kwargs):
+            capturas.setdefault("outbox", []).append(cursor.conexion)
+            return True
+
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
@@ -273,6 +297,7 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
                 patch.object(services, "crear_entrega_pedido", fabricar("entrega", "entrega-1")), \
                 patch.object(services, "cerrar_carrito_usuario", fabricar("carrito", {"ok": True})), \
                 patch.object(services, "confirmar_stock_pedido", fabricar("inventario", {"ok": True})), \
+                patch.object(services, "insertar_confirmacion_pedido", fabricar_outbox), \
                 patch.object(identidad_services, "registrar_facturacion_checkout",
                              fabricar_facturacion):
 
@@ -341,7 +366,7 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
         self.assertTrue(uow.confirmada)
 
         conexiones = self._conexiones(capturas)
-        self.assertEqual(len(conexiones), 7)
+        self.assertEqual(len(conexiones), 8)
         self.assertEqual(len({id(c) for c in conexiones}), 1)
         self.assertIs(conexiones[0], uow.conexion)
 
@@ -349,7 +374,7 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
             uow.conexion.esquemas_seleccionados,
             [ESQUEMAS["identidad"], ESQUEMAS["inventario"], ESQUEMAS["comercio"],
              ESQUEMAS["operaciones"], ESQUEMAS["comercio"],
-             ESQUEMAS["inventario"]],
+             ESQUEMAS["inventario"], ESQUEMAS["identidad"]],
         )
         self.assertEqual(resultado["facturacion_id"], "fact-1")
         self.assertEqual(resultado["tipo_comprobante"], "BOLETA")

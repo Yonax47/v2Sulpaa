@@ -11,6 +11,7 @@ import uuid
 
 from app.config.database import conexion_identidad
 from app.identidad.access_control import evaluar_fallo_contador
+from app.identidad.email_repositories import insertar_solicitud
 
 
 def _auditar_acceso(
@@ -327,6 +328,7 @@ def buscar_usuario_por_correo(correo: str):
                     password_hash,
                     estado,
                     correo_verificado,
+                    requiere_verificacion_correo,
                     ultimo_acceso_en,
                     creado_en,
                     actualizado_en
@@ -454,6 +456,8 @@ def obtener_contexto_autorizacion_usuario(usuario_id: str):
                     u.id,
                     u.correo,
                     u.estado,
+                    u.correo_verificado,
+                    u.requiere_verificacion_correo,
                     r.codigo AS rol_codigo
                 FROM usuarios AS u
                 LEFT JOIN usuario_roles AS ur
@@ -477,6 +481,10 @@ def obtener_contexto_autorizacion_usuario(usuario_id: str):
         "id": filas[0]["id"],
         "correo": filas[0]["correo"],
         "estado": filas[0]["estado"],
+        "correo_verificado": bool(filas[0].get("correo_verificado")),
+        "requiere_verificacion_correo": bool(
+            filas[0].get("requiere_verificacion_correo")
+        ),
         "roles": [
             fila["rol_codigo"]
             for fila in filas
@@ -527,6 +535,7 @@ def crear_usuario_y_perfil(
     dni: str | None,
     telefono: str,
     rol_codigo: str = "CLIENTE",
+    verificacion_correo=None,
 ):
     """
     Crea usuario, perfil y rol inicial dentro de una única transacción.
@@ -546,14 +555,16 @@ def crear_usuario_y_perfil(
                     correo,
                     password_hash,
                     estado,
-                    correo_verificado
+                    correo_verificado,
+                    requiere_verificacion_correo
                 )
                 VALUES (
                     %s,
                     %s,
                     %s,
                     'ACTIVO',
-                    FALSE
+                    FALSE,
+                    TRUE
                 )
             """
 
@@ -624,6 +635,12 @@ def crear_usuario_y_perfil(
                 """,
                 (str(uuid.uuid4()), usuario_id, rol["id"]),
             )
+
+            if not verificacion_correo:
+                raise RuntimeError(
+                    "El registro nuevo requiere una solicitud de correo."
+                )
+            insertar_solicitud(cursor, verificacion_correo)
 
         conexion.commit()
 

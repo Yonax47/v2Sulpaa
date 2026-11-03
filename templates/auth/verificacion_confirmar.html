@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Confirmar correo | SULPAA{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/auth.css') }}">{% endblock %}
+{% block content %}
+<main class="auth-page"><section class="auth-status-card" aria-labelledby="verification-title">
+{% if estado == 'PENDIENTE_CONFIRMACION' %}
+    <span class="auth-status-icon" aria-hidden="true">✓</span><p class="auth-eyebrow">UN ÚLTIMO PASO</p>
+    <h1 id="verification-title">Confirma tu correo</h1>
+    <p>Abrir este enlace no modificó tu cuenta. Pulsa el botón para confirmar de forma segura.</p>
+    <form method="POST" data-verification-token-form><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="form-group"><span class="form-label">Código de verificación</span><input class="form-control" name="token" data-verification-token minlength="20" maxlength="200" autocomplete="off" required><small>Puedes pegar manualmente el código recibido si tu navegador no lo completa.</small></label><button class="btn btn-primary btn-block" type="submit">Confirmar mi correo</button></form>
+{% else %}
+    <span class="auth-status-icon is-warning" aria-hidden="true">!</span><h1 id="verification-title">Enlace no disponible</h1>
+    <p>{% if estado == 'EXPIRADO' %}Este enlace venció.{% elif estado == 'CONSUMIDO' %}Este enlace ya fue utilizado.{% else %}El enlace no es válido o fue reemplazado.{% endif %}</p>
+    <a href="{{ url_for('identidad.verificacion_pendiente') }}">Solicitar un nuevo correo</a>
+{% endif %}
+</section></main>
+{% endblock %}
+{% block page_js %}<script src="{{ url_for('static', filename='js/modules/email-verification.js') }}" defer></script>{% endblock %}

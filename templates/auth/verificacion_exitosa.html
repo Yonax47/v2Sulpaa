@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block title %}Correo verificado | SULPAA{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/auth.css') }}">{% endblock %}
+{% block content %}<main class="auth-page"><section class="auth-status-card"><span class="auth-status-icon">✓</span><p class="auth-eyebrow">CUENTA PROTEGIDA</p><h1>Correo verificado</h1><p>Tu dirección fue confirmada correctamente.</p><a class="btn btn-primary btn-block" href="{{ url_for('inicio') if session.get('autenticado') else url_for('identidad.login') }}">Continuar</a></section></main>{% endblock %}
