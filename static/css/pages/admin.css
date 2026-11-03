@@ -81,9 +81,11 @@ body {
 .admin-nav {
     display: flex;
     flex: 1;
+    min-height: 0;
     flex-direction: column;
     gap: 0.35rem;
     padding-top: 1.35rem;
+    overflow-y: auto;
 }
 
 .admin-nav-heading {

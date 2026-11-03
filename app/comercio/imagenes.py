@@ -117,10 +117,14 @@ def resolver_imagen_producto(
     presentacion=None,
     tipo=None,
     nombre=None,
+    ruta_catalogo=None,
 ):
     """
-    Devuelve la ruta (relativa a /static) de la imagen real que
-    le corresponde a un producto, o None si no hay imagen.
+    Devuelve la ruta lógica de la imagen que corresponde al producto.
+
+    Una ruta activa de ``imagenes_catalogo`` tiene prioridad. Si no existe,
+    se conservan las reglas estáticas anteriores. La plantilla convierte
+    después esa ruta lógica en una URL de ``/static`` o ``/media/catalogo``.
 
     Parámetros:
         sabor (str | None):
@@ -132,7 +136,22 @@ def resolver_imagen_producto(
         nombre (str | None):
             Nombre comercial o del pack. Se usa solo para saber
             qué sabor tiene un pack.
+        ruta_catalogo (str | None):
+            Ruta ya validada que proviene de ``imagenes_catalogo``.
     """
+
+    # Solo se aceptan los dos espacios de nombres internos del catálogo. Una
+    # URL externa o una ruta con retroceso nunca reemplaza el respaldo seguro.
+    ruta_catalogo = str(ruta_catalogo or "").strip().replace("\\", "/")
+    if (
+        ruta_catalogo
+        and ".." not in ruta_catalogo.split("/")
+        and (
+            ruta_catalogo.startswith("img/")
+            or ruta_catalogo.startswith("uploads/catalogo/")
+        )
+    ):
+        return ruta_catalogo
 
     tipo_txt = _normalizar(tipo)
     sabor_txt = _normalizar(sabor)

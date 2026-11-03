@@ -3737,6 +3737,14 @@ def listar_favoritos_del_usuario(usuario_id):
             "presentacion":
                 favorito["presentacion"],
 
+            # La imagen administrada viaja junto con la variante. La plantilla
+            # conserva su respaldo estático cuando estos campos son nulos.
+            "imagen_ruta":
+                favorito.get("imagen_ruta"),
+
+            "imagen_alt":
+                favorito.get("imagen_alt"),
+
             "articulo_venta_id":
                 favorito.get("articulo_venta_id"),
 
@@ -4031,6 +4039,14 @@ def obtener_ficha_producto(sku, usuario_id=None):
 
         "presentacion":
             variante["presentacion"],
+
+        # La ficha prioriza la imagen activa de la variante o del producto.
+        # Si no existe, el componente compartido usa la foto estática anterior.
+        "imagen_ruta":
+            variante.get("imagen_ruta"),
+
+        "imagen_alt":
+            variante.get("imagen_alt"),
 
         "precio":
             (

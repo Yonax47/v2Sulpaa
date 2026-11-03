@@ -1,0 +1,10 @@
+{# Mensajes flash comunes del módulo de catálogo. #}
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+        <div class="admin-alert-stack" aria-live="polite">
+            {% for categoria, mensaje in mensajes %}
+                <div class="admin-alert is-{{ categoria }}" role="alert">{{ mensaje }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}

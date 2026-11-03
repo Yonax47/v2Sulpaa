@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Editar producto" if producto else "Nuevo producto" }} | Catálogo SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-catalog.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Producto</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <a href="{{ url_for('admin_catalogo.productos') }}" class="admin-back-link">← Volver a productos</a>
+
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Catálogo</span>
+                    <h1>{{ producto.nombre if producto else "Nuevo producto" }}</h1>
+                    <p>{{ "Actualiza los datos comerciales y revisa sus variantes." if producto else "Crea el producto y luego agrega sus variantes." }}</p>
+                </div>
+                {% if producto %}
+                    <span class="catalog-badge is-{{ 'active' if producto.estado == 'ACTIVO' else 'inactive' }}">{{ producto.estado|capitalize }}</span>
+                {% endif %}
+            </header>
+
+            {% include "admin/catalogo/_mensajes.html" %}
+            {% include "admin/catalogo/_tabs.html" %}
+
+            <form
+                method="POST"
+                action="{{ url_for('admin_catalogo.producto', producto_id=producto.producto_id) if producto else url_for('admin_catalogo.nuevo_producto') }}"
+                class="catalog-form-card"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="catalog-form-grid">
+                    <label class="admin-filter-field catalog-field-wide">
+                        <span>Nombre *</span>
+                        <input type="text" name="nombre" maxlength="150" required
+                               value="{{ producto.nombre if producto else '' }}">
+                    </label>
+
+                    <label class="admin-filter-field">
+                        <span>Slug (opcional)</span>
+                        <input type="text" name="slug" maxlength="180"
+                               value="{{ producto.slug if producto else '' }}"
+                               placeholder="Se genera desde el nombre">
+                    </label>
+
+                    <label class="admin-filter-field">
+                        <span>Categoría *</span>
+                        <select name="categoria_id" required>
+                            <option value="">Selecciona</option>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}"{% if producto and producto.categoria_id|string == categoria.id|string %} selected{% endif %}>{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+
+                    <label class="admin-filter-field catalog-field-wide">
+                        <span>Descripción</span>
+                        <textarea name="descripcion" rows="4" maxlength="5000">{{ producto.descripcion if producto and producto.descripcion else '' }}</textarea>
+                    </label>
+
+                    <label class="admin-filter-field">
+                        <span>Estado</span>
+                        <select name="estado">
+                            <option value="ACTIVO"{% if not producto or producto.estado == 'ACTIVO' %} selected{% endif %}>Activo</option>
+                            <option value="INACTIVO"{% if producto and producto.estado == 'INACTIVO' %} selected{% endif %}>Inactivo</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="catalog-form-actions">
+                    <button type="submit" class="admin-button is-primary">Guardar producto</button>
+                    <a href="{{ url_for('admin_catalogo.productos') }}" class="admin-button is-ghost">Cancelar</a>
+                </div>
+            </form>
+
+            {% if producto %}
+                <section class="admin-order-table-card" aria-label="Variantes del producto">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Variantes</span>
+                            <h2>Presentaciones vendibles</h2>
+                        </div>
+                        <a class="admin-button is-secondary" href="{{ url_for('admin_catalogo.nueva_variante', producto_id=producto.producto_id) }}">Agregar variante</a>
+                    </div>
+
+                    {% if producto.variantes %}
+                        <div class="admin-order-table-wrap">
+                            <table class="admin-order-table">
+                                <thead>
+                                    <tr><th>SKU</th><th>Nombre comercial</th><th>Sabor</th><th>Presentación</th><th>Estado</th><th>Acciones</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for variante_fila in producto.variantes %}
+                                        <tr>
+                                            <td data-label="SKU"><span class="catalog-code">{{ variante_fila.sku }}</span></td>
+                                            <td data-label="Nombre"><strong>{{ variante_fila.nombre_comercial }}</strong></td>
+                                            <td data-label="Sabor"><span>{{ variante_fila.sabor }}</span></td>
+                                            <td data-label="Presentación"><span>{{ variante_fila.presentacion }}</span></td>
+                                            <td data-label="Estado">
+                                                <span class="catalog-badge is-{{ 'active' if variante_fila.estado == 'ACTIVO' else 'inactive' }}">{{ variante_fila.estado|capitalize }}</span>
+                                            </td>
+                                            <td data-label="Acciones">
+                                                <a class="admin-button is-secondary is-small" href="{{ url_for('admin_catalogo.variante', variante_id=variante_fila.variante_id) }}">Editar</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="catalog-empty">Este producto todavía no tiene variantes.</p>
+                    {% endif %}
+                </section>
+
+                <section class="admin-order-table-card" aria-label="Imágenes del producto">
+                    <div class="admin-section-heading admin-order-heading">
+                        <div>
+                            <span class="admin-section-kicker">Imágenes</span>
+                            <h2>Fotos del producto</h2>
+                        </div>
+                        <a class="admin-button is-secondary" href="{{ url_for('admin_catalogo.nueva_imagen', producto_id=producto.producto_id) }}">Agregar imagen</a>
+                    </div>
+
+                    {% if producto.imagenes %}
+                        <div class="catalog-image-grid">
+                            {% for imagen in producto.imagenes %}
+                                <article class="catalog-image-card">
+                                    <div class="catalog-image-preview">
+                                        {% if imagen.ruta %}
+                                            <img src="{{ url_imagen_catalogo(imagen.ruta) }}" alt="{{ imagen.texto_alternativo or 'Imagen del producto' }}" loading="lazy">
+                                        {% else %}
+                                            <span class="catalog-image-empty">Sin imagen</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="catalog-image-meta">
+                                        <strong>{{ "Principal" if imagen.es_principal else "Secundaria" }}</strong>
+                                        <span class="catalog-badge is-{{ 'active' if imagen.estado == 'ACTIVO' else 'inactive' }}">{{ imagen.estado|capitalize }}</span>
+                                        <a class="admin-button is-ghost is-small" href="{{ url_for('admin_catalogo.imagen', imagen_id=imagen.id) }}">Editar</a>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="catalog-empty">Todavía no hay imágenes asociadas a este producto.</p>
+                    {% endif %}
+                </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

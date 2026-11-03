@@ -115,7 +115,9 @@ Variables esperadas:
             presentacion="Botella 330 ml",
             nombre=producto.nombre,
             clase="store-product-image",
-            alt="Kombucha SULPAA sabor " ~ producto.nombre
+            alt="Kombucha SULPAA sabor " ~ producto.nombre,
+            ruta_catalogo=variante_detalle.imagen_ruta if variante_detalle else none,
+            alt_catalogo=variante_detalle.imagen_alt if variante_detalle else none
         ) }}
 
     </div>

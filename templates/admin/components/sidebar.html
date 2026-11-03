@@ -86,6 +86,14 @@
         {% endif %}
         {% if "GERENTE" in (session.get("roles") or []) or "ADMINISTRADOR" in (session.get("roles") or []) %}
             <a
+                href="{{ url_for('admin_catalogo.panel') }}"
+                class="admin-nav-link{% if admin_activo == 'catalogo' %} is-active{% endif %}"
+                {% if admin_activo == 'catalogo' %}aria-current="page"{% endif %}
+            >
+                <span class="admin-nav-icon" aria-hidden="true">◇</span>
+                <span>Catálogo</span>
+            </a>
+            <a
                 href="{{ url_for('admin_contenido.listado') }}"
                 class="admin-nav-link{% if admin_activo == 'contenido' %} is-active{% endif %}"
                 {% if admin_activo == 'contenido' %}aria-current="page"{% endif %}
@@ -143,6 +151,16 @@
                 <span>Usuarios y roles</span>
             </a>
             {% if "GERENTE" in (session.get("roles") or []) %}
+                {% if config.get("CENTRO_SEGURIDAD_HABILITADO", false) %}
+                    <a
+                        href="{{ url_for('admin_seguridad.accesos') }}"
+                        class="admin-nav-link{% if admin_activo == 'seguridad' %} is-active{% endif %}"
+                        {% if admin_activo == 'seguridad' %}aria-current="page"{% endif %}
+                    >
+                        <span class="admin-nav-icon" aria-hidden="true">◆</span>
+                        <span>Seguridad de accesos</span>
+                    </a>
+                {% endif %}
                 <a
                     href="{{ url_for('admin_auditoria.listado') }}"
                     class="admin-nav-link{% if admin_activo == 'auditoria' %} is-active{% endif %}"
@@ -161,6 +179,7 @@
         <div class="admin-session-actions">
             <a href="{{ url_for('inicio') }}" class="admin-return-link">Volver al sitio</a>
             <form method="POST" action="{{ url_for('identidad.logout') }}" class="admin-logout-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="admin-logout-button">Cerrar sesión</button>
             </form>
         </div>

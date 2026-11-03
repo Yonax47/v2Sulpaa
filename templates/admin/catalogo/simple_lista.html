@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}{{ etiqueta_plural }} | Catálogo SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-catalog.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>{{ etiqueta_plural }}</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <a href="{{ url_for('admin_catalogo.panel') }}" class="admin-back-link">← Volver al catálogo</a>
+
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Catálogo</span>
+                    <h1>{{ etiqueta_plural }}</h1>
+                    <p>Datos base que usan los productos y las variantes de la tienda.</p>
+                </div>
+                <a class="admin-button is-primary" href="{{ url_for(urls.nuevo) }}">Nuevo {{ etiqueta|lower }}</a>
+            </header>
+
+            {% include "admin/catalogo/_mensajes.html" %}
+            {% include "admin/catalogo/_tabs.html" %}
+
+            <form method="GET" action="{{ url_for(urls.lista) }}" class="admin-order-filters" role="search">
+                <label class="admin-filter-field">
+                    <span>Buscar por nombre</span>
+                    <input type="search" name="q" value="{{ busqueda }}" maxlength="120" placeholder="Escribe un nombre">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        <option value="ACTIVO"{% if estado == 'ACTIVO' %} selected{% endif %}>Activo</option>
+                        <option value="INACTIVO"{% if estado == 'INACTIVO' %} selected{% endif %}>Inactivo</option>
+                    </select>
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-secondary">Filtrar</button>
+                    <a href="{{ url_for(urls.lista) }}" class="admin-button is-ghost">Limpiar</a>
+                </div>
+            </form>
+
+            <section class="admin-order-table-card">
+                {% if registros %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    {% if recurso == "categorias" %}<th>Slug</th><th>Orden</th>{% endif %}
+                                    {% if recurso == "presentaciones" %}<th>Tipo</th><th>Cantidad</th>{% endif %}
+                                    <th>Descripción</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                    <tr>
+                                        <td data-label="Nombre"><strong>{{ registro.nombre }}</strong></td>
+                                        {% if recurso == "categorias" %}
+                                            <td data-label="Slug"><span class="catalog-code">{{ registro.slug }}</span></td>
+                                            <td data-label="Orden"><span>{{ registro.orden }}</span></td>
+                                        {% endif %}
+                                        {% if recurso == "presentaciones" %}
+                                            <td data-label="Tipo"><span>{{ registro.tipo_unidad }}</span></td>
+                                            <td data-label="Cantidad"><span>{{ registro.cantidad }}</span></td>
+                                        {% endif %}
+                                        <td data-label="Descripción"><span class="catalog-clamp">{{ registro.descripcion or "—" }}</span></td>
+                                        <td data-label="Estado">
+                                            <span class="catalog-badge is-{{ 'active' if registro.estado == 'ACTIVO' else 'inactive' }}">{{ registro.estado|capitalize }}</span>
+                                        </td>
+                                        <td data-label="Acciones">
+                                            <div class="catalog-row-actions">
+                                                <a class="admin-button is-secondary is-small" href="{{ url_for(urls.editar, registro_id=registro.id) }}">Editar</a>
+                                                <form method="POST" action="{{ url_for(urls.estado, registro_id=registro.id) }}" data-confirmar="¿Cambiar el estado de {{ registro.nombre }}?">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="estado" value="{{ 'INACTIVO' if registro.estado == 'ACTIVO' else 'ACTIVO' }}">
+                                                    <button type="submit" class="admin-button is-ghost is-small">{{ "Desactivar" if registro.estado == "ACTIVO" else "Activar" }}</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="catalog-empty">No se encontraron registros con esos filtros.</p>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

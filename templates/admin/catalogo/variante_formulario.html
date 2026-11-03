@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{{ variante.nombre_comercial if variante else "Nueva variante" }} | Catálogo SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-catalog.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+    <main class="admin-main">
+        <div class="admin-mobile-bar"><label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo"><span aria-hidden="true">☰</span></label><strong>Variante</strong><span class="admin-mobile-spacer" aria-hidden="true"></span></div>
+        <div class="admin-content">
+            <a href="{{ url_for('admin_catalogo.variantes') }}" class="admin-back-link">← Volver a variantes</a>
+            <header class="admin-page-header">
+                <div><span class="admin-eyebrow">SKU</span><h1>{{ variante.nombre_comercial if variante else "Nueva variante" }}</h1><p>La publicación exige producto, sabor, presentación y precio vigentes.</p></div>
+                {% if variante %}<span class="catalog-badge is-{{ 'active' if variante.estado == 'ACTIVO' else 'inactive' }}">{{ variante.estado|capitalize }}</span>{% endif %}
+            </header>
+            {% include "admin/catalogo/_mensajes.html" %}
+            {% include "admin/catalogo/_tabs.html" %}
+
+            {% if stock %}
+                <section class="catalog-stock-bar" aria-label="Stock de solo lectura">
+                    <div><span>Físico</span><strong>{{ stock.stock_fisico }}</strong></div>
+                    <div><span>Reservado</span><strong>{{ stock.stock_reservado }}</strong></div>
+                    <div><span>Disponible</span><strong>{{ stock.stock_disponible }}</strong></div>
+                    <p>Solo lectura. Para modificar existencias usa <a href="{{ url_for('admin_inventario.listado', q=variante.sku) }}">Inventario</a>.</p>
+                </section>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('admin_catalogo.variante', variante_id=variante.variante_id) if variante else url_for('admin_catalogo.nueva_variante') }}" class="catalog-form-card">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="catalog-form-grid">
+                    <label class="admin-filter-field"><span>Producto *</span><select name="producto_id" required><option value="">Selecciona</option>{% for item in productos %}<option value="{{ item.producto_id }}"{% if (variante and variante.producto_id == item.producto_id) or (not variante and producto_id == item.producto_id) %} selected{% endif %}>{{ item.nombre }}{% if item.estado != 'ACTIVO' %} (inactivo){% endif %}</option>{% endfor %}</select></label>
+                    <label class="admin-filter-field"><span>Sabor</span><select name="sabor_id"><option value="">Sin sabor</option>{% for item in sabores %}<option value="{{ item.id }}"{% if variante and variante.sabor_id|string == item.id|string %} selected{% endif %}>{{ item.nombre }}</option>{% endfor %}</select></label>
+                    <label class="admin-filter-field"><span>Presentación *</span><select name="presentacion_id" required><option value="">Selecciona</option>{% for item in presentaciones %}<option value="{{ item.id }}"{% if variante and variante.presentacion_id|string == item.id|string %} selected{% endif %}>{{ item.nombre }}</option>{% endfor %}</select></label>
+                    <label class="admin-filter-field"><span>SKU *</span><input type="text" name="sku" maxlength="80" required value="{{ variante.sku if variante else '' }}" placeholder="SUL-330-CAF"></label>
+                    <label class="admin-filter-field catalog-field-wide"><span>Nombre comercial *</span><input type="text" name="nombre_comercial" maxlength="180" required value="{{ variante.nombre_comercial if variante else '' }}"></label>
+                    <label class="admin-filter-field"><span>Peso (g)</span><input type="number" name="peso_gramos" min="0" step="0.01" value="{{ variante.peso_gramos if variante and variante.peso_gramos is not none else '' }}"></label>
+                    <label class="admin-filter-field"><span>Largo (cm)</span><input type="number" name="largo_cm" min="0" step="0.01" value="{{ variante.largo_cm if variante and variante.largo_cm is not none else '' }}"></label>
+                    <label class="admin-filter-field"><span>Ancho (cm)</span><input type="number" name="ancho_cm" min="0" step="0.01" value="{{ variante.ancho_cm if variante and variante.ancho_cm is not none else '' }}"></label>
+                    <label class="admin-filter-field"><span>Alto (cm)</span><input type="number" name="alto_cm" min="0" step="0.01" value="{{ variante.alto_cm if variante and variante.alto_cm is not none else '' }}"></label>
+                    {% if not variante %}<label class="admin-filter-field"><span>Precio inicial (PEN) *</span><input type="number" name="monto_inicial" min="0.01" step="0.01" required></label>{% endif %}
+                    <label class="admin-filter-field"><span>Estado</span><select name="estado"><option value="ACTIVO"{% if not variante or variante.estado == 'ACTIVO' %} selected{% endif %}>Activo</option><option value="INACTIVO"{% if variante and variante.estado == 'INACTIVO' %} selected{% endif %}>Inactivo</option></select></label>
+                </div>
+                <div class="catalog-form-actions"><button type="submit" class="admin-button is-primary">Guardar variante</button><a href="{{ url_for('admin_catalogo.variantes') }}" class="admin-button is-ghost">Cancelar</a></div>
+            </form>
+
+            {% if variante %}
+                <section class="catalog-split" id="precios">
+                    <article class="catalog-form-card">
+                        <h2>Nuevo precio</h2><p class="admin-muted">Se agrega una vigencia nueva; los precios anteriores no se borran.</p>
+                        <form method="POST" action="{{ url_for('admin_catalogo.precio_variante', variante_id=variante.variante_id) }}" class="catalog-form-grid">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label class="admin-filter-field"><span>Tipo *</span><select name="tipo_precio_id" required>{% for tipo in tipos_precio %}<option value="{{ tipo.id }}">{{ tipo.nombre }}</option>{% endfor %}</select></label>
+                            <label class="admin-filter-field"><span>Monto *</span><input type="number" name="monto" min="0.01" step="0.01" required></label>
+                            <label class="admin-filter-field"><span>Moneda *</span><input type="text" name="moneda" value="PEN" maxlength="3" required></label>
+                            <label class="admin-filter-field"><span>Vigente desde *</span><input type="datetime-local" name="vigente_desde" required></label>
+                            <label class="admin-filter-field"><span>Vigente hasta</span><input type="datetime-local" name="vigente_hasta"></label>
+                            <div class="catalog-form-actions catalog-field-wide"><button type="submit" class="admin-button is-primary">Registrar precio</button></div>
+                        </form>
+                    </article>
+                    <article class="admin-order-table-card">
+                        <div class="admin-section-heading admin-order-heading"><div><span class="admin-section-kicker">Historial</span><h2>Precios</h2></div></div>
+                        {% if precios %}<div class="admin-order-table-wrap"><table class="admin-order-table"><thead><tr><th>Tipo</th><th>Monto</th><th>Desde</th><th>Hasta</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{% for precio in precios %}<tr><td data-label="Tipo">{{ precio.tipo_nombre }}</td><td data-label="Monto"><strong>{{ precio.moneda }} {{ "%.2f"|format(precio.monto) }}</strong></td><td data-label="Desde">{{ precio.vigente_desde }}</td><td data-label="Hasta">{{ precio.vigente_hasta or "Sin cierre" }}</td><td data-label="Estado"><span class="catalog-badge is-{{ 'active' if precio.estado == 'ACTIVO' else 'inactive' }}">{{ precio.estado|capitalize }}</span></td><td data-label="Acción">{% if precio.estado == 'ACTIVO' and not precio.vigente_hasta %}<form method="POST" action="{{ url_for('admin_catalogo.cerrar_precio_ruta', precio_id=precio.precio_id) }}" class="catalog-close-price" data-confirmar="¿Cerrar esta vigencia?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="volver_a" value="{{ url_for('admin_catalogo.variante', variante_id=variante.variante_id, _anchor='precios') }}"><input type="datetime-local" name="vigente_hasta" required aria-label="Fecha de cierre"><button type="submit" class="admin-button is-ghost is-small">Cerrar</button></form>{% else %}<span class="admin-muted">—</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="catalog-empty">No hay precios registrados.</p>{% endif %}
+                    </article>
+                </section>
+
+                <section class="catalog-split" id="imagenes">
+                    <article class="catalog-form-card">
+                        <h2>Agregar imagen</h2><p class="admin-muted">El archivo requiere un volumen persistente configurado. Como respaldo puedes usar una ruta <code>img/...</code>.</p>
+                        <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin_catalogo.imagen_variante', variante_id=variante.variante_id) }}" class="catalog-form-grid">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label class="admin-filter-field catalog-field-wide"><span>Archivo JPG, PNG o WEBP</span><input type="file" name="archivo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label>
+                            <label class="admin-filter-field catalog-field-wide"><span>Ruta estática alternativa</span><input type="text" name="ruta" maxlength="500" placeholder="img/productos/ejemplo.webp"></label>
+                            <label class="admin-filter-field catalog-field-wide"><span>Texto alternativo *</span><input type="text" name="texto_alternativo" maxlength="255" required></label>
+                            <label class="admin-filter-field"><span>Orden</span><input type="number" name="orden" min="0" value="0"></label>
+                            <label class="catalog-checkbox"><input type="checkbox" name="es_principal" value="1"><span>Imagen principal</span></label>
+                            <input type="hidden" name="estado" value="ACTIVO">
+                            <div class="catalog-form-actions catalog-field-wide"><button type="submit" class="admin-button is-primary">Agregar imagen</button></div>
+                        </form>
+                    </article>
+                    <article class="admin-detail-card"><h2>Imágenes actuales</h2>{% if imagenes %}<div class="catalog-image-grid">{% for imagen in imagenes %}<a class="catalog-image-card" href="{{ url_for('admin_catalogo.imagen', imagen_id=imagen.id) }}"><div class="catalog-image-preview"><img src="{{ url_imagen_catalogo(imagen.ruta) }}" alt="{{ imagen.texto_alternativo or '' }}" loading="lazy"></div><span>{{ 'Principal' if imagen.es_principal else 'Orden ' ~ imagen.orden }}</span></a>{% endfor %}</div>{% else %}<p class="catalog-empty">No hay imágenes asociadas.</p>{% endif %}</article>
+                </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

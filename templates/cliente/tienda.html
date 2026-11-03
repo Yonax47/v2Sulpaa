@@ -166,7 +166,7 @@ La información comercial real llega desde Flask.
                 </h1>
 
                 <p>
-                    Descubre nuestros cuatro perfiles SULPAA,
+                    Descubre nuestros perfiles SULPAA,
                     crea tu combinación favorita o elige el formato
                     perfecto para cada ocasión.
                 </p>
@@ -466,6 +466,33 @@ La información comercial real llega desde Flask.
 
                     </div>
 
+                {% endfor %}
+
+                {# Los cuatro sabores clásicos conservan su diseño editorial.
+                   Cualquier sabor activo nuevo también aparece con una tarjeta
+                   neutra construida desde el catálogo real. #}
+                {% set sabores_clasicos = ["Café", "Jamaica", "Limón", "Kion"] %}
+                {% for variante in variantes_330 %}
+                    {% if variante.sabor not in sabores_clasicos %}
+                        {% set variante_detalle = variante %}
+                        {% set producto = {
+                            "nombre": variante.sabor,
+                            "slug": variante.sabor|lower|replace(" ", "-"),
+                            "sabor_bd": variante.sabor,
+                            "sabor": "Nuevo perfil SULPAA",
+                            "perfil": "NUEVO",
+                            "clase": "",
+                            "descripcion": variante.nombre_comercial,
+                            "atributos": [
+                                "Bebida fermentada",
+                                variante.presentacion,
+                                "Catálogo SULPAA"
+                            ]
+                        } %}
+                        <div class="reveal" data-product-wrapper data-name="{{ variante.sabor|lower }}" data-flavor="{{ producto.slug }}">
+                            {% include "components/product_card.html" %}
+                        </div>
+                    {% endif %}
                 {% endfor %}
 
             </div>

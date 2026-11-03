@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Editar" if registro else "Nuevo" }} {{ etiqueta|lower }} | Catálogo SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-catalog.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>{{ etiqueta }}</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <a href="{{ url_for(urls.lista) }}" class="admin-back-link">← Volver a {{ etiqueta|lower }}s</a>
+
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Catálogo</span>
+                    <h1>{{ "Editar" if registro else "Nuevo" }} {{ etiqueta|lower }}</h1>
+                    <p>Los cambios se registran en la auditoría con tu usuario.</p>
+                </div>
+            </header>
+
+            {% include "admin/catalogo/_mensajes.html" %}
+            {% include "admin/catalogo/_tabs.html" %}
+
+            <form
+                method="POST"
+                action="{{ url_for(urls.editar, registro_id=registro.id) if registro else url_for(urls.nuevo) }}"
+                class="catalog-form-card"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="catalog-form-grid">
+                    <label class="admin-filter-field catalog-field-wide">
+                        <span>Nombre *</span>
+                        <input type="text" name="nombre" maxlength="100" required
+                               value="{{ registro.nombre if registro else '' }}"
+                               placeholder="Nombre visible">
+                    </label>
+
+                    {% if recurso == "categorias" %}
+                        <label class="admin-filter-field">
+                            <span>Slug (opcional)</span>
+                            <input type="text" name="slug" maxlength="120"
+                                   value="{{ registro.slug if registro else '' }}"
+                                   placeholder="Se genera desde el nombre">
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Orden</span>
+                            <input type="number" name="orden" min="0" step="1"
+                                   value="{{ registro.orden if registro else 0 }}">
+                        </label>
+                    {% endif %}
+
+                    {% if recurso == "presentaciones" %}
+                        <label class="admin-filter-field">
+                            <span>Tipo de unidad *</span>
+                            <select name="tipo_unidad" required>
+                                <option value="">Selecciona</option>
+                                {% for codigo, etiqueta_unidad in tipos_unidad %}
+                                    <option value="{{ codigo }}"{% if registro and registro.tipo_unidad == codigo %} selected{% endif %}>{{ etiqueta_unidad }} ({{ codigo }})</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="admin-filter-field">
+                            <span>Cantidad *</span>
+                            <input type="number" name="cantidad" min="0.01" step="0.01" required
+                                   value="{{ registro.cantidad if registro else '' }}"
+                                   placeholder="Ej. 330">
+                        </label>
+                    {% endif %}
+
+                    <label class="admin-filter-field catalog-field-wide">
+                        <span>Descripción</span>
+                        <textarea name="descripcion" rows="4" maxlength="{{ 255 if recurso == 'presentaciones' else 500 }}">{{ registro.descripcion if registro and registro.descripcion else '' }}</textarea>
+                    </label>
+
+                    <label class="admin-filter-field">
+                        <span>Estado</span>
+                        <select name="estado">
+                            <option value="ACTIVO"{% if not registro or registro.estado == 'ACTIVO' %} selected{% endif %}>Activo</option>
+                            <option value="INACTIVO"{% if registro and registro.estado == 'INACTIVO' %} selected{% endif %}>Inactivo</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="catalog-form-actions">
+                    <button type="submit" class="admin-button is-primary">{{ "Guardar cambios" if registro else "Crear " ~ etiqueta|lower }}</button>
+                    <a href="{{ url_for(urls.lista) }}" class="admin-button is-ghost">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+{% endblock %}

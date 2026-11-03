@@ -1,0 +1,11 @@
+{# Navegación interna del módulo de catálogo. #}
+<nav class="catalog-tabs" aria-label="Secciones del catálogo">
+    <a href="{{ url_for('admin_catalogo.panel') }}" class="catalog-tab{% if subactivo == 'panel' %} is-active{% endif %}"{% if subactivo == 'panel' %} aria-current="page"{% endif %}>Resumen</a>
+    <a href="{{ url_for('admin_catalogo.productos') }}" class="catalog-tab{% if subactivo == 'productos' %} is-active{% endif %}"{% if subactivo == 'productos' %} aria-current="page"{% endif %}>Productos</a>
+    <a href="{{ url_for('admin_catalogo.variantes') }}" class="catalog-tab{% if subactivo == 'variantes' %} is-active{% endif %}"{% if subactivo == 'variantes' %} aria-current="page"{% endif %}>Variantes</a>
+    <a href="{{ url_for('admin_catalogo.categorias') }}" class="catalog-tab{% if subactivo == 'categorias' %} is-active{% endif %}"{% if subactivo == 'categorias' %} aria-current="page"{% endif %}>Categorías</a>
+    <a href="{{ url_for('admin_catalogo.sabores') }}" class="catalog-tab{% if subactivo == 'sabores' %} is-active{% endif %}"{% if subactivo == 'sabores' %} aria-current="page"{% endif %}>Sabores</a>
+    <a href="{{ url_for('admin_catalogo.presentaciones') }}" class="catalog-tab{% if subactivo == 'presentaciones' %} is-active{% endif %}"{% if subactivo == 'presentaciones' %} aria-current="page"{% endif %}>Presentaciones</a>
+    <a href="{{ url_for('admin_catalogo.packs') }}" class="catalog-tab{% if subactivo == 'packs' %} is-active{% endif %}"{% if subactivo == 'packs' %} aria-current="page"{% endif %}>Packs</a>
+    <a href="{{ url_for('admin_catalogo.imagenes') }}" class="catalog-tab{% if subactivo == 'imagenes' %} is-active{% endif %}"{% if subactivo == 'imagenes' %} aria-current="page"{% endif %}>Imágenes</a>
+</nav>

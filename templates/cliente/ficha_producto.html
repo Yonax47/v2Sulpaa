@@ -55,7 +55,9 @@
                 presentacion=producto.presentacion,
                 nombre=producto.nombre_comercial,
                 clase="ficha-bottle",
-                alt="Kombucha SULPAA sabor " ~ (producto.sabor or "")
+                alt="Kombucha SULPAA sabor " ~ (producto.sabor or ""),
+                ruta_catalogo=producto.imagen_ruta,
+                alt_catalogo=producto.imagen_alt
             ) }}
 
             <span class="ficha-float ficha-float-one">●</span>

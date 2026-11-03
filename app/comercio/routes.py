@@ -13,7 +13,14 @@ from flask import (
     jsonify,
     session,
     abort,
+    send_from_directory,
 )
+
+from app.admin.catalogo.imagenes import (
+    directorio_imagenes,
+    nombre_archivo_persistente,
+)
+from app.admin.catalogo.validaciones import ErrorCatalogo
 
 from app.shared.decorators import (
     login_required,
@@ -50,6 +57,31 @@ comercio_bp = Blueprint(
     "comercio",
     __name__,
 )
+
+
+# ============================================================
+# IMÁGENES PERSISTENTES DEL CATÁLOGO
+# ============================================================
+
+@comercio_bp.route("/media/catalogo/<filename>", methods=["GET"])
+def media_catalogo(filename):
+    """Sirve una imagen validada desde el volumen persistente.
+
+    ``send_from_directory`` evita salir de la carpeta configurada. Además se
+    vuelve a validar el nombre lógico para rechazar rutas anidadas o extrañas.
+    Cuando el volumen no está configurado se responde 404 y no se revela la
+    ubicación interna del servidor.
+    """
+
+    try:
+        nombre = nombre_archivo_persistente(
+            f"uploads/catalogo/{filename}"
+        )
+        carpeta = directorio_imagenes()
+    except ErrorCatalogo:
+        abort(404)
+
+    return send_from_directory(carpeta, nombre, conditional=True)
 
 
 # ============================================================

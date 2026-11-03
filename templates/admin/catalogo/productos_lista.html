@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Productos | Catálogo SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-catalog.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Productos</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <a href="{{ url_for('admin_catalogo.panel') }}" class="admin-back-link">← Volver al catálogo</a>
+
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Catálogo</span>
+                    <h1>Productos</h1>
+                    <p>Cada producto agrupa sus variantes, precios e imágenes.</p>
+                </div>
+                <a class="admin-button is-primary" href="{{ url_for('admin_catalogo.nuevo_producto') }}">Nuevo producto</a>
+            </header>
+
+            {% include "admin/catalogo/_mensajes.html" %}
+            {% include "admin/catalogo/_tabs.html" %}
+
+            <form method="GET" action="{{ url_for('admin_catalogo.productos') }}" class="admin-order-filters" role="search">
+                <label class="admin-filter-field">
+                    <span>Buscar</span>
+                    <input type="search" name="q" value="{{ busqueda }}" maxlength="120" placeholder="Nombre o slug">
+                </label>
+                <label class="admin-filter-field">
+                    <span>Categoría</span>
+                    <select name="categoria_id">
+                        <option value="">Todas</option>
+                        {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}"{% if categoria_id|string == categoria.id|string %} selected{% endif %}>{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="admin-filter-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                        <option value="">Todos</option>
+                        <option value="ACTIVO"{% if estado == 'ACTIVO' %} selected{% endif %}>Activo</option>
+                        <option value="INACTIVO"{% if estado == 'INACTIVO' %} selected{% endif %}>Inactivo</option>
+                    </select>
+                </label>
+                <div class="admin-filter-actions">
+                    <button type="submit" class="admin-button is-secondary">Filtrar</button>
+                    <a href="{{ url_for('admin_catalogo.productos') }}" class="admin-button is-ghost">Limpiar</a>
+                </div>
+            </form>
+
+            <section class="admin-order-table-card">
+                {% if productos %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th><th>Categoría</th><th>Variantes</th><th>Imágenes</th><th>Estado</th><th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for producto_fila in productos %}
+                                    <tr>
+                                        <td data-label="Producto">
+                                            <strong>{{ producto_fila.nombre }}</strong>
+                                            <span class="catalog-code">{{ producto_fila.slug }}</span>
+                                        </td>
+                                        <td data-label="Categoría">
+                                            <span>{{ producto_fila.categoria }}</span>
+                                            {% if producto_fila.categoria_estado != "ACTIVO" %}
+                                                <span class="catalog-badge is-warning">Categoría inactiva</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Variantes">
+                                            <strong>{{ producto_fila.variantes_activas }}</strong>
+                                            <span class="admin-muted">/ {{ producto_fila.total_variantes }}</span>
+                                        </td>
+                                        <td data-label="Imágenes"><span>{{ producto_fila.total_imagenes }}</span></td>
+                                        <td data-label="Estado">
+                                            <span class="catalog-badge is-{{ 'active' if producto_fila.estado == 'ACTIVO' else 'inactive' }}">{{ producto_fila.estado|capitalize }}</span>
+                                        </td>
+                                        <td data-label="Acciones">
+                                            <div class="catalog-row-actions">
+                                                <a class="admin-button is-secondary is-small" href="{{ url_for('admin_catalogo.producto', producto_id=producto_fila.producto_id) }}">Editar</a>
+                                                <a class="admin-button is-ghost is-small" href="{{ url_for('admin_catalogo.nueva_variante', producto_id=producto_fila.producto_id) }}">+ Variante</a>
+                                                <form method="POST" action="{{ url_for('admin_catalogo.estado_producto', producto_id=producto_fila.producto_id) }}" data-confirmar="¿Cambiar el estado de {{ producto_fila.nombre }}?">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="estado" value="{{ 'INACTIVO' if producto_fila.estado == 'ACTIVO' else 'ACTIVO' }}">
+                                                    <button type="submit" class="admin-button is-ghost is-small">{{ "Desactivar" if producto_fila.estado == "ACTIVO" else "Activar" }}</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="catalog-empty">No se encontraron productos con esos filtros.</p>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

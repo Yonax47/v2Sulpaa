@@ -70,7 +70,9 @@ Mis favoritos | SULPAA
                             presentacion=favorito.presentacion,
                             nombre=favorito.nombre_comercial,
                             clase="fav-bottle",
-                            alt="Kombucha SULPAA sabor " ~ (favorito.sabor or "")
+                            alt="Kombucha SULPAA sabor " ~ (favorito.sabor or ""),
+                            ruta_catalogo=favorito.imagen_ruta,
+                            alt_catalogo=favorito.imagen_alt
                         ) }}
                     </div>
 

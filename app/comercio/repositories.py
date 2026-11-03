@@ -38,6 +38,44 @@ def obtener_variantes_comerciales_tienda():
                     v.sku,
                     v.nombre_comercial,
 
+                    (
+                        SELECT ic.ruta
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_ruta,
+
+                    (
+                        SELECT ic.texto_alternativo
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_alt,
+
                     s.id AS sabor_id,
                     s.nombre AS sabor,
 
@@ -51,11 +89,16 @@ def obtener_variantes_comerciales_tienda():
 
                 FROM variantes AS v
 
+                INNER JOIN productos AS prod
+                    ON prod.id = v.producto_id
+                    AND prod.estado = 'ACTIVO'
+
                 INNER JOIN sabores AS s
                     ON s.id = v.sabor_id
 
                 INNER JOIN presentaciones AS p
                     ON p.id = v.presentacion_id
+                    AND p.estado = 'ACTIVO'
 
                 INNER JOIN articulos_venta AS av
                     ON av.variante_id = v.id
@@ -79,33 +122,30 @@ def obtener_variantes_comerciales_tienda():
                         OR pr.vigente_hasta >= NOW()
                     )
 
-                    AND s.nombre IN (
-                        'Café',
-                        'Jamaica',
-                        'Limón',
-                        'Kion'
-                    )
-
-                    AND p.nombre IN (
-                        'Botella 1 L',
-                        'Barril 30 L',
-                        'Barril 50 L'
-                    )
-
                 ORDER BY
-                    FIELD(
-                        s.nombre,
-                        'Café',
-                        'Jamaica',
-                        'Limón',
-                        'Kion'
-                    ),
-                    FIELD(
-                        p.nombre,
-                        'Botella 1 L',
-                        'Barril 30 L',
-                        'Barril 50 L'
-                    )
+                    CASE
+                        WHEN FIELD(
+                            s.nombre, 'Café', 'Jamaica', 'Limón', 'Kion'
+                        ) = 0 THEN 999
+                        ELSE FIELD(
+                            s.nombre, 'Café', 'Jamaica', 'Limón', 'Kion'
+                        )
+                    END,
+                    CASE
+                        WHEN FIELD(
+                            p.nombre,
+                            'Botella 1 L',
+                            'Barril 30 L',
+                            'Barril 50 L'
+                        ) = 0 THEN 999
+                        ELSE FIELD(
+                            p.nombre,
+                            'Botella 1 L',
+                            'Barril 30 L',
+                            'Barril 50 L'
+                        )
+                    END,
+                    p.nombre ASC
             """
 
             cursor.execute(consulta)
@@ -133,6 +173,44 @@ def obtener_variantes_330ml_tienda():
                     v.sku,
                     v.nombre_comercial,
 
+                    (
+                        SELECT ic.ruta
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_ruta,
+
+                    (
+                        SELECT ic.texto_alternativo
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_alt,
+
                     s.id AS sabor_id,
                     s.nombre AS sabor,
 
@@ -141,33 +219,33 @@ def obtener_variantes_330ml_tienda():
 
                 FROM variantes AS v
 
+                INNER JOIN productos AS prod
+                    ON prod.id = v.producto_id
+                    AND prod.estado = 'ACTIVO'
+
                 INNER JOIN sabores AS s
                     ON s.id = v.sabor_id
 
                 INNER JOIN presentaciones AS p
                     ON p.id = v.presentacion_id
+                    AND p.estado = 'ACTIVO'
 
                 WHERE
                     v.estado = 'ACTIVO'
                     AND s.estado = 'ACTIVO'
 
-                    AND s.nombre IN (
-                        'Café',
-                        'Jamaica',
-                        'Limón',
-                        'Kion'
-                    )
-
                     AND p.nombre = 'Botella 330 ml'
 
                 ORDER BY
-                    FIELD(
-                        s.nombre,
-                        'Café',
-                        'Jamaica',
-                        'Limón',
-                        'Kion'
-                    )
+                    CASE
+                        WHEN FIELD(
+                            s.nombre, 'Café', 'Jamaica', 'Limón', 'Kion'
+                        ) = 0 THEN 999
+                        ELSE FIELD(
+                            s.nombre, 'Café', 'Jamaica', 'Limón', 'Kion'
+                        )
+                    END,
+                    s.nombre ASC
             """
 
             cursor.execute(consulta)
@@ -2314,6 +2392,44 @@ def listar_favoritos_usuario(usuario_id):
                     v.sku,
                     v.nombre_comercial,
 
+                    (
+                        SELECT ic.ruta
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_ruta,
+
+                    (
+                        SELECT ic.texto_alternativo
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_alt,
+
                     s.nombre AS sabor,
                     p.nombre AS presentacion,
 
@@ -2357,11 +2473,16 @@ def listar_favoritos_usuario(usuario_id):
                     ON v.id = f.variante_id
                     AND v.estado = 'ACTIVO'
 
+                INNER JOIN productos AS prod
+                    ON prod.id = v.producto_id
+                    AND prod.estado = 'ACTIVO'
+
                 LEFT JOIN sabores AS s
                     ON s.id = v.sabor_id
 
                 LEFT JOIN presentaciones AS p
                     ON p.id = v.presentacion_id
+                    AND p.estado = 'ACTIVO'
 
                 LEFT JOIN articulos_venta AS av
                     ON av.variante_id = v.id
@@ -2588,6 +2709,44 @@ def obtener_variante_por_id(variante_id):
                     v.nombre_comercial,
                     v.peso_gramos,
 
+                    (
+                        SELECT ic.ruta
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_ruta,
+
+                    (
+                        SELECT ic.texto_alternativo
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_alt,
+
                     s.nombre AS sabor,
                     p.nombre AS presentacion,
 
@@ -2627,11 +2786,16 @@ def obtener_variante_por_id(variante_id):
 
                 FROM variantes AS v
 
+                INNER JOIN productos AS prod
+                    ON prod.id = v.producto_id
+                    AND prod.estado = 'ACTIVO'
+
                 INNER JOIN sabores AS s
                     ON s.id = v.sabor_id
 
                 INNER JOIN presentaciones AS p
                     ON p.id = v.presentacion_id
+                    AND p.estado = 'ACTIVO'
 
                 LEFT JOIN articulos_venta AS av
                     ON av.variante_id = v.id
@@ -2682,6 +2846,44 @@ def obtener_variante_por_sku(sku):
                     v.nombre_comercial,
                     v.peso_gramos,
 
+                    (
+                        SELECT ic.ruta
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_ruta,
+
+                    (
+                        SELECT ic.texto_alternativo
+                        FROM imagenes_catalogo AS ic
+                        WHERE ic.estado = 'ACTIVO'
+                          AND (
+                              ic.variante_id = v.id
+                              OR (
+                                  ic.variante_id IS NULL
+                                  AND ic.producto_id = v.producto_id
+                              )
+                          )
+                        ORDER BY
+                            CASE WHEN ic.variante_id = v.id THEN 0 ELSE 1 END,
+                            ic.es_principal DESC,
+                            ic.orden ASC,
+                            ic.creado_en ASC
+                        LIMIT 1
+                    ) AS imagen_alt,
+
                     s.nombre AS sabor,
                     p.nombre AS presentacion,
 
@@ -2721,11 +2923,16 @@ def obtener_variante_por_sku(sku):
 
                 FROM variantes AS v
 
+                INNER JOIN productos AS prod
+                    ON prod.id = v.producto_id
+                    AND prod.estado = 'ACTIVO'
+
                 INNER JOIN sabores AS s
                     ON s.id = v.sabor_id
 
                 INNER JOIN presentaciones AS p
                     ON p.id = v.presentacion_id
+                    AND p.estado = 'ACTIVO'
 
                 LEFT JOIN articulos_venta AS av
                     ON av.variante_id = v.id

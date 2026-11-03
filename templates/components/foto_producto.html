@@ -24,15 +24,18 @@ Uso:
 ============================================================
 #}
 
-{% macro foto_producto(sabor=none, presentacion=none, tipo=none, nombre=none, clase='', alt='') %}
+{% macro foto_producto(sabor=none, presentacion=none, tipo=none, nombre=none, clase='', alt='', ruta_catalogo=none, alt_catalogo=none) %}
 
-    {%- set ruta = imagen_producto(sabor, presentacion, tipo, nombre) -%}
+    {# La fuente única de Comercio decide entre la imagen administrada y el
+       respaldo estático. Este componente solo convierte la ruta en una URL. #}
+    {%- set ruta = imagen_producto(sabor, presentacion, tipo, nombre, ruta_catalogo) -%}
+    {%- set url_imagen = url_imagen_catalogo(ruta) if ruta else none -%}
 
-    {%- if ruta -%}
+    {%- if url_imagen -%}
 
         <img
-            src="{{ url_for('static', filename=ruta) }}"
-            alt="{{ alt }}"
+            src="{{ url_imagen }}"
+            alt="{{ alt_catalogo or alt }}"
             class="{{ clase }}"
             loading="lazy"
         >

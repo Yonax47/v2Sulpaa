@@ -105,6 +105,30 @@ class ResolverImagenTest(unittest.TestCase):
             resolver_imagen_producto(sabor="Piña", presentacion="Botella 750 ml")
         )
 
+    def test_imagen_administrada_tiene_prioridad_sobre_respaldo(self):
+        """Una ruta segura de la base reemplaza la foto estática anterior."""
+
+        self.assertEqual(
+            resolver_imagen_producto(
+                sabor="Café",
+                presentacion="Botella 330 ml",
+                ruta_catalogo="uploads/catalogo/nueva-cafe.webp",
+            ),
+            "uploads/catalogo/nueva-cafe.webp",
+        )
+
+    def test_ruta_externa_no_reemplaza_el_respaldo(self):
+        """El resolutor nunca entrega una URL externa recibida como dato."""
+
+        self.assertEqual(
+            resolver_imagen_producto(
+                sabor="Café",
+                presentacion="Botella 330 ml",
+                ruta_catalogo="https://example.test/peligro.webp",
+            ),
+            "img/BotellaCafe.webp",
+        )
+
 
 class PlantillasUsanLaFuenteDeVerdadTest(unittest.TestCase):
     """Ninguna plantilla debe fijar la imagen de un sabor a mano."""

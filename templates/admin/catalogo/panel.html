@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Catálogo | SULPAA{% endblock %}
+
+{% block page_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-catalog.css') }}">
+{% endblock %}
+
+{% block content %}
+<input type="checkbox" id="admin-menu-control" class="admin-menu-control" aria-hidden="true">
+<div class="admin-layout">
+    {% include "admin/components/sidebar.html" %}
+    <label for="admin-menu-control" class="admin-sidebar-backdrop" aria-label="Cerrar menú administrativo"></label>
+
+    <main class="admin-main">
+        <div class="admin-mobile-bar">
+            <label for="admin-menu-control" class="admin-menu-button" role="button" tabindex="0" aria-label="Abrir menú administrativo">
+                <span aria-hidden="true">☰</span>
+            </label>
+            <strong>Catálogo</strong>
+            <span class="admin-mobile-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="admin-content">
+            <header class="admin-page-header">
+                <div>
+                    <span class="admin-eyebrow">Comercio</span>
+                    <h1>Catálogo comercial</h1>
+                    <p>Productos, presentaciones, precios, imágenes y packs de SULPAA.</p>
+                </div>
+            </header>
+
+            {% include "admin/catalogo/_mensajes.html" %}
+            {% include "admin/catalogo/_tabs.html" %}
+
+            <section class="catalog-metrics" aria-label="Resumen del catálogo">
+                <article class="catalog-metric">
+                    <span class="catalog-metric-label">Productos activos</span>
+                    <strong class="catalog-metric-value">{{ resumen.productos_activos or 0 }}</strong>
+                    <span class="catalog-metric-hint">de {{ resumen.productos or 0 }} registrados</span>
+                </article>
+                <article class="catalog-metric">
+                    <span class="catalog-metric-label">Variantes activas</span>
+                    <strong class="catalog-metric-value">{{ resumen.variantes_activas or 0 }}</strong>
+                    <span class="catalog-metric-hint">de {{ resumen.variantes or 0 }} registradas</span>
+                </article>
+                <article class="catalog-metric">
+                    <span class="catalog-metric-label">Packs activos</span>
+                    <strong class="catalog-metric-value">{{ resumen.packs_activos or 0 }}</strong>
+                    <span class="catalog-metric-hint">de {{ resumen.packs or 0 }} registrados</span>
+                </article>
+                <article class="catalog-metric">
+                    <span class="catalog-metric-label">Precios vigentes</span>
+                    <strong class="catalog-metric-value">{{ resumen.precios_vigentes or 0 }}</strong>
+                    <span class="catalog-metric-hint">{{ resumen.variantes_sin_precio or 0 }} variantes sin precio</span>
+                </article>
+            </section>
+
+            <section class="admin-detail-grid" aria-label="Accesos rápidos">
+                <article class="admin-detail-card">
+                    <h2>Accesos rápidos</h2>
+                    <div class="catalog-quick-links">
+                        <a class="admin-button is-primary" href="{{ url_for('admin_catalogo.nuevo_producto') }}">Nuevo producto</a>
+                        <a class="admin-button is-secondary" href="{{ url_for('admin_catalogo.nueva_variante') }}">Nueva variante</a>
+                        <a class="admin-button is-secondary" href="{{ url_for('admin_catalogo.nuevo_pack') }}">Nuevo pack</a>
+                        <a class="admin-button is-secondary" href="{{ url_for('admin_catalogo.nueva_imagen') }}">Nueva imagen</a>
+                    </div>
+                    <dl class="admin-detail-list catalog-mini-summary">
+                        <div><dt>Categorías</dt><dd>{{ resumen.categorias or 0 }}</dd></div>
+                        <div><dt>Sabores</dt><dd>{{ resumen.sabores or 0 }}</dd></div>
+                        <div><dt>Presentaciones</dt><dd>{{ resumen.presentaciones or 0 }}</dd></div>
+                        <div><dt>Imágenes activas</dt><dd>{{ resumen.imagenes or 0 }}</dd></div>
+                    </dl>
+                </article>
+
+                <article class="admin-detail-card">
+                    <h2>Reglas del catálogo</h2>
+                    <ul class="catalog-rules">
+                        <li>Los precios deben ser mayores que cero y no pueden tener vigencias cruzadas.</li>
+                        <li>Una variante publicada necesita producto, sabor y presentación activos.</li>
+                        <li>Los packs no tienen stock propio: se calculan con sus componentes.</li>
+                        <li>El stock se modifica únicamente desde Inventario.</li>
+                    </ul>
+                </article>
+            </section>
+
+            <section class="admin-order-table-card" aria-label="Precios por vencer">
+                <div class="admin-section-heading admin-order-heading">
+                    <div>
+                        <span class="admin-section-kicker">Próximos 30 días</span>
+                        <h2>Precios por vencer</h2>
+                    </div>
+                </div>
+
+                {% if por_vencer %}
+                    <div class="admin-order-table-wrap">
+                        <table class="admin-order-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th><th>SKU</th><th>Monto</th><th>Vence</th><th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for precio in por_vencer %}
+                                    <tr>
+                                        <td data-label="Producto"><strong>{{ precio.nombre_comercial or "Pack" }}</strong></td>
+                                        <td data-label="SKU"><span>{{ precio.sku or "—" }}</span></td>
+                                        <td data-label="Monto"><strong>{{ precio.moneda }} {{ "%.2f"|format(precio.monto) }}</strong></td>
+                                        <td data-label="Vence"><span>{{ precio.vigente_hasta }}</span></td>
+                                        <td data-label="Acción">
+                                            {% if precio.variante_id %}
+                                                <a class="admin-button is-secondary is-small" href="{{ url_for('admin_catalogo.variante', variante_id=precio.variante_id, _anchor='precios') }}">Revisar</a>
+                                            {% else %}
+                                                <span class="admin-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="catalog-empty">No hay precios que venzan en los próximos 30 días.</p>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}
