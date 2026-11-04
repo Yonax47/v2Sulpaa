@@ -154,7 +154,7 @@
                             <span>Respaldado por verificación (opcional)</span>
                             <select name="verificacion_id">
                                 <option value="">Sin verificación</option>
-                                {% for verif in existencia.verificaciones[:5] %}
+                                {% for verif in existencia.verificaciones_ajuste|default(existencia.verificaciones[:5]) %}
                                     <option value="{{ verif.verificacion_id }}">
                                         {{ verif.codigo_verificacion or verif.verificacion_id[:8] }}
                                         · sistema {{ verif.stock_sistema }} vs conteo {{ verif.stock_fisico }}
@@ -219,11 +219,15 @@
                 {% endif %}
             </section>
 
+            {% with paginacion=existencia.paginacion_verificaciones %}
+                {% include 'admin/components/pagination.html' %}
+            {% endwith %}
+
             <section class="admin-order-table-card admin-detail-wide" id="movimientos" style="margin-top:1rem">
                 <div class="admin-section-heading admin-order-heading">
                     <div>
                         <span class="admin-section-kicker">Kardex</span>
-                        <h2>Movimientos recientes</h2>
+                        <h2>Movimientos de inventario</h2>
                     </div>
                 </div>
                 {% if existencia.movimientos %}
@@ -275,6 +279,9 @@
                 {% endif %}
             </section>
 
+            {% with paginacion=existencia.paginacion_movimientos %}
+                {% include 'admin/components/pagination.html' %}
+            {% endwith %}
         </div>
     </main>
 </div>

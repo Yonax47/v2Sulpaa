@@ -57,13 +57,20 @@ def listado():
         "origen": request.args.get("origen", ""),
         "categoria_id": request.args.get("categoria_id", ""),
     }
-    movimientos = listar_movimientos(filtros)
+    resultado = listar_movimientos(filtros, pagina=request.args.get("page", 1),
+                                  por_pagina=request.args.get("per_page", 25))
+    if isinstance(resultado, dict):
+        movimientos, paginacion = resultado["elementos"], resultado["paginacion"]
+        paginacion.update(endpoint="admin_caja.listado", filtros=filtros)
+    else:
+        movimientos, paginacion = resultado, None
     resumen = resumen_caja(filtros)
     categorias = listar_categorias()
     serie_flujo = serie_flujo_mensual()
     return render_template(
         "admin/caja/lista.html",
         movimientos=movimientos,
+        paginacion=paginacion,
         resumen=resumen,
         categorias=categorias,
         filtros=filtros,

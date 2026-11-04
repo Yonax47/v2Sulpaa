@@ -70,11 +70,14 @@ def enriquecer_detalle(detalle):
     return detalle
 
 
-def listar_repartidores():
+def listar_repartidores(pagina=None, por_pagina=25):
     """Lista la planilla real de repartidores."""
-    repartidores = _ejecutar(
-        operaciones_services.listar_repartidores_operativa
-    )
+    if pagina is None:
+        repartidores = _ejecutar(operaciones_services.listar_repartidores_operativa)
+    else:
+        resultado = _ejecutar(operaciones_services.listar_repartidores_operativa,
+                             pagina=pagina, por_pagina=por_pagina)
+        repartidores = resultado["elementos"]
     for repartidor in repartidores:
         repartidor["disponible_label"] = (
             "Disponible" if repartidor.get("disponible") else "En reparto"
@@ -82,7 +85,7 @@ def listar_repartidores():
         repartidor["estado_label"] = str(
             repartidor.get("estado") or "ACTIVO"
         ).capitalize()
-    return repartidores
+    return resultado if pagina is not None else repartidores
 
 
 def marcar_listo(actor_id, roles, entrega_id):

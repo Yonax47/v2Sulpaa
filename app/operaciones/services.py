@@ -3040,9 +3040,15 @@ def obtener_detalle_entrega_operativa(entrega_id):
         )
 
 
-def listar_repartidores_operativa():
+def listar_repartidores_operativa(pagina=None, por_pagina=25):
     """Lista la planilla real de repartidores registrados."""
     with UnidadTrabajo() as unidad:
+        if pagina is not None:
+            from app.shared.pagination import crear_paginacion
+            p = crear_paginacion(_repos.contar_repartidores(unidad.conexion, unidad.esquemas), pagina, por_pagina)
+            return {"elementos": _repos.listar_repartidores(unidad.conexion, unidad.esquemas,
+                                                          limite=p["por_pagina"], offset=p["offset"]),
+                    "paginacion": p}
         repartidores = _repos.listar_repartidores(
             unidad.conexion, unidad.esquemas
         )

@@ -2321,7 +2321,7 @@ def actualizar_disponibilidad_repartidor(conexion, esquemas, repartidor_id,
         return cursor.rowcount == 1
 
 
-def listar_repartidores(conexion, esquemas):
+def listar_repartidores(conexion, esquemas, limite=None, offset=0):
     """Lista repartidores con su identidad y carga activa."""
     operaciones = esquemas["operaciones"]
     identidad = esquemas["identidad"]
@@ -2338,11 +2338,22 @@ def listar_repartidores(conexion, esquemas):
         FROM {operaciones}.repartidores AS r
         INNER JOIN {identidad}.usuarios AS u ON u.id = r.usuario_id
         LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = r.usuario_id
-        ORDER BY r.creado_en DESC
+        ORDER BY r.creado_en DESC, r.id DESC
     """
+    params = ()
+    if limite is not None:
+        consulta += " LIMIT %s OFFSET %s"
+        params = (int(limite), int(offset))
     with conexion.cursor() as cursor:
-        cursor.execute(consulta)
+        cursor.execute(consulta, params)
         return cursor.fetchall()
+
+
+def contar_repartidores(conexion, esquemas):
+    with conexion.cursor() as cursor:
+        cursor.execute(f"SELECT COUNT(*) AS total FROM {esquemas['operaciones']}.repartidores r "
+                       f"INNER JOIN {esquemas['identidad']}.usuarios u ON u.id=r.usuario_id")
+        return cursor.fetchone()["total"]
 
 
 def obtener_repartidor_activo(conexion, esquemas, repartidor_id):

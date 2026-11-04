@@ -17,6 +17,7 @@ from datetime import datetime
 from app.admin.caja import repositories as repos
 from app.operaciones import repositories as repos_operaciones_mov
 from app.shared.unit_of_work import esquemas_sulpaa
+from app.shared.pagination import crear_paginacion
 
 ROLES_CAJA = ("GERENTE", "ADMINISTRADOR")
 _MONEDA = "PEN"
@@ -122,9 +123,14 @@ def anular_movimiento(actor_id, roles, movimiento_id, motivo):
     return {"ok": True, "estado": "ANULADO"}
 
 
-def listar_movimientos(filtros=None):
+def listar_movimientos(filtros=None, pagina=None, por_pagina=25):
     """Lista movimientos con filtros validados por tipo/origen."""
     filtros = filtros or {}
+    if pagina is not None:
+        filtros_sql = {k: filtros.get(k) or None for k in ("desde", "hasta", "tipo", "origen", "categoria_id")}
+        p = crear_paginacion(repos.contar_movimientos(**filtros_sql), pagina, por_pagina)
+        return {"elementos": repos.listar_movimientos(**filtros_sql, limite=p["por_pagina"], offset=p["offset"]),
+                "paginacion": p}
     return repos.listar_movimientos(
         desde=filtros.get("desde") or None,
         hasta=filtros.get("hasta") or None,

@@ -107,13 +107,20 @@ def listado():
 def repartidores():
     """Muestra la planilla real de repartidores registrados."""
     planilla = []
+    paginacion = None
     try:
-        planilla = listar_repartidores()
+        planilla = listar_repartidores(pagina=request.args.get("page", 1),
+                                      por_pagina=request.args.get("per_page", 25))
+        if isinstance(planilla, dict):
+            paginacion = planilla["paginacion"]
+            planilla = planilla["elementos"]
+            paginacion.update(endpoint="admin_entregas.repartidores", filtros={})
     except ReglaEntregaError as error:
         flash(str(error), "danger")
     return render_template(
         "admin/entregas/repartidores.html",
         repartidores=planilla,
+        paginacion=paginacion,
     )
 
 

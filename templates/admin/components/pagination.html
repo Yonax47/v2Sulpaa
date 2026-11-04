@@ -5,10 +5,14 @@
         </span>
         <div class="admin-pagination-actions">
             {% if paginacion.tiene_anterior %}
-                <a class="admin-button is-secondary" rel="prev" href="{{ url_for(paginacion.endpoint, page=paginacion.pagina-1, per_page=paginacion.por_pagina, **paginacion.filtros) }}">Anterior</a>
+                {% set args = dict(paginacion.filtros) %}
+                {% set _ = args.update({paginacion.parametro|default('page'): paginacion.pagina-1, 'per_page': paginacion.por_pagina}) %}
+                <a class="admin-button is-secondary" rel="prev" href="{{ url_for(paginacion.endpoint, **args) }}">Anterior</a>
             {% endif %}
             {% if paginacion.tiene_siguiente %}
-                <a class="admin-button is-secondary" rel="next" href="{{ url_for(paginacion.endpoint, page=paginacion.pagina+1, per_page=paginacion.por_pagina, **paginacion.filtros) }}">Siguiente</a>
+                {% set args = dict(paginacion.filtros) %}
+                {% set _ = args.update({paginacion.parametro|default('page'): paginacion.pagina+1, 'per_page': paginacion.por_pagina}) %}
+                <a class="admin-button is-secondary" rel="next" href="{{ url_for(paginacion.endpoint, **args) }}">Siguiente</a>
             {% endif %}
         </div>
     </nav>

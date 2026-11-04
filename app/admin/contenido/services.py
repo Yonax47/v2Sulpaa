@@ -90,11 +90,17 @@ def _normalizar_resumen(resumen):
     return resumen[:500] or None
 
 
-def listar_para_admin(roles, estado=None):
+def listar_para_admin(roles, estado=None, pagina=None, por_pagina=25):
     """Lista el contenido educativo con su estado de publicación."""
     _validar_acceso(roles)
     if estado not in (None, "BORRADOR", "PUBLICADO"):
         raise ErrorContenido("El estado indicado no es válido.")
+    if pagina is not None:
+        from app.admin.contenido.repositories import contar_contenidos
+        from app.shared.pagination import crear_paginacion
+        p = crear_paginacion(contar_contenidos(estado), pagina, por_pagina)
+        return {"elementos": listar_contenidos(estado=estado, limite=p["por_pagina"], offset=p["offset"]),
+                "paginacion": p}
     return listar_contenidos(estado=estado)
 
 

@@ -22,6 +22,7 @@ import logging
 
 from app.admin.inventario.repositories import (
     contar_existencias_detalladas,
+    contar_historial_existencia,
     listar_existencias_detalladas,
     obtener_existencia_detalle,
     listar_movimientos,
@@ -86,7 +87,8 @@ def listar_existencias(roles, busqueda=None, solo_bajo_minimo=False,
     return {"elementos": elementos, "paginacion": paginacion}
 
 
-def obtener_detalle_existencia(roles, existencia_id):
+def obtener_detalle_existencia(roles, existencia_id, pagina_movimientos=None,
+                              pagina_verificaciones=None, por_pagina=25):
     """Devuelve el detalle completo de una existencia con permisos."""
     if not _puede_leer(roles):
         raise ErrorInventario(
@@ -95,8 +97,21 @@ def obtener_detalle_existencia(roles, existencia_id):
     detalle = obtener_existencia_detalle(existencia_id)
     if not detalle:
         return None
-    detalle["movimientos"] = listar_movimientos(existencia_id)
-    detalle["verificaciones"] = listar_verificaciones(existencia_id)
+    for tipo, pagina, listar in (
+        ("movimientos", pagina_movimientos, listar_movimientos),
+        ("verificaciones", pagina_verificaciones, listar_verificaciones),
+    ):
+        if pagina is None:
+            detalle[tipo] = listar(existencia_id)
+        else:
+            p = crear_paginacion(contar_historial_existencia(existencia_id, tipo), pagina, por_pagina)
+            detalle[tipo] = listar(existencia_id, limite=p["por_pagina"], offset=p["offset"])
+            detalle["paginacion_" + tipo] = p
+    # El selector del formulario no debe depender de la página del historial.
+    if detalle.get("paginacion_verificaciones", {}).get("pagina", 1) > 1:
+        detalle["verificaciones_ajuste"] = listar_verificaciones(existencia_id, limite=5)
+    else:
+        detalle["verificaciones_ajuste"] = detalle["verificaciones"][:5]
     detalle["motivos_entrada"] = listar_motivos_activos()
     return detalle
 

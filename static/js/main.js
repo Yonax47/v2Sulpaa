@@ -114,6 +114,11 @@
         }
 
         const tipoNormalizado = normalizarTipo(tipo);
+        const repetido = Array.from(document.querySelectorAll("[data-toast]")).find(
+            (item) => item.dataset.toastType === tipoNormalizado &&
+                item.querySelector("p")?.textContent === texto
+        );
+        if (repetido) { return repetido; }
         const configuracion = opciones || {};
         const toast = document.createElement("div");
         toast.className = "sulpaa-toast is-" + tipoNormalizado;

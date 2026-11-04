@@ -84,6 +84,9 @@ Este archivo solo mejora la experiencia del usuario.
     let temporizadorToast = null;
 
     function mostrarToast(mensaje, tipo = "success") {
+        if (window.SulpaaToast && window.SulpaaToast.show !== mostrarToast) {
+            return window.SulpaaToast.show(mensaje, tipo);
+        }
         let toast = document.querySelector("[data-store-toast]");
 
         if (!toast) {
@@ -109,7 +112,9 @@ Este archivo solo mejora la experiencia del usuario.
         }, 3500);
     }
 
-    window.SulpaaToast = { show: mostrarToast };
+    if (!window.SulpaaToast) {
+        window.SulpaaToast = { show: mostrarToast };
+    }
 
 
     // ========================================================

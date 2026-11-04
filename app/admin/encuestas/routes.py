@@ -50,11 +50,20 @@ def listado():
         "desde": request.args.get("desde", ""),
         "hasta": request.args.get("hasta", ""),
     }
-    encuestas = listar_encuestas(filtros)
+    encuestas = listar_encuestas(
+        filtros, pagina=request.args.get("page", 1),
+        por_pagina=request.args.get("per_page", 25),
+    )
+    paginacion = None
+    if isinstance(encuestas, dict):
+        paginacion = encuestas["paginacion"]
+        encuestas = encuestas["elementos"]
+        paginacion.update(endpoint="admin_encuestas.listado", filtros=filtros)
     estadisticas = estadisticas_encuestas(encuestas)
     return render_template(
         "admin/encuestas/lista.html",
         encuestas=encuestas,
+        paginacion=paginacion,
         filtros=filtros,
         estadisticas=estadisticas,
     )

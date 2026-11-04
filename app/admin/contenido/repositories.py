@@ -53,7 +53,7 @@ def validar_tipo_contenido(tipo):
 # LISTADOS
 # ============================================================
 
-def listar_contenidos(estado=None):
+def listar_contenidos(estado=None, limite=None, offset=0):
     """
     Lista el contenido educativo, opcionalmente filtrado por estado.
 
@@ -108,8 +108,12 @@ def listar_contenidos(estado=None):
         ORDER BY
             ce.estado DESC,
             COALESCE(ce.orden, 99999) ASC,
-            ce.creado_en DESC
+            ce.creado_en DESC, ce.id DESC
     """
+
+    if limite is not None:
+        consulta += " LIMIT %s OFFSET %s"
+        parametros.extend((int(limite), int(offset)))
 
     conexion = conexion_comercio()
 
@@ -117,6 +121,19 @@ def listar_contenidos(estado=None):
         with conexion.cursor() as cursor:
             cursor.execute(consulta, tuple(parametros))
             return cursor.fetchall()
+    finally:
+        conexion.close()
+
+
+def contar_contenidos(estado=None):
+    conexion = conexion_comercio()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM contenido_educativo" +
+                (" WHERE estado = %s" if estado else ""), (estado,) if estado else (),
+            )
+            return cursor.fetchone()["total"]
     finally:
         conexion.close()
 

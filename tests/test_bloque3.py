@@ -784,6 +784,15 @@ class ServicioFavoritosTest(unittest.TestCase):
 # ============================================================
 
 class KPIDashboardBloque3Test(unittest.TestCase):
+    def setUp(self):
+        # Métricas agregadas después del bloque 3: estos tests deben seguir
+        # siendo unitarios y no consultar la BD que encuentre el entorno.
+        for nombre in ('obtener_metrica_kpi09', 'obtener_metrica_reportes',
+                       'obtener_metrica_programacion_entregas'):
+            parche = patch('app.admin.services.' + nombre, return_value={'disponible': False})
+            parche.start()
+            self.addCleanup(parche.stop)
+
 
     def test_dashboard_incluye_catalogo_funcional_completo(self):
         resumen = {}

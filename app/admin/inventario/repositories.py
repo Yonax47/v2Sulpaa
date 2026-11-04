@@ -264,7 +264,7 @@ def obtener_existencia_por_variante(variante_id, almacen_id=None):
 # HISTÓRICO DE MOVIMIENTOS
 # ============================================================
 
-def listar_movimientos(existencia_id, limite=20):
+def listar_movimientos(existencia_id, limite=20, offset=0):
     """
     Lista los movimientos recientes de una existencia.
 
@@ -308,7 +308,7 @@ def listar_movimientos(existencia_id, limite=20):
                 WHERE ex.id = %s
             )
         ORDER BY mv.creado_en DESC, mv.id DESC
-        LIMIT %s
+        LIMIT %s OFFSET %s
     """
 
     conexion = conexion_inventario()
@@ -317,14 +317,14 @@ def listar_movimientos(existencia_id, limite=20):
         with conexion.cursor() as cursor:
             cursor.execute(
                 consulta,
-                (existencia_id, existencia_id, int(limite)),
+                (existencia_id, existencia_id, int(limite), int(offset)),
             )
             return cursor.fetchall()
     finally:
         conexion.close()
 
 
-def listar_verificaciones(existencia_id, limite=10):
+def listar_verificaciones(existencia_id, limite=10, offset=0):
     """
     Lista las verificaciones físicas recientes de una existencia.
     """
@@ -350,8 +350,8 @@ def listar_verificaciones(existencia_id, limite=10):
         LEFT JOIN {identidad}.usuarios AS us
             ON us.id = vf.usuario_responsable_id
         WHERE ex.id = %s
-        ORDER BY vf.creado_en DESC
-        LIMIT %s
+        ORDER BY vf.creado_en DESC, vf.id DESC
+        LIMIT %s OFFSET %s
     """
 
     conexion = conexion_inventario()
@@ -360,7 +360,7 @@ def listar_verificaciones(existencia_id, limite=10):
         with conexion.cursor() as cursor:
             cursor.execute(
                 consulta,
-                (existencia_id, int(limite)),
+                (existencia_id, int(limite), int(offset)),
             )
             return cursor.fetchall()
     finally:
@@ -370,6 +370,23 @@ def listar_verificaciones(existencia_id, limite=10):
 # ============================================================
 # MOTIVOS DE MOVIMIENTO
 # ============================================================
+
+def contar_historial_existencia(existencia_id, tipo):
+    if tipo not in {"movimientos", "verificaciones"}:
+        raise ValueError("Historial no permitido")
+    tabla = "movimientos_inventario" if tipo == "movimientos" else "verificaciones_fisicas"
+    conexion = conexion_inventario()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM {tabla} h INNER JOIN existencias ex "
+                "ON ex.almacen_id=h.almacen_id AND ex.variante_id=h.variante_id WHERE ex.id=%s",
+                (existencia_id,),
+            )
+            return cursor.fetchone()["total"]
+    finally:
+        conexion.close()
+
 
 def listar_motivos_activos():
     """Lista los motivos ACTIVOS del dominio (catálogo real)."""

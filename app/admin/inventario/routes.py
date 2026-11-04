@@ -90,13 +90,23 @@ def detalle(existencia_id):
     """Muestra el detalle de una existencia, movimientos y verificaciones."""
     try:
         detalle = obtener_detalle_existencia(
-            session.get("roles"), existencia_id
+            session.get("roles"), existencia_id,
+            pagina_movimientos=request.args.get("mov_page", 1),
+            pagina_verificaciones=request.args.get("ver_page", 1),
+            por_pagina=request.args.get("per_page", 25),
         )
     except ErrorInventario as error:
         flash(str(error), "danger")
         return redirect(url_for("admin_inventario.listado"))
     if not detalle:
         abort(404)
+    for tipo, parametro, otro in (("movimientos", "mov_page", "ver_page"),
+                                  ("verificaciones", "ver_page", "mov_page")):
+        if detalle.get("paginacion_" + tipo):
+            detalle["paginacion_" + tipo].update(
+                endpoint="admin_inventario.detalle", parametro=parametro,
+                filtros={"existencia_id": existencia_id, otro: request.args.get(otro, 1)},
+            )
     return render_template(
         "admin/inventario/detalle.html",
         existencia=detalle,

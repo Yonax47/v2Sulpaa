@@ -314,14 +314,33 @@ def responder_encuesta(token, datos):
 # ADMINISTRACIÓN DE ENCUESTAS
 # ============================================================
 
-def listar_encuestas(filtros=None):
-    """Lista encuestas para el panel administrativo."""
+def listar_encuestas(filtros=None, pagina=None, por_pagina=25):
+    """Lista encuestas para el panel administrativo.
+
+    Sin ``pagina`` conserva la interfaz histórica (lista). Con ``pagina``
+    devuelve el contrato paginado usado por los listados administrativos.
+    """
     filtros = filtros or {}
-    return repos.listar_encuestas(
-        estado=filtros.get("estado") or None,
-        desde=filtros.get("desde") or None,
-        hasta=filtros.get("hasta") or None,
-    )
+    criterios = {
+        "estado": filtros.get("estado") or None,
+        "desde": filtros.get("desde") or None,
+        "hasta": filtros.get("hasta") or None,
+    }
+    if pagina is not None:
+        from app.shared.pagination import crear_paginacion
+
+        paginacion = crear_paginacion(
+            repos.contar_encuestas(**criterios), pagina, por_pagina,
+            filtros=criterios,
+        )
+        return {
+            "elementos": repos.listar_encuestas(
+                **criterios, limite=paginacion["por_pagina"],
+                offset=paginacion["offset"],
+            ),
+            "paginacion": paginacion,
+        }
+    return repos.listar_encuestas(**criterios)
 
 
 def obtener_detalle_encuesta(encuesta_id):

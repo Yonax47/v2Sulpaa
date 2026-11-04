@@ -73,6 +73,7 @@ from app.shared.unit_of_work import (
 from app.shared.email.repositories import insertar_confirmacion_pedido
 from app.config.database import cerrar_conexiones_solicitud
 from app.config.email import eventos_pedido_habilitados
+from app.comercio.visibilidad import filtrar_presentacion_tienda
 
 from app.operaciones.repositories import (
     obtener_pago_pedido,
@@ -1571,7 +1572,7 @@ def obtener_datos_tienda():
         sorted(variantes_disponibilidad)
     )
 
-    return {
+    return filtrar_presentacion_tienda({
         "catalogo":
             obtener_catalogo_tienda(
                 productos=productos,
@@ -1600,7 +1601,7 @@ def obtener_datos_tienda():
                 variantes_330=variantes_330,
                 disponibilidad=disponibilidad,
             ),
-    }
+    })
 
 # ============================================================
 # 13. BUSCAR DETALLE DEL CARRITO DEL USUARIO

@@ -84,6 +84,7 @@ from app.config.testing import configurar_seguridad_pruebas
 from app.config.security import configurar_seguridad_accesos
 from app.config.email import configurar_email
 from app.config.apisperu import configurar_apisperu
+from app.shared.assets import registrar_versionado_assets
 
 from app.config.database import cerrar_conexiones_solicitud
 
@@ -138,6 +139,7 @@ def create_app():
     # Solo carga configuración. No envía correos ni procesa el outbox.
     configurar_email(app)
     configurar_apisperu(app)
+    registrar_versionado_assets(app)
 
 
     # ========================================================

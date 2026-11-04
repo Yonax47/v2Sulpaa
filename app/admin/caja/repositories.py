@@ -147,7 +147,7 @@ def anular_movimiento(movimiento_id, actor_id, motivo):
 
 
 def listar_movimientos(desde=None, hasta=None, tipo=None, origen=None,
-                       categoria_id=None, limite=300):
+                       categoria_id=None, limite=300, offset=0):
     """Lista movimientos enriquecidos (categoría y método de pago)."""
     conexion = conexion_operaciones()
     try:
@@ -185,11 +185,35 @@ def listar_movimientos(desde=None, hasta=None, tipo=None, origen=None,
                 LEFT JOIN metodos_pago AS mp ON mp.id = m.metodo_pago_id
                 {condicion}
                 ORDER BY m.fecha_movimiento DESC, m.id DESC
-                LIMIT %s
+                LIMIT %s OFFSET %s
                 """,
-                parametros + [limite],
+                parametros + [int(limite), int(offset)],
             )
             return cursor.fetchall()
+    finally:
+        conexion.close()
+
+
+def contar_movimientos(desde=None, hasta=None, tipo=None, origen=None, categoria_id=None):
+    condiciones, params = [], []
+    for valor, condicion in (
+        (desde, "m.fecha_movimiento >= %s"),
+        (hasta, "m.fecha_movimiento < DATE_ADD(%s, INTERVAL 1 DAY)"),
+        (tipo, "m.tipo = %s"), (origen, "m.origen = %s"),
+        (categoria_id, "m.categoria_id = %s"),
+    ):
+        if valor:
+            condiciones.append(condicion)
+            params.append(valor)
+    where = " WHERE " + " AND ".join(condiciones) if condiciones else ""
+    conexion = conexion_operaciones()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM caja_movimientos m "
+                "INNER JOIN caja_categorias c ON c.id=m.categoria_id" + where, params
+            )
+            return cursor.fetchone()["total"]
     finally:
         conexion.close()
 

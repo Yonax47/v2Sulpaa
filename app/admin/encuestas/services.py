@@ -17,14 +17,14 @@ from app.encuestas.services import (
 ROLES_ENCUESTAS_ADMIN = ROLES_ENCUESTAS
 
 
-def listar_encuestas(filtros=None):
+def listar_encuestas(filtros=None, pagina=None, por_pagina=25):
     """Lista encuestas con filtros de estado y período."""
     filtros = filtros or {}
     return listar_del_dominio({
         "estado": filtros.get("estado"),
         "desde": filtros.get("desde"),
         "hasta": filtros.get("hasta"),
-    })
+    }, pagina=pagina, por_pagina=por_pagina)
 
 
 def estadisticas_encuestas(encuestas):

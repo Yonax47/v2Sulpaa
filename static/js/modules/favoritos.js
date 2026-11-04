@@ -12,6 +12,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let toastTimer = null;
 
     function showMessage(message, type = "success") {
+        if (window.SulpaaToast) {
+            return window.SulpaaToast.show(message, type);
+        }
         let toast = document.querySelector("[data-store-toast]");
 
         if (!toast) {

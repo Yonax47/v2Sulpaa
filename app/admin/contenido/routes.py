@@ -66,16 +66,24 @@ def listado():
         estado = ""
     try:
         contenidos = listar_para_admin(
-            session.get("roles"), estado=estado or None
+            session.get("roles"), estado=estado or None,
+            pagina=request.args.get("page", 1), por_pagina=request.args.get("per_page", 25),
         )
+        paginacion = None
+        if isinstance(contenidos, dict):
+            paginacion = contenidos["paginacion"]
+            contenidos = contenidos["elementos"]
+            paginacion.update(endpoint="admin_contenido.listado", filtros={"estado": estado})
         for contenido in contenidos:
             contenido["tipo_label"] = etiqueta_tipo(contenido["tipo"])
     except ErrorContenido as error:
         flash(str(error), "danger")
         contenidos = []
+        paginacion = None
     return render_template(
         "admin/contenido/lista.html",
         contenidos=contenidos,
+        paginacion=paginacion,
         estado=estado,
         tipos=TIPOS_CONTENIDO,
     )

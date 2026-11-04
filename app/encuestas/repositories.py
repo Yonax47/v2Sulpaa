@@ -219,7 +219,7 @@ def existe_respuesta(conexion, esquemas, encuesta_id):
 # ============================================================
 
 def listar_encuestas(esquemas=None, estado=None, desde=None, hasta=None,
-                     limite=200):
+                     limite=200, offset=0):
     """Lista encuestas con número de pedido y calificación respondida."""
     from app.shared.unit_of_work import esquemas_sulpaa
     from app.config.database import conexion_operaciones
@@ -257,12 +257,44 @@ def listar_encuestas(esquemas=None, estado=None, desde=None, hasta=None,
                 LEFT JOIN {operaciones}.encuesta_respuestas AS r
                     ON r.encuesta_id = e.id
                 {condicion}
-                ORDER BY e.creado_en DESC
-                LIMIT %s
+                ORDER BY e.creado_en DESC, e.id DESC
+                LIMIT %s OFFSET %s
                 """
             )
-            cursor.execute(consulta, parametros + [limite])
+            cursor.execute(consulta, parametros + [int(limite), int(offset)])
             return cursor.fetchall()
+    finally:
+        conexion.close()
+
+
+def contar_encuestas(esquemas=None, estado=None, desde=None, hasta=None):
+    """Cuenta las encuestas filtradas para la paginación administrativa."""
+    from app.shared.unit_of_work import esquemas_sulpaa
+    from app.config.database import conexion_operaciones
+
+    esquemas = esquemas or esquemas_sulpaa()
+    operaciones = esquemas["operaciones"]
+
+    where, parametros = [], []
+    if estado:
+        where.append("estado = %s")
+        parametros.append(estado)
+    if desde:
+        where.append("creado_en >= %s")
+        parametros.append(desde)
+    if hasta:
+        where.append("creado_en < DATE_ADD(%s, INTERVAL 1 DAY)")
+        parametros.append(hasta)
+    condicion = ((" WHERE " + " AND ".join(where)) if where else "")
+
+    conexion = conexion_operaciones()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM {operaciones}.encuestas" + condicion,
+                parametros,
+            )
+            return cursor.fetchone()["total"]
     finally:
         conexion.close()
 
