@@ -101,6 +101,12 @@ confiables. Si el contador habilitado falla, no se llama al proveedor.
 
 ## Bloqueos observados en esta ejecución
 
+**Actualización posterior:** ya se confirmó acceso MariaDB por TLS en solo
+lectura y se localizaron los cuatro respaldos; recuperación aún no probada.
+Se corrigió localmente 004 para `roles.id SMALLINT UNSIGNED AUTO_INCREMENT`.
+Consultar `docs/alwaysdata_prechecks_confirmados.md` y el paquete SQL exacto
+allí indicado. Railway sigue sin acceso CLI autenticado; no se aplicó SQL.
+
 No hay clientes `mariadb-dump`/`mysqldump` ni CLI Railway/GitHub disponibles.
 No se detectaron tokens Railway en entorno/.env. Solo se comprobó presencia de
 variables de conexión, sin revelar valores ni conectar al servidor. No se
