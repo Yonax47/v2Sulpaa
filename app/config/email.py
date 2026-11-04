@@ -5,6 +5,16 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet
+from flask import current_app, has_app_context
+
+
+def verificacion_correo_requerida():
+    """Política backend; conserva el modo original fuera de una app de prueba."""
+    return not has_app_context() or current_app.config.get("EMAIL_VERIFICATION_REQUIRED", True)
+
+
+def eventos_pedido_habilitados():
+    return has_app_context() and bool(current_app.config.get("MAIL_ENABLED"))
 
 
 def _booleano(nombre, predeterminado=False):
@@ -55,6 +65,7 @@ def configurar_email(app):
 
     enabled = _booleano("MAIL_ENABLED", False)
     app.config.update(
+        EMAIL_VERIFICATION_REQUIRED=_booleano("EMAIL_VERIFICATION_REQUIRED", True),
         MAIL_ENABLED=enabled,
         RESEND_API_KEY=str(os.getenv("RESEND_API_KEY") or "").strip(),
         MAIL_FROM=str(os.getenv("MAIL_FROM") or "").strip(),

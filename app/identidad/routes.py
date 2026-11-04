@@ -30,6 +30,8 @@ from flask import (
     url_for,
     jsonify,
     make_response,
+    current_app,
+    abort,
 )
 
 from app.shared.decorators import (
@@ -177,6 +179,9 @@ def registro():
         # ----------------------------------------------------
 
         if resultado["ok"]:
+            if not current_app.config.get("EMAIL_VERIFICATION_REQUIRED", True):
+                flash("Cuenta creada correctamente. Ahora puedes iniciar sesión.", "success")
+                return redirect(url_for("identidad.login"))
             session["registro_correo_pendiente"] = True
             return redirect(
                 url_for("identidad.verificacion_pendiente")
@@ -477,6 +482,8 @@ def login():
 
 @identidad_bp.route("/verificacion/pendiente", methods=["GET"])
 def verificacion_pendiente():
+    if not current_app.config.get("EMAIL_VERIFICATION_REQUIRED", True):
+        abort(404)
     respuesta = make_response(render_template(
         "auth/verificacion_pendiente.html",
         autenticado=bool(session.get("autenticado")),
@@ -489,6 +496,8 @@ def verificacion_pendiente():
 
 @identidad_bp.route("/verificacion/reenviar", methods=["POST"])
 def reenviar_verificacion():
+    if not current_app.config.get("EMAIL_VERIFICATION_REQUIRED", True):
+        abort(404)
     correo = (
         session.get("correo")
         if session.get("autenticado")
@@ -501,6 +510,8 @@ def reenviar_verificacion():
 
 @identidad_bp.route("/verificacion", methods=["GET", "POST"])
 def verificar_correo():
+    if not current_app.config.get("EMAIL_VERIFICATION_REQUIRED", True):
+        abort(404)
     if request.method == "POST":
         token = request.form.get("token", "")
         resultado = confirmar_correo(token)

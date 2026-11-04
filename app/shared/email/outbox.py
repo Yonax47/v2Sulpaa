@@ -15,6 +15,7 @@ from app.shared.email.repositories import (
 )
 from app.shared.email.resend import ResendProvider
 from app.shared.email.templates import render_email
+from app.config.email import verificacion_correo_requerida
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ def _backoff(intentos):
 
 
 def _preparar_datos(fila):
+    if fila["plantilla"] == "verificacion_correo" and not verificacion_correo_requerida():
+        raise ValueError("Verificación de correo desactivada")
     datos = json.loads(fila["datos_json"])
     if not isinstance(datos, dict):
         raise ValueError("datos_json inválido")

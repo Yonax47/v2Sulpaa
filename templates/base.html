@@ -78,7 +78,7 @@
 
     {% include "components/flash_messages.html" %}
 
-    {% if session.get('autenticado') and not session.get('correo_verificado') %}
+    {% if config.EMAIL_VERIFICATION_REQUIRED and session.get('autenticado') and not session.get('correo_verificado') %}
     <aside class="email-verification-banner" role="status">
         <span>{% if session.get('requiere_verificacion_correo') %}Verifica tu correo antes de confirmar compras.{% else %}Tu correo aún no está verificado.{% endif %}</span>
         <a href="{{ url_for('identidad.verificacion_pendiente') }}">Revisar estado</a>

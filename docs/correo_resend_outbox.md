@@ -1,5 +1,14 @@
 # Correo transaccional SULPAA — Resend y outbox
 
+## Modo inicial sin correo
+
+Con `EMAIL_VERIFICATION_REQUIRED=0` no se exige correo, no se crean solicitudes,
+tokens ni eventos de verificación y sus endpoints quedan desactivados. Con
+`MAIL_ENABLED=0` tampoco se encolan correos de pedidos. Registro/checkout no
+necesitan claves Fernet en ese modo. No se marca a nadie como verificado.
+Consultar `docs/despliegue_sin_correo.md`; el resto de esta guía describe la
+activación futura con EMAIL_VERIFICATION_REQUIRED=1 y Resend configurado.
+
 > Fase 4.4 preparada localmente. Ninguna migración, variable, dominio, cron o
 > envío real ha sido activado.
 

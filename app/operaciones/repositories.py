@@ -13,6 +13,7 @@ Reglas de arquitectura:
 
 from app.config.database import conexion_operaciones, nombre_esquema
 from app.identidad.email_repositories import insertar_solicitud
+from app.config.email import verificacion_correo_requerida
 import uuid
 
 
@@ -2736,6 +2737,8 @@ def crear_usuario_perfil(conexion, esquemas, usuario_id, perfil_id, correo,
                          apellido_materno, dni, telefono,
                          verificacion_correo=None):
     """Crea el usuario y su perfil dentro de la transacción recibida."""
+    if not verificacion_correo_requerida():
+        verificacion_correo = None
     identidad = esquemas["identidad"]
     with conexion.cursor() as cursor:
         cursor.execute(
@@ -2743,9 +2746,9 @@ def crear_usuario_perfil(conexion, esquemas, usuario_id, perfil_id, correo,
             INSERT INTO {identidad}.usuarios
                 (id, correo, password_hash, estado, correo_verificado,
                  requiere_verificacion_correo)
-            VALUES (%s, %s, %s, 'ACTIVO', 0, 1)
+            VALUES (%s, %s, %s, 'ACTIVO', 0, %s)
             """,
-            (usuario_id, correo, password_hash),
+            (usuario_id, correo, password_hash, bool(verificacion_correo)),
         )
         cursor.execute(
             f"""
@@ -2757,12 +2760,13 @@ def crear_usuario_perfil(conexion, esquemas, usuario_id, perfil_id, correo,
             (perfil_id, usuario_id, nombres, apellido_paterno,
              apellido_materno, dni, telefono),
         )
-        if not verificacion_correo:
+        if verificacion_correo_requerida() and not verificacion_correo:
             raise RuntimeError(
                 "El repartidor nuevo requiere una solicitud de correo."
             )
-        conexion.select_db(identidad)
-        insertar_solicitud(cursor, verificacion_correo)
+        if verificacion_correo:
+            conexion.select_db(identidad)
+            insertar_solicitud(cursor, verificacion_correo)
         return True
 
 

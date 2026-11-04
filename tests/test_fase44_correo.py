@@ -547,7 +547,7 @@ class CheckoutCorreoTest(unittest.TestCase):
     def test_compra_encola_evento_sin_contactar_proveedor(self):
         conexion = self.Conexion()
         entrega = {"ok": True, "direccion_entrega": "Dirección sintética"}
-        with patch.object(
+        with patch.object(comercio_services, "eventos_pedido_habilitados", return_value=True), patch.object(
             comercio_services, "reservar_stock_pedido", return_value={"ok": True}
         ), patch.object(
             comercio_services, "crear_pedido", return_value={"ok": True}

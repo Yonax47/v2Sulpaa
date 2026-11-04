@@ -177,7 +177,7 @@ def registrar_usuario(
         "ok": True,
         "mensaje": "Usuario registrado correctamente.",
         "usuario_id": usuario_id,
-        "correo_pendiente": True,
+        "correo_pendiente": bool(solicitud_correo),
     }
 
 

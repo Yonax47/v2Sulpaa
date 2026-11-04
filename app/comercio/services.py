@@ -72,6 +72,7 @@ from app.shared.unit_of_work import (
 )
 from app.shared.email.repositories import insertar_confirmacion_pedido
 from app.config.database import cerrar_conexiones_solicitud
+from app.config.email import eventos_pedido_habilitados
 
 from app.operaciones.repositories import (
     obtener_pago_pedido,
@@ -2632,17 +2633,18 @@ def _checkout_escrituras(
     # -------- Identidad: outbox de confirmación ------
     # Se inserta antes del commit de la UnidadTrabajo y no contacta Resend.
     # La clave única PEDIDO_CONFIRMADO:<id> evita eventos duplicados.
-    conexion.select_db(esquemas["identidad"])
-    with conexion.cursor() as cursor:
-        insertar_confirmacion_pedido(
-            cursor,
-            pedido_id=pedido_id,
-            numero_pedido=numero_pedido,
-            usuario_id=usuario_id,
-            items=items,
-            total=total,
-            fecha=datetime.now().strftime("%d/%m/%Y %H:%M"),
-        )
+    if eventos_pedido_habilitados():
+        conexion.select_db(esquemas["identidad"])
+        with conexion.cursor() as cursor:
+            insertar_confirmacion_pedido(
+                cursor,
+                pedido_id=pedido_id,
+                numero_pedido=numero_pedido,
+                usuario_id=usuario_id,
+                items=items,
+                total=total,
+                fecha=datetime.now().strftime("%d/%m/%Y %H:%M"),
+            )
 
     return {
         "ok": True,

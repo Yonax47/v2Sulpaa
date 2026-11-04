@@ -15,6 +15,7 @@ import uuid
 
 from app.config.database import conexion_identidad
 from app.identidad.email_repositories import insertar_solicitud
+from app.config.email import verificacion_correo_requerida
 
 
 def _nuevo_uuid():
@@ -244,6 +245,8 @@ def crear_usuario_con_roles(
 
     Si cualquiera de las inserciones falla, ninguna queda registrada.
     """
+    if not verificacion_correo_requerida():
+        verificacion_correo = None
     conexion = conexion_identidad()
     try:
         with conexion.cursor() as cursor:
@@ -253,9 +256,9 @@ def crear_usuario_con_roles(
                     id, correo, password_hash, estado, correo_verificado,
                     requiere_verificacion_correo
                 )
-                VALUES (%s, %s, %s, 'ACTIVO', FALSE, TRUE)
+                VALUES (%s, %s, %s, 'ACTIVO', FALSE, %s)
                 """,
-                (usuario_id, correo, password_hash),
+                (usuario_id, correo, password_hash, bool(verificacion_correo)),
             )
 
             cursor.execute(
@@ -294,11 +297,12 @@ def crear_usuario_con_roles(
                     ),
                 )
 
-            if not verificacion_correo:
+            if verificacion_correo_requerida() and not verificacion_correo:
                 raise RuntimeError(
                     "El usuario nuevo requiere una solicitud de correo."
                 )
-            insertar_solicitud(cursor, verificacion_correo)
+            if verificacion_correo:
+                insertar_solicitud(cursor, verificacion_correo)
 
         conexion.commit()
         return True

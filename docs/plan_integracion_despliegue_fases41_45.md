@@ -1,5 +1,11 @@
 # Plan único de integración y despliegue — Fases 4.1 a 4.5
 
+**Decisión posterior:** el primer despliegue será sin correo ni Resend. Aplicar
+`docs/despliegue_sin_correo.md` para la configuración inicial: ambas banderas
+EMAIL_VERIFICATION_REQUIRED y MAIL_ENABLED en 0, sin claves de correo y sin
+worker. 006 sigue requerida por su columna de política. Las instrucciones de
+activación de correo de este documento quedan para una fase futura.
+
 > Documento operativo. Preparado localmente; ninguna acción sobre Railway,
 > Alwaysdata, Resend, DNS o datos reales ha sido ejecutada.
 

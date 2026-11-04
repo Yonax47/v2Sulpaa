@@ -13,6 +13,7 @@ from app.identidad import email_repositories
 from app.shared.email.crypto import encrypt_payload
 from app.shared.email.repositories import consumir_limites_persistentes
 from app.shared.validators import validar_correo
+from app.config.email import verificacion_correo_requerida
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ def _hmac_clave(valor):
 def preparar_solicitud(usuario_id, correo, nombre):
     """Genera token CSPRNG, conserva hash y cifra el valor para el outbox."""
 
+    if not verificacion_correo_requerida():
+        return None
     public_url = current_app.config.get("APP_PUBLIC_URL", "")
     encryption_key = current_app.config.get("MAIL_PAYLOAD_ENCRYPTION_KEY", "")
     if not public_url or not encryption_key:
@@ -71,6 +74,8 @@ def preparar_solicitud(usuario_id, correo, nombre):
 
 
 def inspeccionar(token):
+    if not verificacion_correo_requerida():
+        return {"estado": "DESACTIVADO"}
     if not token or len(token) > 200:
         return {"estado": "INVALIDO"}
     registro = email_repositories.inspeccionar_token(token_hash(token))
@@ -84,6 +89,8 @@ def inspeccionar(token):
 
 
 def confirmar(token):
+    if not verificacion_correo_requerida():
+        return {"estado": "DESACTIVADO"}
     if not token or len(token) > 200:
         return {"estado": "INVALIDO"}
     return email_repositories.consumir_token(token_hash(token))
@@ -92,6 +99,8 @@ def confirmar(token):
 def solicitar_reenvio(correo, direccion_ip):
     """Respuesta no enumerable; limita antes de consultar si existe cuenta."""
 
+    if not verificacion_correo_requerida():
+        return {"ok": True, "mensaje": "La verificación de correo no está habilitada."}
     correo = str(correo or "").strip().lower()[:150]
     valido, _ = validar_correo(correo)
     clave_correo = correo if valido else "correo-invalido"
@@ -133,6 +142,8 @@ def solicitar_reenvio(correo, direccion_ip):
 def estado_cuenta(correo_verificado, requiere_verificacion, roles=None):
     if correo_verificado:
         return "VERIFICADO"
+    if not verificacion_correo_requerida():
+        return "NO_REQUERIDO"
     if requiere_verificacion:
         return "PENDIENTE_OBLIGATORIO"
     # Históricos permanecen en transición. La fecha de gracia no se activa si

@@ -38,7 +38,7 @@
                 <div class="is-wide"><span>Correo protegido</span><strong>{{ perfil.correo }}</strong></div>
             </div>
             <p class="profile-note">Los nombres y el DNI no pueden editarse libremente. El correo podrá cambiarse mediante un flujo verificado en una fase posterior.</p>
-            {% if not perfil.correo_verificado %}
+            {% if config.EMAIL_VERIFICATION_REQUIRED and not perfil.correo_verificado %}
             <div class="profile-verification-notice">
                 <p><strong>Verificación pendiente.</strong> {% if perfil.requiere_verificacion_correo %}Debes confirmar el correo antes de comprar.{% else %}Tu cuenta histórica conserva acceso durante la transición, pero aún no se considera verificada.{% endif %}</p>
                 <form method="POST" action="{{ url_for('identidad.reenviar_verificacion') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="profile-button is-secondary" type="submit">Reenviar verificación</button></form>

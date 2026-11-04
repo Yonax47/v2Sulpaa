@@ -101,6 +101,7 @@ class CheckoutAtomicoUnitTest(unittest.TestCase):
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
+                patch.object(services, "eventos_pedido_habilitados", return_value=True), \
                 patch.object(services.logger, "error"), \
                 patch.object(services, "UnidadTrabajo", _UnidadTrabajoFalsa), \
                 patch.object(services, "preparar_snapshot_pedido", return_value=snapshot), \
@@ -293,6 +294,7 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
+                patch.object(services, "eventos_pedido_habilitados", return_value=True), \
                 patch.object(services.logger, "error"), \
                 patch.object(services, "UnidadTrabajo", _UnidadTrabajoFalsa), \
                 patch.object(services, "validar_entrega_confirmacion",

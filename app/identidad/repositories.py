@@ -12,6 +12,7 @@ import uuid
 from app.config.database import conexion_identidad
 from app.identidad.access_control import evaluar_fallo_contador
 from app.identidad.email_repositories import insertar_solicitud
+from app.config.email import verificacion_correo_requerida
 
 
 def _auditar_acceso(
@@ -544,6 +545,8 @@ def crear_usuario_y_perfil(
     cuenta parcial. El rol se resuelve por código dentro de esta misma
     transacción; no se modifican vínculos de cuentas existentes.
     """
+    if not verificacion_correo_requerida():
+        verificacion_correo = None
     conexion = conexion_identidad()
 
     try:
@@ -564,7 +567,7 @@ def crear_usuario_y_perfil(
                     %s,
                     'ACTIVO',
                     FALSE,
-                    TRUE
+                    %s
                 )
             """
 
@@ -574,6 +577,7 @@ def crear_usuario_y_perfil(
                     usuario_id,
                     correo,
                     password_hash,
+                    bool(verificacion_correo),
                 ),
             )
 
@@ -636,11 +640,12 @@ def crear_usuario_y_perfil(
                 (str(uuid.uuid4()), usuario_id, rol["id"]),
             )
 
-            if not verificacion_correo:
+            if verificacion_correo_requerida() and not verificacion_correo:
                 raise RuntimeError(
                     "El registro nuevo requiere una solicitud de correo."
                 )
-            insertar_solicitud(cursor, verificacion_correo)
+            if verificacion_correo:
+                insertar_solicitud(cursor, verificacion_correo)
 
         conexion.commit()
 

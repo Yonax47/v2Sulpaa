@@ -282,12 +282,14 @@ Iniciar sesión | SULPAA
                         </label>
 
 
+                        {% if config.EMAIL_VERIFICATION_REQUIRED %}
                         <a
                             href="{{ url_for('identidad.verificacion_pendiente') }}"
                             class="auth-forgot-link"
                         >
                             Reenviar verificación
                         </a>
+                        {% endif %}
 
                     </div>
 
