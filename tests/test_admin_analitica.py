@@ -32,19 +32,27 @@ class DashboardLayoutTest(unittest.TestCase):
 class EstadisticasEncuestasTest(unittest.TestCase):
     def test_agrega_por_estado_y_satisfaccion(self):
         encuestas = [
-            {"estado": "RESPONDIDA", "calificacion_general": 5, "recomendaria": 1},
-            {"estado": "RESPONDIDA", "calificacion_general": 3, "recomendaria": 0},
+            {"estado": "RESPONDIDA", "calificacion_general": 5, "recomendaria": "SI"},
+            {"estado": "RESPONDIDA", "calificacion_general": 3, "recomendaria": "NO"},
+            {"estado": "RESPONDIDA", "calificacion_general": 4, "recomendaria": "SI"},
             {"estado": "ENVIADA", "calificacion_general": None, "recomendaria": None},
             {"estado": "PENDIENTE", "calificacion_general": None, "recomendaria": None},
         ]
         estadisticas = estadisticas_encuestas(encuestas)
 
         conteos = {fila["estado"]: fila["cantidad"] for fila in estadisticas["por_estado"]}
-        self.assertEqual(conteos["RESPONDIDA"], 2)
+        self.assertEqual(conteos["RESPONDIDA"], 3)
         self.assertEqual(conteos["ENVIADA"], 1)
         self.assertEqual(conteos["PENDIENTE"], 1)
-        self.assertEqual(estadisticas["respuestas"], 2)
+        self.assertEqual(estadisticas["respuestas"], 3)
         self.assertEqual(estadisticas["promedio"], 4.0)
+        self.assertEqual(estadisticas["recomendarian"], 2)
+
+    def test_recomendaria_admite_valor_heredado_numerico(self):
+        estadisticas = estadisticas_encuestas([
+            {"estado": "RESPONDIDA", "calificacion_general": 5, "recomendaria": 1},
+            {"estado": "RESPONDIDA", "calificacion_general": 5, "recomendaria": "NO"},
+        ])
         self.assertEqual(estadisticas["recomendarian"], 1)
 
     def test_lista_vacia_no_rompe(self):

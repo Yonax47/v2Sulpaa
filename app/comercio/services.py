@@ -2109,12 +2109,22 @@ def preparar_snapshot_pedido(
             detalle["cantidad"]
         )
 
+        if detalle["precio"] is None:
+
+            return {
+                "ok": False,
+                "mensaje":
+                    (
+                        "Uno de los productos no tiene "
+                        "un precio vigente."
+                    ),
+            }
+
         precio = float(
             detalle["precio"]
-            or 0
         )
 
-        if precio < 0:
+        if precio <= 0:
 
             return {
                 "ok": False,

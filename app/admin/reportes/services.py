@@ -455,6 +455,17 @@ _MIMETYPES = {
 # ORQUESTACIÓN PRINCIPAL (KPI-05)
 # ============================================================
 
+def _fecha_reporte(valor, nombre):
+    """Valida una fecha ISO recibida por el generador de reportes."""
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+    try:
+        return date.fromisoformat(texto).isoformat()
+    except (TypeError, ValueError) as error:
+        raise ReglaReporteError(f"{nombre} no es válida.") from error
+
+
 def generar_reporte(tipo, formato, actor_id, filtros=None):
     """Genera el reporte, construye su archivo y audita la solicitud.
 
@@ -471,8 +482,12 @@ def generar_reporte(tipo, formato, actor_id, filtros=None):
     if formato not in FORMATOS:
         raise ReglaReporteError("El formato del reporte no es válido.")
 
-    desde = filtros.get("desde") or None
-    hasta = filtros.get("hasta") or None
+    desde = _fecha_reporte(filtros.get("desde"), "La fecha inicial")
+    hasta = _fecha_reporte(filtros.get("hasta"), "La fecha final")
+    if desde and hasta and desde > hasta:
+        raise ReglaReporteError(
+            "La fecha inicial no puede superar la fecha final."
+        )
     parametros = f"desde={desde or ''}|hasta={hasta or ''}"
 
     try:
@@ -519,7 +534,8 @@ def generar_reporte(tipo, formato, actor_id, filtros=None):
         except Exception:
             pass
         raise ReglaReporteError(
-            f"No se pudo generar el reporte: {error}"
+            "No se pudo generar el reporte. Intenta nuevamente o contacta "
+            "al administrador del sistema."
         )
 
     fecha = date.today().strftime("%Y%m%d")

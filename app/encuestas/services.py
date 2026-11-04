@@ -14,6 +14,8 @@ Metodología KPI-09 (autorizada):
   garantiza con ``UNIQUE(encuesta_id)`` en ``encuesta_respuestas``.
 """
 
+from datetime import date
+
 from app.config.database import crear_conexion, conexion_operaciones
 from app.encuestas import codigos as codigos_token
 from app.encuestas import repositories as repos
@@ -264,7 +266,7 @@ def responder_encuesta(token, datos):
     conexion = conexion_operaciones()
     try:
         conexion.begin()
-        encuesta = repos.buscar_por_hash(
+        encuesta = repos.buscar_por_hash_bloqueado(
             conexion, esquemas, codigos_token.hash_token(token)
         )
         if not encuesta:
@@ -314,18 +316,40 @@ def responder_encuesta(token, datos):
 # ADMINISTRACIÓN DE ENCUESTAS
 # ============================================================
 
+def _fecha_filtro(valor, nombre):
+    """Valida una fecha ISO de filtro del panel administrativo."""
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+    try:
+        return date.fromisoformat(texto).isoformat()
+    except (TypeError, ValueError) as error:
+        raise ReglaEncuestaError(f"{nombre} no es válida.") from error
+
+
+def _criterios_filtro(filtros):
+    """Normaliza estado y rango de fechas de las encuestas."""
+    filtros = filtros or {}
+    desde = _fecha_filtro(filtros.get("desde"), "La fecha inicial")
+    hasta = _fecha_filtro(filtros.get("hasta"), "La fecha final")
+    if desde and hasta and desde > hasta:
+        raise ReglaEncuestaError(
+            "La fecha inicial no puede superar la fecha final."
+        )
+    return {
+        "estado": filtros.get("estado") or None,
+        "desde": desde,
+        "hasta": hasta,
+    }
+
+
 def listar_encuestas(filtros=None, pagina=None, por_pagina=25):
     """Lista encuestas para el panel administrativo.
 
     Sin ``pagina`` conserva la interfaz histórica (lista). Con ``pagina``
     devuelve el contrato paginado usado por los listados administrativos.
     """
-    filtros = filtros or {}
-    criterios = {
-        "estado": filtros.get("estado") or None,
-        "desde": filtros.get("desde") or None,
-        "hasta": filtros.get("hasta") or None,
-    }
+    criterios = _criterios_filtro(filtros)
     if pagina is not None:
         from app.shared.pagination import crear_paginacion
 
@@ -341,6 +365,16 @@ def listar_encuestas(filtros=None, pagina=None, por_pagina=25):
             "paginacion": paginacion,
         }
     return repos.listar_encuestas(**criterios)
+
+
+def agregar_encuestas(filtros=None):
+    """Agrega todas las encuestas filtradas para la analítica del panel."""
+    criterios = _criterios_filtro(filtros)
+    return repos.agregar_encuestas(
+        estado=criterios["estado"],
+        desde=criterios["desde"],
+        hasta=criterios["hasta"],
+    )
 
 
 def obtener_detalle_encuesta(encuesta_id):

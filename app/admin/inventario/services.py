@@ -30,6 +30,7 @@ from app.admin.inventario.repositories import (
     listar_motivos_activos,
     registrar_verificacion_fisica,
     registrar_movimiento_stock,
+    verificacion_pertenece_existencia,
 )
 from app.shared.pagination import crear_paginacion
 
@@ -273,6 +274,13 @@ def registrar_ajuste(
         raise ErrorInventario(
             "Los ajustes requieren un motivo de categoría AJUSTE "
             "(AJUSTE_CONTEO u OTRO)."
+        )
+
+    if verificacion_id and not verificacion_pertenece_existencia(
+        verificacion_id, existencia_id
+    ):
+        raise ErrorInventario(
+            "La verificación seleccionada no corresponde a esta existencia."
         )
 
     try:

@@ -12,7 +12,8 @@ Reglas de negocio validadas aquí (no en el repositorio):
   genera los ingresos faltantes sin duplicar (UNIQUE pago_id).
 """
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 
 from app.admin.caja import repositories as repos
 from app.operaciones import repositories as repos_operaciones_mov
@@ -58,11 +59,15 @@ def registrar_egreso_manual(actor_id, roles, datos):
     datos = datos or {}
     monto_texto = str(datos.get("monto") or "").strip()
     try:
-        monto = float(monto_texto)
-    except (TypeError, ValueError):
+        monto = Decimal(monto_texto)
+    except (InvalidOperation, TypeError, ValueError):
         raise ReglaCajaError("El monto debe ser un número válido.")
-    if monto <= 0:
+    if not monto.is_finite() or monto <= 0:
         raise ReglaCajaError("El monto del egreso debe ser mayor a cero.")
+    try:
+        monto = monto.quantize(Decimal("0.01"))
+    except InvalidOperation:
+        raise ReglaCajaError("El monto debe ser un número válido.")
 
     categoria_id = datos.get("categoria_id")
     try:
@@ -123,9 +128,34 @@ def anular_movimiento(actor_id, roles, movimiento_id, motivo):
     return {"ok": True, "estado": "ANULADO"}
 
 
+def _fecha_filtro(valor, nombre):
+    """Valida una fecha ISO de filtro y la devuelve normalizada."""
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+    try:
+        return date.fromisoformat(texto).isoformat()
+    except (TypeError, ValueError) as error:
+        raise ReglaCajaError(f"{nombre} no es válida.") from error
+
+
+def _normalizar_filtros(filtros):
+    """Copia los filtros y valida el rango de fechas de la caja."""
+    filtros = dict(filtros or {})
+    desde = _fecha_filtro(filtros.get("desde"), "La fecha inicial")
+    hasta = _fecha_filtro(filtros.get("hasta"), "La fecha final")
+    if desde and hasta and desde > hasta:
+        raise ReglaCajaError(
+            "La fecha inicial no puede superar la fecha final."
+        )
+    filtros["desde"] = desde
+    filtros["hasta"] = hasta
+    return filtros
+
+
 def listar_movimientos(filtros=None, pagina=None, por_pagina=25):
     """Lista movimientos con filtros validados por tipo/origen."""
-    filtros = filtros or {}
+    filtros = _normalizar_filtros(filtros)
     if pagina is not None:
         filtros_sql = {k: filtros.get(k) or None for k in ("desde", "hasta", "tipo", "origen", "categoria_id")}
         p = crear_paginacion(repos.contar_movimientos(**filtros_sql), pagina, por_pagina)
@@ -147,7 +177,7 @@ def resumen_caja(filtros=None):
     origen, categoría) para que las tarjetas coincidan con la lista
     visible siempre.
     """
-    filtros = filtros or {}
+    filtros = _normalizar_filtros(filtros)
     return repos.resumen_movimientos(
         desde=filtros.get("desde") or None,
         hasta=filtros.get("hasta") or None,

@@ -367,6 +367,27 @@ def listar_verificaciones(existencia_id, limite=10, offset=0):
         conexion.close()
 
 
+def verificacion_pertenece_existencia(verificacion_id, existencia_id):
+    """Comprueba que la verificación corresponda a la existencia indicada."""
+    inventario = _esquema("DB_INVENTARIO")
+    consulta = f"""
+        SELECT 1
+        FROM {inventario}.verificaciones_fisicas AS vf
+        INNER JOIN {inventario}.existencias AS ex
+            ON ex.almacen_id = vf.almacen_id
+            AND ex.variante_id = vf.variante_id
+        WHERE vf.id = %s AND ex.id = %s
+        LIMIT 1
+    """
+    conexion = conexion_inventario()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(consulta, (verificacion_id, existencia_id))
+            return cursor.fetchone() is not None
+    finally:
+        conexion.close()
+
+
 # ============================================================
 # MOTIVOS DE MOVIMIENTO
 # ============================================================

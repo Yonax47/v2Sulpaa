@@ -37,6 +37,7 @@
                 <div><dt>Programada</dt><dd>{{ reparto.fecha_programada.strftime('%d/%m/%Y %H:%M') if reparto.fecha_programada else "Sin programar" }}</dd></div>
                 <div><dt>Asignada</dt><dd>{{ reparto.asignado_en.strftime('%d/%m/%Y %H:%M') if reparto.asignado_en else "—" }}</dd></div>
                 <div><dt>Aceptada</dt><dd>{{ reparto.aceptado_en.strftime('%d/%m/%Y %H:%M') if reparto.aceptado_en else "—" }}</dd></div>
+                {% if reparto.finalizado_en %}<div><dt>Finalizada</dt><dd>{{ reparto.finalizado_en.strftime('%d/%m/%Y %H:%M') }}</dd></div>{% endif %}
                 <div><dt>Costo de reparto</dt><dd>S/ {{ "%.2f"|format(reparto.costo_cobrado_cliente|float) }}</dd></div>
             </dl>
         </section>
@@ -83,6 +84,10 @@
                         </label>
                         <button type="submit" class="admin-button is-primary">Confirmar entrega</button>
                     </form>
+                {% endif %}
+
+                {% if aes not in ["ASIGNADA", "ACEPTADA"] %}
+                    <p class="admin-muted">Este reparto ya fue cerrado. Puedes consultar sus datos, pero no realizar acciones.</p>
                 {% endif %}
             </div>
         </section>

@@ -2014,6 +2014,7 @@ from app.shared.validators import (
     validar_password,
     validar_nombre,
     validar_telefono_peru,
+    validar_dni,
     normalizar_telefono,
 )
 from app.identidad.email_verification import preparar_solicitud
@@ -2216,6 +2217,12 @@ def programar_entrega(actor_id, roles, entrega_id, fecha_programada):
         fecha_programada = _fecha_iso_operativa(fecha_programada)
     if not fecha_programada:
         raise ReglaOperativaError("Selecciona una fecha de programación.")
+
+    from datetime import datetime as _datetime
+    if fecha_programada < _datetime.now():
+        raise ReglaOperativaError(
+            "La fecha de programación debe ser posterior al momento actual."
+        )
 
     with UnidadTrabajo() as unidad:
         contexto = _repos.bloquear_entrega_operativa(
@@ -2945,6 +2952,9 @@ def registrar_repartidor(actor_id, roles, correo, password, nombres,
     valido, mensaje = validar_telefono_peru(telefono, obligatorio=True)
     if not valido:
         raise ReglaOperativaError(mensaje)
+    valido, mensaje = validar_dni(dni, obligatorio=False)
+    if not valido:
+        raise ReglaOperativaError(mensaje)
 
     with UnidadTrabajo() as unidad:
         if _repos.buscar_usuario_por_correo_transaccion(
@@ -3101,15 +3111,21 @@ def _repartidor_de_sesion(unidad, usuario_id):
     return repartidor
 
 
-def listar_repartos_repartidor(usuario_id):
-    """Asignaciones actives del repartidor autenticado."""
+def listar_repartos_repartidor(usuario_id, pagina=1, por_pagina=20):
+    """Asignaciones activas e historial paginado del repartidor autenticado."""
     with UnidadTrabajo() as unidad:
         repartidor = _repartidor_de_sesion(unidad, usuario_id)
         asignaciones = _repos.listar_asignaciones_repartidor(
             unidad.conexion, unidad.esquemas, repartidor["id"]
         )
-        historial = _repos.listar_asignaciones_repartidor_historial(
+        total_historial = _repos.contar_asignaciones_repartidor_historial(
             unidad.conexion, unidad.esquemas, repartidor["id"]
+        )
+        from app.shared.pagination import crear_paginacion
+        paginacion = crear_paginacion(total_historial, pagina, por_pagina)
+        historial = _repos.listar_asignaciones_repartidor_historial(
+            unidad.conexion, unidad.esquemas, repartidor["id"],
+            limite=paginacion["por_pagina"], offset=paginacion["offset"],
         )
     for item in asignaciones:
         item["entrega_estado_label"] = _etiqueta_estado_entrega(
@@ -3118,7 +3134,18 @@ def listar_repartos_repartidor(usuario_id):
         item["asignacion_estado_label"] = ETIQUETAS_ASIGNACION.get(
             item["asignacion_estado"], item["asignacion_estado"]
         )
-    return {"activas": asignaciones, "historial": historial}
+    for item in historial:
+        item["entrega_estado_label"] = _etiqueta_estado_entrega(
+            item["entrega_estado"]
+        )
+        item["asignacion_estado_label"] = ETIQUETAS_ASIGNACION.get(
+            item["asignacion_estado"], item["asignacion_estado"]
+        )
+    return {
+        "activas": asignaciones,
+        "historial": historial,
+        "paginacion": paginacion,
+    }
 
 
 def obtener_detalle_reparto_repartidor(usuario_id, entrega_id):

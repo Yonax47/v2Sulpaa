@@ -2514,8 +2514,9 @@ def listar_asignaciones_repartidor(conexion, esquemas, repartidor_id):
 
 
 def listar_asignaciones_repartidor_historial(conexion, esquemas,
-                                             repartidor_id):
-    """Historial de entregas ya finalizadas del repartidor."""
+                                             repartidor_id,
+                                             limite=None, offset=0):
+    """Historial paginado de entregas ya finalizadas del repartidor."""
     operaciones = esquemas["operaciones"]
     comercio = esquemas["comercio"]
     consulta = f"""
@@ -2529,24 +2530,52 @@ def listar_asignaciones_repartidor_historial(conexion, esquemas,
         INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
         WHERE a.repartidor_id = %s
           AND a.estado IN ('FINALIZADA', 'CANCELADA')
-        ORDER BY a.asignado_en DESC
-        LIMIT 50
+        ORDER BY a.asignado_en DESC, a.id DESC
     """
+    parametros = [repartidor_id]
+    if limite is not None:
+        consulta += " LIMIT %s OFFSET %s"
+        parametros.extend([int(limite), int(offset)])
     with conexion.cursor() as cursor:
-        cursor.execute(consulta, (repartidor_id,))
+        cursor.execute(consulta, tuple(parametros))
         return cursor.fetchall()
+
+
+def contar_asignaciones_repartidor_historial(conexion, esquemas,
+                                             repartidor_id):
+    """Total de asignaciones cerradas del repartidor para paginar."""
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM {operaciones}.asignaciones_reparto AS a
+            INNER JOIN {operaciones}.entregas AS e ON e.id = a.entrega_id
+            INNER JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+            WHERE a.repartidor_id = %s
+              AND a.estado IN ('FINALIZADA', 'CANCELADA')
+            """,
+            (repartidor_id,),
+        )
+        return cursor.fetchone()["total"]
 
 
 def obtener_detalle_asignacion(conexion, esquemas, repartidor_id,
                                entrega_id):
-    """Detalle de la asignación del repartidor para una entrega."""
+    """Detalle de la asignación del repartidor para una entrega.
+
+    Incluye asignaciones cerradas: el historial enlaza a este detalle y un
+    reparto finalizado debe seguir siendo consultable en modo lectura. Las
+    acciones operativas del template solo se muestran para ASIGNADA/ACEPTADA.
+    """
     operaciones = esquemas["operaciones"]
     comercio = esquemas["comercio"]
     identidad = esquemas["identidad"]
     consulta = f"""
         SELECT
             a.id AS asignacion_id, a.estado AS asignacion_estado,
-            a.asignado_en, a.aceptado_en,
+            a.asignado_en, a.aceptado_en, a.finalizado_en,
             e.id AS entrega_id, e.tipo_entrega, e.estado AS entrega_estado,
             e.fecha_programada, e.costo_cobrado_cliente,
             e.creado_en AS entrega_creado_en,
@@ -2561,7 +2590,10 @@ def obtener_detalle_asignacion(conexion, esquemas, repartidor_id,
         INNER JOIN {identidad}.usuarios AS u ON u.id = p.usuario_id
         LEFT JOIN {identidad}.perfiles AS pf ON pf.usuario_id = p.usuario_id
         WHERE a.repartidor_id = %s AND a.entrega_id = %s
-          AND a.estado IN ('ASIGNADA', 'ACEPTADA')
+          AND a.estado IN ('ASIGNADA', 'ACEPTADA', 'FINALIZADA',
+                           'CANCELADA', 'REASIGNADA')
+        ORDER BY (a.estado IN ('ASIGNADA', 'ACEPTADA')) DESC,
+                 a.asignado_en DESC, a.id DESC
         LIMIT 1
     """
     with conexion.cursor() as cursor:

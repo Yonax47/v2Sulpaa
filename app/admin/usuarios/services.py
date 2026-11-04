@@ -257,6 +257,12 @@ def cambiar_estado_usuario_admin(
     if usuario_id == actor_id and nuevo_estado != "ACTIVO":
         raise ErrorUsuarios("No puedes desactivar tu propia cuenta.")
 
+    roles_usuario = {fila["codigo"] for fila in usuario["roles"]}
+    if ROL_GERENTE in roles_usuario and not _es_gerente(actor_roles):
+        raise ErrorUsuarios(
+            "Solo un gerente puede cambiar el estado de una cuenta GERENTE."
+        )
+
     estado_anterior = usuario["estado"]
     if estado_anterior == nuevo_estado:
         return True
@@ -302,7 +308,20 @@ def asignar_roles_usuario_admin(
 
     anteriores = [fila["codigo"] for fila in usuario["roles"]]
 
-    toca_gerente = ROL_GERENTE in anteriores or ROL_GERENTE in codigos_nuevos
+    # El formulario deshabilita el checkbox GERENTE para quien no es
+    # gerente, por lo que el navegador no lo envía. Sin este ajuste se
+    # interpretaría como un intento de retirarlo y se rechazaría toda la
+    # operación, impidiendo cambios legítimos sobre otros roles.
+    if (
+        not _es_gerente(actor_roles)
+        and ROL_GERENTE in anteriores
+        and ROL_GERENTE not in codigos_nuevos
+    ):
+        codigos_nuevos.append(ROL_GERENTE)
+
+    toca_gerente = (ROL_GERENTE in anteriores) != (
+        ROL_GERENTE in codigos_nuevos
+    )
     if toca_gerente and not _es_gerente(actor_roles):
         raise ErrorUsuarios("Solo un gerente puede gestionar el rol GERENTE.")
 

@@ -1141,11 +1141,17 @@ def obtener_top_productos_vendidos_cobrados(desde=None, hasta=None, limit=10):
             cond = " AND ".join(where)
             sql = f"""SELECT v2.sku, v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion,
                          SUM(pd.cantidad * pc.cantidad) AS unidades_vendidas,
-                         SUM(pd.subtotal_linea) AS ingresos_linea
+                         SUM(pd.subtotal_linea * pc.cantidad / pc.total_composicion) AS ingresos_linea
                   FROM {comercio}.pedidos pe
                    JOIN ({cobros}) cobro ON cobro.pedido_id = pe.id
                   JOIN {comercio}.pedido_detalles pd ON pd.pedido_id = pe.id
-                  JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id = pd.id
+                  JOIN (
+                      SELECT pedido_detalle_id, variante_id, cantidad,
+                             SUM(cantidad) OVER (
+                                 PARTITION BY pedido_detalle_id
+                             ) AS total_composicion
+                      FROM {comercio}.pedido_composiciones
+                  ) pc ON pc.pedido_detalle_id = pd.id
                   JOIN {comercio}.variantes v2 ON v2.id = pc.variante_id
                   LEFT JOIN {comercio}.productos p ON p.id = v2.producto_id
                   LEFT JOIN {comercio}.sabores s ON s.id = v2.sabor_id
@@ -1276,7 +1282,7 @@ def obtener_ingresos_por_producto_cobrado(desde=None, hasta=None, limit=10):
             filtros, params = _filtros_fecha_cobro(desde, hasta)
             where=["pe.estado!='CANCELADO'", *filtros]
             cond=' AND '.join(where)
-            cursor.execute(f"SELECT v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion, SUM(pd.subtotal_linea) AS ingresos_linea FROM {comercio}.pedidos pe JOIN ({cobros}) cobro ON cobro.pedido_id=pe.id JOIN {comercio}.pedido_detalles pd ON pd.pedido_id=pe.id JOIN {comercio}.pedido_composiciones pc ON pc.pedido_detalle_id=pd.id JOIN {comercio}.variantes v2 ON v2.id=pc.variante_id LEFT JOIN {comercio}.productos p ON p.id=v2.producto_id LEFT JOIN {comercio}.sabores s ON s.id=v2.sabor_id LEFT JOIN {comercio}.presentaciones pr ON pr.id=v2.presentacion_id WHERE {cond} GROUP BY v2.id,v2.nombre_comercial,p.nombre,s.nombre,pr.nombre ORDER BY ingresos_linea DESC LIMIT %s", params+[int(limit)])
+            cursor.execute(f"SELECT v2.nombre_comercial, p.nombre AS producto, s.nombre AS sabor, pr.nombre AS presentacion, SUM(pd.subtotal_linea * pc.cantidad / pc.total_composicion) AS ingresos_linea FROM {comercio}.pedidos pe JOIN ({cobros}) cobro ON cobro.pedido_id=pe.id JOIN {comercio}.pedido_detalles pd ON pd.pedido_id=pe.id JOIN (SELECT pedido_detalle_id, variante_id, cantidad, SUM(cantidad) OVER (PARTITION BY pedido_detalle_id) AS total_composicion FROM {comercio}.pedido_composiciones) pc ON pc.pedido_detalle_id=pd.id JOIN {comercio}.variantes v2 ON v2.id=pc.variante_id LEFT JOIN {comercio}.productos p ON p.id=v2.producto_id LEFT JOIN {comercio}.sabores s ON s.id=v2.sabor_id LEFT JOIN {comercio}.presentaciones pr ON pr.id=v2.presentacion_id WHERE {cond} GROUP BY v2.id,v2.nombre_comercial,p.nombre,s.nombre,pr.nombre ORDER BY ingresos_linea DESC LIMIT %s", params+[int(limit)])
             return cursor.fetchall()
     finally:
         conn.close()

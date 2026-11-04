@@ -1299,7 +1299,7 @@ def guardar_datos_facturacion(
                     INSERT INTO datos_facturacion (
                         id,
                         usuario_id,
-                        tipo_contribuyente,
+                        tipo,
                         dni,
                         ruc,
                         nombre_facturacion,
@@ -1326,7 +1326,7 @@ def guardar_datos_facturacion(
                     (
                         facturacion_id,
                         usuario_id,
-                        tipo,
+                        tipo_contribuyente,
                         dni,
                         ruc,
                         nombre_facturacion,

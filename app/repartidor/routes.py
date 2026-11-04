@@ -52,14 +52,21 @@ ROLES_REPARTIDOR = ("REPARTIDOR",)
 def repartos():
     """Lista SOLO los repartos asignados al repartidor autenticado."""
     try:
-        datos = listar_repartos_repartidor(session.get("usuario_id"))
+        datos = listar_repartos_repartidor(
+            session.get("usuario_id"),
+            pagina=request.args.get("page", 1),
+        )
     except ReglaOperativaError as error:
         flash(str(error), "danger")
-        datos = {"activas": [], "historial": []}
+        datos = {"activas": [], "historial": [], "paginacion": None}
+    paginacion = datos.get("paginacion")
+    if paginacion:
+        paginacion.update(endpoint="repartidor.repartos", filtros={})
     return render_template(
         "repartidor/repartos.html",
         activas=datos["activas"],
         historial=datos["historial"],
+        paginacion=paginacion,
     )
 
 

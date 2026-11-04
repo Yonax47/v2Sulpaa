@@ -14,6 +14,7 @@ Este Service orquesta el CRUD del contenido educativo administrable
 
 import logging
 import re
+from urllib.parse import urlsplit
 
 from app.admin.contenido.repositories import (
     actualizar_contenido,
@@ -242,16 +243,51 @@ def agregar_fuente_para_admin(roles, contenido_id, nombre, **opciones):
     if len(nombre) > 150:
         raise ErrorContenido("El nombre de la fuente es demasiado largo.")
 
+    referencia = _texto_opcional(opciones.get("referencia"), 255, "referencia")
+    nota = _texto_opcional(opciones.get("nota"), 500, "nota")
+    url = _url_fuente(opciones.get("url"))
+
     try:
         return agregar_fuente(
             contenido_id=contenido_id,
             nombre=nombre,
-            referencia=opciones.get("referencia"),
-            url=opciones.get("url"),
-            nota=opciones.get("nota"),
+            referencia=referencia,
+            url=url,
+            nota=nota,
         )
     except ValueError as error:
         raise ErrorContenido(str(error)) from error
+
+
+def _texto_opcional(valor, limite, campo):
+    """Normaliza un campo de texto opcional y controla el límite real."""
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+    if len(texto) > limite:
+        raise ErrorContenido(
+            f"La {campo} no puede superar {limite} caracteres."
+        )
+    return texto
+
+
+def _url_fuente(valor):
+    """Acepta solo enlaces http/https públicos para evitar XSS almacenado."""
+    url = str(valor or "").strip()
+    if not url:
+        return None
+    if len(url) > 500:
+        raise ErrorContenido("La URL de la fuente es demasiado larga.")
+    partes = urlsplit(url)
+    if partes.scheme.lower() not in ("http", "https") or not partes.netloc:
+        raise ErrorContenido(
+            "La URL de la fuente debe empezar por http:// o https://."
+        )
+    if partes.username or partes.password:
+        raise ErrorContenido(
+            "La URL de la fuente no puede incluir credenciales."
+        )
+    return url
 
 
 def eliminar_fuente_para_admin(roles, contenido_id, fuente_id):

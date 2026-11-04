@@ -180,6 +180,13 @@ class PermisosHTTPEncuestasAdminTest(unittest.TestCase):
             with self.subTest(rol=rol), patch(
                 "app.admin.encuestas.routes.listar_encuestas",
                 return_value=[],
+            ), patch(
+                "app.admin.encuestas.routes."
+                "estadisticas_encuestas_filtradas",
+                return_value={
+                    "por_estado": [], "respuestas": 0,
+                    "promedio": None, "recomendarian": 0,
+                },
             ):
                 self.assertEqual(
                     cliente_con_sesion(self.app, [rol]).get(

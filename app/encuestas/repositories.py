@@ -110,6 +110,30 @@ def buscar_por_hash(conexion, esquemas, token_hash):
         return cursor.fetchone()
 
 
+def buscar_por_hash_bloqueado(conexion, esquemas, token_hash):
+    """Busca y BLOQUEA la encuesta por hash dentro de la transacción.
+
+    Evita que dos envíos simultáneos del mismo enlace lean la encuesta
+    como PENDIENTE y ambos intenten insertar la respuesta (UNIQUE).
+    """
+    operaciones = esquemas["operaciones"]
+    comercio = esquemas["comercio"]
+    with conexion.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT e.id, e.pedido_id, e.entrega_id, e.usuario_id, e.estado,
+                   e.canal, e.token_hash, e.token_cifrado, e.enviado_en,
+                   e.respondido_en, e.creado_en,
+                   p.numero_pedido
+            FROM {operaciones}.encuestas AS e
+            LEFT JOIN {comercio}.pedidos AS p ON p.id = e.pedido_id
+            WHERE e.token_hash = %s LIMIT 1 FOR UPDATE
+            """,
+            (token_hash,),
+        )
+        return cursor.fetchone()
+
+
 def bloquear_por_pedido(conexion, esquemas, pedido_id):
     """BLOQUEA la encuesta del pedido para resolverla dentro de la transacción."""
     operaciones = esquemas["operaciones"]
@@ -262,6 +286,56 @@ def listar_encuestas(esquemas=None, estado=None, desde=None, hasta=None,
                 """
             )
             cursor.execute(consulta, parametros + [int(limite), int(offset)])
+            return cursor.fetchall()
+    finally:
+        conexion.close()
+
+
+def agregar_encuestas(esquemas=None, estado=None, desde=None, hasta=None):
+    """Agrega TODAS las encuestas filtradas, no solo la página visible.
+
+    Devuelve por estado el conteo y, sumados, los datos de satisfacción
+    necesarios para calcular el promedio real del período consultado.
+    """
+    from app.shared.unit_of_work import esquemas_sulpaa
+    from app.config.database import conexion_operaciones
+
+    esquemas = esquemas or esquemas_sulpaa()
+    operaciones = esquemas["operaciones"]
+
+    where, parametros = [], []
+    if estado:
+        where.append("e.estado = %s")
+        parametros.append(estado)
+    if desde:
+        where.append("e.creado_en >= %s")
+        parametros.append(desde)
+    if hasta:
+        where.append("e.creado_en < DATE_ADD(%s, INTERVAL 1 DAY)")
+        parametros.append(hasta)
+    condicion = ((" WHERE " + " AND ".join(where)) if where else "")
+
+    conexion = conexion_operaciones()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT e.estado,
+                       COUNT(*) AS cantidad,
+                       COUNT(r.calificacion_general) AS respuestas,
+                       COALESCE(SUM(r.calificacion_general), 0) AS suma,
+                       SUM(CASE WHEN UPPER(TRIM(COALESCE(r.recomendaria, '')))
+                                     IN ('SI', '1')
+                                THEN 1 ELSE 0 END) AS recomendarian
+                FROM {operaciones}.encuestas AS e
+                LEFT JOIN {operaciones}.encuesta_respuestas AS r
+                    ON r.encuesta_id = e.id
+                {condicion}
+                GROUP BY e.estado
+                ORDER BY e.estado
+                """,
+                parametros,
+            )
             return cursor.fetchall()
     finally:
         conexion.close()

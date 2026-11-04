@@ -24,7 +24,7 @@ from flask import (
 from app.admin.encuestas.services import (
     ROLES_ENCUESTAS_ADMIN,
     ReglaEncuestaError,
-    estadisticas_encuestas,
+    estadisticas_encuestas_filtradas,
     listar_encuestas,
     obtener_detalle,
     reenviar,
@@ -50,16 +50,25 @@ def listado():
         "desde": request.args.get("desde", ""),
         "hasta": request.args.get("hasta", ""),
     }
-    encuestas = listar_encuestas(
-        filtros, pagina=request.args.get("page", 1),
-        por_pagina=request.args.get("per_page", 25),
-    )
+    try:
+        encuestas = listar_encuestas(
+            filtros, pagina=request.args.get("page", 1),
+            por_pagina=request.args.get("per_page", 25),
+        )
+        estadisticas = estadisticas_encuestas_filtradas(filtros)
+    except ReglaEncuestaError as error:
+        flash(str(error), "error")
+        filtros.update(desde="", hasta="")
+        encuestas = listar_encuestas(
+            filtros, pagina=1,
+            por_pagina=request.args.get("per_page", 25),
+        )
+        estadisticas = estadisticas_encuestas_filtradas(filtros)
     paginacion = None
     if isinstance(encuestas, dict):
         paginacion = encuestas["paginacion"]
         encuestas = encuestas["elementos"]
         paginacion.update(endpoint="admin_encuestas.listado", filtros=filtros)
-    estadisticas = estadisticas_encuestas(encuestas)
     return render_template(
         "admin/encuestas/lista.html",
         encuestas=encuestas,

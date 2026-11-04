@@ -49,31 +49,31 @@
                     <div class="admin-form-grid">
                         <label class="admin-filter-field">
                             <span>Correo *</span>
-                            <input type="email" name="correo" value="{{ datos.correo or '' }}" required>
+                            <input type="email" name="correo" maxlength="150" value="{{ datos.correo or '' }}" required>
                         </label>
                         <label class="admin-filter-field">
                             <span>Contraseña *</span>
-                            <input type="password" name="password" minlength="8" required>
+                            <input type="password" name="password" minlength="8" maxlength="72" required>
                         </label>
                         <label class="admin-filter-field">
                             <span>Nombres *</span>
-                            <input type="text" name="nombres" value="{{ datos.nombres or '' }}" required>
+                            <input type="text" name="nombres" minlength="2" maxlength="80" pattern="[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s'-]+" value="{{ datos.nombres or '' }}" required>
                         </label>
                         <label class="admin-filter-field">
                             <span>Apellido paterno *</span>
-                            <input type="text" name="apellido_paterno" value="{{ datos.apellido_paterno or '' }}" required>
+                            <input type="text" name="apellido_paterno" minlength="2" maxlength="80" pattern="[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s'-]+" value="{{ datos.apellido_paterno or '' }}" required>
                         </label>
                         <label class="admin-filter-field">
                             <span>Apellido materno</span>
-                            <input type="text" name="apellido_materno" value="{{ datos.apellido_materno or '' }}">
+                            <input type="text" name="apellido_materno" maxlength="80" pattern="[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s'-]+" value="{{ datos.apellido_materno or '' }}">
                         </label>
                         <label class="admin-filter-field">
                             <span>DNI</span>
-                            <input type="text" name="dni" maxlength="8" value="{{ datos.dni or '' }}">
+                            <input type="text" name="dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" value="{{ datos.dni or '' }}">
                         </label>
                         <label class="admin-filter-field">
                             <span>Teléfono *</span>
-                            <input type="text" name="telefono" value="{{ datos.telefono or '' }}" required>
+                            <input type="tel" name="telefono" inputmode="numeric" pattern="9[0-9]{8}" maxlength="9" value="{{ datos.telefono or '' }}" required>
                         </label>
                     </div>
 

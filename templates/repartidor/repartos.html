@@ -65,21 +65,23 @@
             <div class="admin-order-table-wrap">
                 <table class="admin-order-table">
                     <thead>
-                        <tr><th>Pedido</th><th>Estado entrega</th><th>Asignación</th><th>Asignado</th><th></th></tr>
+                        <tr><th>Pedido</th><th>Estado entrega</th><th>Asignación</th><th>Asignado</th><th>Finalizado</th><th></th></tr>
                     </thead>
                     <tbody>
                         {% for item in historial %}
                             <tr>
                                 <td data-label="Pedido"><strong>{{ item.numero_pedido }}</strong></td>
-                                <td data-label="Estado"><span class="admin-state is-{{ (item.entrega_estado or 'sin-registro')|lower }}">{{ item.entrega_estado }}</span></td>
-                                <td data-label="Asignación">{{ (item.asignacion_estado or "")|title }}</td>
+                                <td data-label="Estado"><span class="admin-state is-{{ (item.entrega_estado or 'sin-registro')|lower }}">{{ item.entrega_estado_label }}</span></td>
+                                <td data-label="Asignación">{{ item.asignacion_estado_label }}</td>
                                 <td data-label="Asignado">{{ item.asignado_en.strftime('%d/%m/%Y %H:%M') if item.asignado_en else "—" }}</td>
+                                <td data-label="Finalizado">{{ item.finalizado_en.strftime('%d/%m/%Y %H:%M') if item.finalizado_en else "—" }}</td>
                                 <td class="admin-table-action">{% if item.entrega_id %}<a class="admin-button is-secondary is-small" href="{{ url_for('repartidor.detalle_reparto', entrega_id=item.entrega_id) }}">Ver</a>{% endif %}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            {% include 'admin/components/pagination.html' %}
         {% else %}
             <p class="admin-muted" style="padding: 1.2rem;">Aún no hay repartos finalizados.</p>
         {% endif %}

@@ -158,16 +158,18 @@
                     {% if est == "PROGRAMADO" and tipo == "DELIVERY_LOCAL" %}
                         <form method="POST" action="{{ url_for('admin_entregas.accion_asignar', entrega_id=entrega.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <label>Repartidor disponible
+                            <label>Repartidor
                                 <select name="repartidor_id" required>
                                     <option value="">Selecciona un repartidor</option>
                                     {% for repartidor in repartidores %}
-                                        {% if repartidor.estado == "ACTIVO" and repartidor.disponible %}
-                                            <option value="{{ repartidor.id }}">{{ repartidor.nombre }} ({{ repartidor.correo }})</option>
+                                        {% if repartidor.estado == "ACTIVO" %}
+                                            {% set ocupado = (not repartidor.disponible) and (repartidor.carga_activa|int > 0) %}
+                                            <option value="{{ repartidor.id }}"{% if ocupado %} disabled{% endif %}>{{ repartidor.nombre }} ({{ repartidor.correo }}){% if ocupado %} — en reparto{% endif %}</option>
                                         {% endif %}
                                     {% endfor %}
                                 </select>
                             </label>
+                            <p class="admin-muted">Solo los repartidores disponibles pueden recibir una asignación nueva.</p>
                             <button type="submit" class="admin-button is-primary">Asignar repartidor</button>
                         </form>
                     {% endif %}
