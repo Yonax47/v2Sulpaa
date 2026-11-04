@@ -5,11 +5,93 @@ La credencial permanece únicamente en el backend.
 Nunca debe enviarse al navegador.
 """
 
+import hashlib
+import hmac
+import logging
 import os
+
 import requests
+from flask import current_app, has_app_context, has_request_context, request
+
+from app.identidad.apisperu_rate_limit import consumir_limite_apisperu
+from app.shared.network import obtener_ip_cliente
 
 APISPERU_BASE_URL = "https://dniruc.apisperu.com/api/v1"
 APISPERU_TIMEOUT = (3.05, 10)
+logger = logging.getLogger(__name__)
+
+
+def _comprobar_limite_compartido(operacion):
+    """Devuelve un error controlado o ``None`` si puede consultarse.
+
+    El documento y el token nunca forman parte de la clave. Solo se usa la IP
+    canónica determinada por Flask/ProxyFix y una HMAC con secreto dedicado.
+    """
+
+    if not has_app_context() or not current_app.config.get(
+        "APISPERU_RATE_LIMIT_ENABLED"
+    ):
+        return None
+
+    if not has_request_context():
+        return {
+            "ok": False,
+            "mensaje": "El servicio de consulta no está disponible.",
+            "tipo_error": "CONTADOR_NO_DISPONIBLE",
+        }
+
+    direccion_ip = obtener_ip_cliente(request)
+    clave = current_app.config.get("APISPERU_RATE_LIMIT_KEY", "")
+    entorno_proxy = str(current_app.config.get("ENTORNO", "")).lower() in {
+        "production", "staging"
+    }
+    proxy_seguro = not entorno_proxy or (
+        current_app.config.get("RAILWAY_PROXY_VALIDADO")
+        and current_app.config.get("TRUSTED_PROXY_HOPS", 0) > 0
+    )
+    if (not direccion_ip or len(clave) < 32 or not proxy_seguro
+            or not current_app.config.get("APISPERU_RATE_LIMIT_MIGRATION_APPROVED")):
+        return {
+            "ok": False,
+            "mensaje": "El servicio de consulta no está disponible.",
+            "tipo_error": "CONTADOR_NO_DISPONIBLE",
+        }
+
+    clave_hash = hmac.new(
+        clave.encode("utf-8"),
+        direccion_ip.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    maximo = current_app.config[
+        f"APISPERU_RATE_LIMIT_MAX_{operacion}"
+    ]
+    try:
+        resultado = consumir_limite_apisperu(
+            operacion=operacion,
+            clave_hash=clave_hash,
+            maximo=maximo,
+            ventana_segundos=current_app.config[
+                "APISPERU_RATE_LIMIT_WINDOW_SECONDS"
+            ],
+        )
+    except Exception:
+        # No se adjunta IP, documento, token ni excepción: ante indisponibilidad
+        # del contador se falla cerrado y no se llama al proveedor externo.
+        logger.error("No se pudo aplicar el límite compartido de APIsPERU")
+        return {
+            "ok": False,
+            "mensaje": "El servicio de consulta no está disponible.",
+            "tipo_error": "CONTADOR_NO_DISPONIBLE",
+        }
+
+    if not resultado.permitido:
+        return {
+            "ok": False,
+            "mensaje": "Demasiadas consultas. Intenta nuevamente más tarde.",
+            "tipo_error": "LIMITE",
+            "reintentar_en": resultado.reintentar_en,
+        }
+    return None
 
 
 # ============================================================
@@ -50,6 +132,10 @@ def consultar_dni(dni):
             "mensaje": "El DNI debe tener 8 dígitos.",
             "tipo_error": "INVALIDO",
         }
+
+    limite = _comprobar_limite_compartido("DNI")
+    if limite:
+        return limite
 
     try:
         response = requests.get(
@@ -152,6 +238,10 @@ def consultar_ruc(ruc):
             "ok": False,
             "mensaje": "El RUC debe tener 11 dígitos.",
         }
+
+    limite = _comprobar_limite_compartido("RUC")
+    if limite:
+        return limite
 
     try:
         response = requests.get(

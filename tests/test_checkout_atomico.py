@@ -254,6 +254,7 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
         falla_facturacion=False,
         falla_en=None,
         facturacion_resultado=None,
+        falla_preparacion=False,
     ):
         capturas = {}
         snapshot = {
@@ -282,6 +283,13 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
             capturas.setdefault("outbox", []).append(cursor.conexion)
             return True
 
+        def preparar(*args, **kwargs):
+            # Ni siquiera se ha creado la unidad de trabajo al consultar HTTP.
+            self.assertEqual(_UnidadTrabajoFalsa.instancias, [])
+            if falla_preparacion:
+                return {"ok": False, "mensaje": "Proveedor no disponible"}
+            return {"ok": True, "preparada": object()}
+
         _UnidadTrabajoFalsa.instancias = []
 
         with patch.object(services, "esquemas_sulpaa", return_value=ESQUEMAS), \
@@ -298,7 +306,9 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
                 patch.object(services, "cerrar_carrito_usuario", fabricar("carrito", {"ok": True})), \
                 patch.object(services, "confirmar_stock_pedido", fabricar("inventario", {"ok": True})), \
                 patch.object(services, "insertar_confirmacion_pedido", fabricar_outbox), \
-                patch.object(identidad_services, "registrar_facturacion_checkout",
+                patch.object(identidad_services, "preparar_facturacion_checkout",
+                             side_effect=preparar), \
+                patch.object(identidad_services, "guardar_facturacion_preparada",
                              fabricar_facturacion):
 
             resultado = services.confirmar_checkout_con_entrega(
@@ -309,6 +319,12 @@ class CheckoutConFacturacionUnitTest(unittest.TestCase):
 
     def _conexiones(self, capturas):
         return [c for lista in capturas.values() for c in lista]
+
+    def test_fallo_http_no_abre_unidad_ni_escribe(self):
+        resultado, capturas = self._ejecutar(falla_preparacion=True)
+        self.assertFalse(resultado["ok"])
+        self.assertEqual(_UnidadTrabajoFalsa.instancias, [])
+        self.assertEqual(capturas, {})
 
     def test_fallo_facturacion_no_abre_checkout_ni_confirma(self):
         resultado, capturas = self._ejecutar(falla_facturacion=True)

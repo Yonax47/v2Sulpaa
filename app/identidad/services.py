@@ -9,6 +9,7 @@ Esta capa no contiene rutas Flask ni SQL directo.
 
 import uuid
 import logging
+from dataclasses import dataclass
 
 import bcrypt
 from flask import current_app, has_app_context
@@ -628,16 +629,29 @@ def verificar_dni_registro(dni, comprobar_duplicado=True):
 
     resultado = consultar_dni(dni)
     if not resultado.get("ok"):
-        no_disponible = resultado.get("tipo_error") == "NO_DISPONIBLE"
+        tipo_error = resultado.get("tipo_error")
+        limitado = tipo_error == "LIMITE"
+        no_disponible = tipo_error in {
+            "NO_DISPONIBLE", "CONTADOR_NO_DISPONIBLE"
+        }
         return {
             "ok": False,
             "mensaje": (
+                "Demasiadas consultas. Intenta nuevamente más tarde."
+                if limitado
+                else
                 "El servicio de consulta de DNI no está disponible. "
                 "Intenta nuevamente más tarde."
                 if no_disponible
                 else "No fue posible verificar el DNI ingresado."
             ),
-            "estado": "ERROR" if no_disponible else "INVALIDO",
+            "estado": (
+                "LIMITE" if limitado
+                else "ERROR" if no_disponible
+                else "INVALIDO"
+            ),
+            "tipo_error": tipo_error,
+            "reintentar_en": resultado.get("reintentar_en", 0),
         }
 
     persona = {
@@ -1171,6 +1185,71 @@ TIPO_CONTRIBUYENTE_POR_COMPROBANTE = {
 }
 
 
+@dataclass(frozen=True)
+class FacturacionPreparada:
+    """Resultado interno efímero; nunca se acepta desde JSON, sesión o formulario."""
+
+    usuario_id: str
+    tipo_comprobante: str
+    dni: str | None = None
+    nombre_facturacion: str | None = None
+    ruc: str | None = None
+    razon_social: str | None = None
+    direccion_fiscal: str | None = None
+
+
+def preparar_facturacion_checkout(usuario_id, tipo_comprobante, documento):
+    """Valida mediante backend antes de abrir la unidad de trabajo de compra."""
+
+    tipo_comprobante = str(tipo_comprobante or "").strip().upper()
+    documento = (documento or "").strip()
+    if tipo_comprobante == "BOLETA":
+        resultado = validar_dni_con_perfil(usuario_id=usuario_id, dni=documento)
+        if not resultado.get("ok"):
+            return resultado
+        persona = resultado["persona"]
+        preparada = FacturacionPreparada(
+            usuario_id=usuario_id, tipo_comprobante=tipo_comprobante,
+            dni=persona["dni"], nombre_facturacion=persona["nombre_completo"],
+        )
+    elif tipo_comprobante == "FACTURA":
+        resultado = validar_ruc_facturacion(documento)
+        if not resultado.get("ok"):
+            return resultado
+        empresa = resultado["empresa"]
+        preparada = FacturacionPreparada(
+            usuario_id=usuario_id, tipo_comprobante=tipo_comprobante,
+            ruc=empresa["ruc"], razon_social=empresa["razon_social"],
+            direccion_fiscal=empresa["direccion"] or None,
+        )
+    else:
+        return {"ok": False, "mensaje": "Selecciona un tipo de comprobante válido."}
+    return {"ok": True, "preparada": preparada}
+
+
+def guardar_facturacion_preparada(usuario_id, preparada, conexion=None):
+    """Escritura sin HTTP; participa del commit/rollback del checkout."""
+
+    if (not isinstance(preparada, FacturacionPreparada)
+            or preparada.usuario_id != usuario_id
+            or preparada.tipo_comprobante not in TIPO_CONTRIBUYENTE_POR_COMPROBANTE):
+        raise ValueError("La facturación preparada no corresponde a esta compra.")
+    tipo = preparada.tipo_comprobante
+    resultado_id = guardar_datos_facturacion(
+        facturacion_id=str(uuid.uuid4()), usuario_id=usuario_id,
+        tipo_contribuyente=TIPO_CONTRIBUYENTE_POR_COMPROBANTE[tipo],
+        dni=preparada.dni, ruc=preparada.ruc,
+        nombre_facturacion=preparada.nombre_facturacion,
+        razon_social=preparada.razon_social, distrito_id=None,
+        direccion_fiscal=preparada.direccion_fiscal, conexion=conexion,
+    )
+    return {
+        "ok": True, "mensaje": f"Datos de {tipo.lower()} guardados correctamente.",
+        "facturacion_id": resultado_id, "tipo": tipo, "tipo_comprobante": tipo,
+        "tipo_contribuyente": TIPO_CONTRIBUYENTE_POR_COMPROBANTE[tipo],
+    }
+
+
 def registrar_facturacion_checkout(
     usuario_id,
     tipo=None,
@@ -1202,110 +1281,10 @@ def registrar_facturacion_checkout(
     ).strip().upper()
     documento = (documento or "").strip()
 
-    # --------------------------------------------------------
-    # BOLETA
-    # --------------------------------------------------------
-
-    if tipo_comprobante == "BOLETA":
-
-        resultado = validar_dni_con_perfil(
-            usuario_id=usuario_id,
-            dni=documento,
-        )
-
-        if not resultado.get("ok"):
-            return resultado
-
-        persona = resultado["persona"]
-
-        facturacion_id = str(
-            uuid.uuid4()
-        )
-
-        resultado_id = guardar_datos_facturacion(
-            facturacion_id=facturacion_id,
-            usuario_id=usuario_id,
-            tipo_contribuyente=(
-                TIPO_CONTRIBUYENTE_POR_COMPROBANTE[tipo_comprobante]
-            ),
-            dni=persona["dni"],
-            ruc=None,
-            nombre_facturacion=persona["nombre_completo"],
-            razon_social=None,
-            distrito_id=None,
-            direccion_fiscal=None,
-            conexion=conexion,
-        )
-
-        return {
-            "ok": True,
-            "mensaje":
-                "Datos de boleta guardados correctamente.",
-            "facturacion_id":
-                resultado_id,
-            "tipo":
-                "BOLETA",
-            "tipo_comprobante": "BOLETA",
-            "tipo_contribuyente": "PERSONA",
-        }
-
-    # --------------------------------------------------------
-    # FACTURA
-    # --------------------------------------------------------
-
-    if tipo_comprobante == "FACTURA":
-
-        resultado = validar_ruc_facturacion(
-            documento
-        )
-
-        if not resultado.get("ok"):
-            return resultado
-
-        empresa = resultado["empresa"]
-
-        facturacion_id = str(
-            uuid.uuid4()
-        )
-
-        resultado_id = guardar_datos_facturacion(
-            facturacion_id=facturacion_id,
-            usuario_id=usuario_id,
-            tipo_contribuyente=(
-                TIPO_CONTRIBUYENTE_POR_COMPROBANTE[tipo_comprobante]
-            ),
-            dni=None,
-            ruc=empresa["ruc"],
-            nombre_facturacion=None,
-            razon_social=empresa["razon_social"],
-            distrito_id=None,
-            direccion_fiscal=(
-                empresa["direccion"] or None
-            ),
-            conexion=conexion,
-        )
-
-        return {
-            "ok": True,
-            "mensaje":
-                "Datos de factura guardados correctamente.",
-            "facturacion_id":
-                resultado_id,
-            "tipo":
-                "FACTURA",
-            "tipo_comprobante": "FACTURA",
-            "tipo_contribuyente": "EMPRESA",
-        }
-
-    # --------------------------------------------------------
-    # TIPO NO PERMITIDO
-    # --------------------------------------------------------
-
-    return {
-        "ok": False,
-        "mensaje":
-            "Selecciona un tipo de comprobante válido.",
-    }
+    resultado = preparar_facturacion_checkout(usuario_id, tipo_comprobante, documento)
+    if not resultado.get("ok"):
+        return resultado
+    return guardar_facturacion_preparada(usuario_id, resultado["preparada"], conexion)
 
 
 def validar_coordenadas_direccion(latitud, longitud, obligatorias=False):

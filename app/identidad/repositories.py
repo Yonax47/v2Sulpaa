@@ -697,7 +697,11 @@ def obtener_datos_checkout_usuario(usuario_id):
     y facturación del usuario autenticado.
     """
 
-    conexion = conexion_identidad()
+    # Esta lectura precede a la verificación HTTP de facturación. No dejar su
+    # transacción/socket en la caché durante la espera del proveedor.
+    from app.config.database import crear_conexion, nombre_esquema
+
+    conexion = crear_conexion(nombre_esquema("DB_IDENTIDAD"), reutilizar=False)
 
     try:
 

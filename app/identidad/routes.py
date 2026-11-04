@@ -70,6 +70,17 @@ identidad_bp = Blueprint(
 )
 
 
+def _estado_http_consulta_externa(resultado, predeterminado=400):
+    """Proyecta límites/indisponibilidad sin revelar detalles internos."""
+
+    if resultado.get("tipo_error") == "LIMITE" \
+            or resultado.get("estado") == "LIMITE":
+        return 429
+    if resultado.get("tipo_error") == "CONTADOR_NO_DISPONIBLE":
+        return 503
+    return predeterminado
+
+
 # ============================================================
 # REGISTRO
 # ============================================================
@@ -218,7 +229,10 @@ def verificar_dni_para_registro():
     # La respuesta contiene nombres asociados a un documento: no debe quedar
     # almacenada en cachés de navegador ni en proxies intermedios.
     respuesta.headers["Cache-Control"] = "no-store"
-    return respuesta, 200 if resultado.get("ok") else 400
+    return respuesta, (
+        200 if resultado.get("ok")
+        else _estado_http_consulta_externa(resultado)
+    )
 
 
 # ============================================================
@@ -677,9 +691,7 @@ def verificar_dni_facturacion():
 
     if not resultado["ok"]:
 
-        return jsonify(
-            resultado
-        ), 400
+        return jsonify(resultado), _estado_http_consulta_externa(resultado)
 
     return jsonify(
         resultado
@@ -711,9 +723,7 @@ def verificar_ruc_facturacion():
     )
 
     if not resultado["ok"]:
-        return jsonify(
-            resultado
-        ), 400
+        return jsonify(resultado), _estado_http_consulta_externa(resultado)
 
     return jsonify(
         resultado
@@ -750,9 +760,7 @@ def guardar_facturacion_checkout():
     )
 
     if not resultado["ok"]:
-        return jsonify(
-            resultado
-        ), 400
+        return jsonify(resultado), _estado_http_consulta_externa(resultado)
 
     return jsonify(
         resultado

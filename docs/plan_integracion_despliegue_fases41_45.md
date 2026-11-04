@@ -25,10 +25,10 @@ No iniciar producción hasta contar con:
 5. Dominio remitente verificado en Resend mediante SPF/DKIM y política DMARC
    revisada.
 6. Remitente, URL pública y secretos dedicados aprobados.
-7. Aceptación explícita de que la migración 005 prepara el limitador compartido
-   de APIsPERU, pero el código actual todavía conserva su limitador en memoria.
-   No debe declararse activo hasta implementar y validar su repositorio. El
-   rate limit compartido de reenvíos de correo sí forma parte de 006 y del código.
+7. Validar el nuevo consumidor compartido de APIsPERU en TEST; mantener
+   `APISPERU_RATE_LIMIT_ENABLED=0` y
+   `APISPERU_RATE_LIMIT_MIGRATION_APPROVED=0` hasta aplicar/verificar 005.
+   Revisar los hallazgos y condiciones de `docs/preflight_produccion.md`.
 8. `EMAIL_EXISTING_GRACE_END` vacío durante el primer despliegue.
 
 ## A. Operaciones que pueden prepararse localmente
@@ -98,6 +98,11 @@ Configurar como secretos, sin imprimir valores:
 - `MAIL_OUTBOX_MAX_ATTEMPTS`
 - `MAIL_OUTBOX_LEASE_SECONDS`
 - `EMAIL_EXISTING_GRACE_END` sin valor
+- `APISPERU_RATE_LIMIT_ENABLED=0`
+- `APISPERU_RATE_LIMIT_MIGRATION_APPROVED=0`
+- `APISPERU_RATE_LIMIT_KEY` dedicada, aleatoria, >=32 caracteres
+- `APISPERU_RATE_LIMIT_MAX_DNI=5`, `APISPERU_RATE_LIMIT_MAX_RUC=5`
+- `APISPERU_RATE_LIMIT_WINDOW_SECONDS=600`
 
 Conservar también las variables existentes de Flask, bases, proxy, APIsPERU y
 almacenamiento. No rotar `SECRET_KEY` durante este despliegue.
@@ -112,8 +117,8 @@ Aplicar exclusivamente en Identidad y en este orden:
 
 1. **003** — índice único `uq_perfiles_dni`.
 2. **004** — rol CLIENTE, solo cuando el precheck autorice la inserción.
-3. **005** — tabla preparada para límite compartido de APIsPERU; permanece
-   inactiva hasta que exista código autorizado que la consuma.
+3. **005** — tabla para límite compartido de APIsPERU; consumidor implementado
+   pero desactivado. Aprobar migración y activar únicamente después de TEST.
 4. **006** — columna de transición, tokens, outbox y límites de correo.
 
 Después de cada paso, ejecutar sus verificaciones. No continuar si una
@@ -157,8 +162,8 @@ Con una cuenta ficticia verificada y productos autorizados:
 ### B.6 Activación controlada de correo
 
 1. Confirmar dominio Resend verificado y remitente permitido.
-2. Ejecutar manualmente un lote de tamaño 1 dirigido a un destinatario
-   expresamente autorizado.
+2. Con Cron detenido, habilitar MAIL_ENABLED=1 solo en el worker del ensayo y
+   ejecutar un lote de tamaño 1 a un destinatario expresamente autorizado.
 3. Verificar HTML, texto plano, enlace con fragmento, confirmación POST+CSRF y
    limpieza del secreto cifrado tras el envío.
 4. Comprobar en Resend el ID e `Idempotency-Key` sin registrar cuerpos o tokens.
@@ -201,7 +206,8 @@ métricas o campos de log.
 3. No eliminar/desactivar CLIENTE sin revisar todos los `usuario_roles`.
 4. No retirar `uq_perfiles_dni` hasta confirmar que ninguna operación concurrente
    puede crear duplicados.
-5. 005 puede retirarse únicamente si sigue sin uso y está vacía.
+5. Desactivar las dos banderas de APIsPERU antes de retirar 005 y confirmar que
+   ningún worker la usa; conservarla inicialmente para evitar pérdida de datos.
 6. Ejecutar las sentencias de reversión documentadas en cada migración, en orden
    inverso, y verificar conteos después de cada paso.
 

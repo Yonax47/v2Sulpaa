@@ -71,6 +71,7 @@ from app.shared.unit_of_work import (
     esquemas_sulpaa,
 )
 from app.shared.email.repositories import insertar_confirmacion_pedido
+from app.config.database import cerrar_conexiones_solicitud
 
 from app.operaciones.repositories import (
     obtener_pago_pedido,
@@ -3095,7 +3096,8 @@ def confirmar_checkout_con_entrega(
     # --------------------------------------------------------
 
     from app.identidad.services import (
-        registrar_facturacion_checkout,
+        preparar_facturacion_checkout,
+        guardar_facturacion_preparada,
     )
 
     # ========================================================
@@ -3201,6 +3203,18 @@ def confirmar_checkout_con_entrega(
 
     try:
 
+        # Toda validación HTTP termina antes de abrir la conexión transaccional.
+        # Hasta este punto solo hay lecturas de sesión/carrito/cotización;
+        # cerrarlas físicamente no afecta ninguna escritura de la compra.
+        cerrar_conexiones_solicitud(None)
+        preparacion = preparar_facturacion_checkout(
+            usuario_id=usuario_id,
+            tipo_comprobante=tipo_comprobante,
+            documento=documento_facturacion,
+        )
+        if not preparacion.get("ok"):
+            return preparacion
+
         with UnidadTrabajo() as uow:
 
             conexion = uow.conexion
@@ -3212,10 +3226,9 @@ def confirmar_checkout_con_entrega(
             )
 
             resultado_facturacion = (
-                registrar_facturacion_checkout(
+                guardar_facturacion_preparada(
                     usuario_id=usuario_id,
-                    tipo_comprobante=tipo_comprobante,
-                    documento=documento_facturacion,
+                    preparada=preparacion["preparada"],
                     conexion=conexion,
                 )
             )
